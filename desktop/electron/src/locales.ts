@@ -1,4 +1,4 @@
-export type DesktopLocale = "en" | "zh-CN" | "ja" | "ko" | "ar";
+export type DesktopLocale = "en" | "zh-CN";
 
 export type DesktopMessages = {
   startupFailureTitle: string;
@@ -53,9 +53,6 @@ export type DesktopRendererLocale = {
 export const supportedDesktopLocales: readonly DesktopLocale[] = [
   "en",
   "zh-CN",
-  "ja",
-  "ko",
-  "ar",
 ];
 
 const messages: Record<DesktopLocale, DesktopMessages> = {
@@ -129,111 +126,6 @@ const messages: Record<DesktopLocale, DesktopMessages> = {
     loadingFailedTitle: "启动失败",
     loadingRestartingTitle: "正在重新启动",
   },
-  ja: {
-    startupFailureTitle: "Vibe-Trading Desktop の起動に失敗しました",
-    backendAlreadyRunning: "バックエンドプロセスはすでに実行中です。",
-    backendUnexpectedExit: "Vibe-Trading バックエンドが予期せず終了しました（コード {code}）。",
-    backendStarting: "バックエンドを起動しました。ヘルスチェックを待っています · {port}",
-    backendReady: "ローカルサービスの準備ができました · {port}",
-    backendNotStarted: "バックエンドはまだ起動していません。",
-    backendExitedEarly: "Vibe-Trading バックエンドが準備完了前に終了しました（コード {code}）。\n{details}",
-    backendHealthTimeout: "Vibe-Trading バックエンドの準備待ちがタイムアウトしました。\n{details}",
-    backendNotFound: "vibe-trading.exe が見つかりません。バックエンドをインストールするか、VIBE_TRADING_EXECUTABLE を設定してください。",
-    portUnavailable: "ローカルポートを割り当てられませんでした。",
-    credentialEncryptionUnavailable: "この Windows ユーザーセッションでは資格情報の暗号化を利用できません。",
-    credentialFileUnsupported: "デスクトップ資格情報ファイルの形式はサポートされていません。",
-    credentialKeyUnsupported: "この資格情報キーはサポートされていません。",
-    credentialRequestInvalid: "資格情報の要求が無効です。",
-    credentialStoreUnavailable: "安全な資格情報ストアが初期化されていません。",
-    closingService: "ローカルサービスを終了しています…",
-    menuApplication: "アプリケーション",
-    menuRestartService: "ローカルサービスを再起動",
-    menuOpenLogs: "ログフォルダーを開く",
-    menuQuit: "終了",
-    menuView: "表示",
-    menuReload: "再読み込み",
-    menuDeveloperTools: "開発者ツール",
-    menuActualSize: "実際のサイズ",
-    menuZoomIn: "拡大",
-    menuZoomOut: "縮小",
-    menuFullscreen: "全画面表示",
-    loadingTitle: "Vibe-Trading Desktop を起動しています",
-    loadingMessage: "ローカルサービスを準備しています。初回起動には少し時間がかかる場合があります。",
-    loadingRetry: "再試行",
-    loadingOpenLogs: "ログフォルダーを開く",
-    loadingFailedTitle: "起動に失敗しました",
-    loadingRestartingTitle: "再起動しています",
-  },
-  ko: {
-    startupFailureTitle: "Vibe-Trading Desktop를 시작하지 못했습니다",
-    backendAlreadyRunning: "백엔드 프로세스가 이미 실행 중입니다.",
-    backendUnexpectedExit: "Vibe-Trading 백엔드가 예기치 않게 종료되었습니다(코드 {code}).",
-    backendStarting: "백엔드가 시작되었습니다. 상태 확인을 기다리는 중 · {port}",
-    backendReady: "로컬 서비스가 준비되었습니다 · {port}",
-    backendNotStarted: "백엔드가 아직 시작되지 않았습니다.",
-    backendExitedEarly: "Vibe-Trading 백엔드가 준비되기 전에 종료되었습니다(코드 {code}).\n{details}",
-    backendHealthTimeout: "Vibe-Trading 백엔드 준비를 기다리는 동안 시간이 초과되었습니다.\n{details}",
-    backendNotFound: "vibe-trading.exe를 찾을 수 없습니다. 백엔드를 설치하거나 VIBE_TRADING_EXECUTABLE을 설정하세요.",
-    portUnavailable: "로컬 포트를 할당할 수 없습니다.",
-    credentialEncryptionUnavailable: "현재 Windows 사용자 세션에서 자격 증명 암호화를 사용할 수 없습니다.",
-    credentialFileUnsupported: "데스크톱 자격 증명 파일 형식이 지원되지 않습니다.",
-    credentialKeyUnsupported: "지원되지 않는 자격 증명 키입니다.",
-    credentialRequestInvalid: "자격 증명 요청이 올바르지 않습니다.",
-    credentialStoreUnavailable: "보안 자격 증명 저장소가 초기화되지 않았습니다.",
-    closingService: "로컬 서비스를 종료하는 중…",
-    menuApplication: "애플리케이션",
-    menuRestartService: "로컬 서비스 다시 시작",
-    menuOpenLogs: "로그 폴더 열기",
-    menuQuit: "종료",
-    menuView: "보기",
-    menuReload: "새로 고침",
-    menuDeveloperTools: "개발자 도구",
-    menuActualSize: "실제 크기",
-    menuZoomIn: "확대",
-    menuZoomOut: "축소",
-    menuFullscreen: "전체 화면",
-    loadingTitle: "Vibe-Trading Desktop 시작 중",
-    loadingMessage: "로컬 서비스를 준비하고 있습니다. 처음 시작할 때는 잠시 시간이 걸릴 수 있습니다.",
-    loadingRetry: "다시 시도",
-    loadingOpenLogs: "로그 폴더 열기",
-    loadingFailedTitle: "시작 실패",
-    loadingRestartingTitle: "다시 시작하는 중",
-  },
-  ar: {
-    startupFailureTitle: "تعذّر بدء Vibe-Trading Desktop",
-    backendAlreadyRunning: "عملية الواجهة الخلفية قيد التشغيل بالفعل.",
-    backendUnexpectedExit: "توقفت الواجهة الخلفية لـ Vibe-Trading بشكل غير متوقع (الرمز {code}).",
-    backendStarting: "بدأت الواجهة الخلفية؛ جارٍ انتظار فحص السلامة · {port}",
-    backendReady: "الخدمة المحلية جاهزة · {port}",
-    backendNotStarted: "لم تبدأ الواجهة الخلفية بعد.",
-    backendExitedEarly: "توقفت الواجهة الخلفية لـ Vibe-Trading قبل أن تصبح جاهزة (الرمز {code}).\n{details}",
-    backendHealthTimeout: "انتهت مهلة انتظار جاهزية الواجهة الخلفية لـ Vibe-Trading.\n{details}",
-    backendNotFound: "تعذّر العثور على vibe-trading.exe. ثبّت الواجهة الخلفية أولاً أو اضبط VIBE_TRADING_EXECUTABLE.",
-    portUnavailable: "تعذّر تخصيص منفذ محلي.",
-    credentialEncryptionUnavailable: "تشفير بيانات الاعتماد غير متاح لجلسة مستخدم Windows الحالية.",
-    credentialFileUnsupported: "تنسيق ملف بيانات اعتماد سطح المكتب غير مدعوم.",
-    credentialKeyUnsupported: "مفتاح بيانات الاعتماد هذا غير مدعوم.",
-    credentialRequestInvalid: "طلب بيانات الاعتماد غير صالح.",
-    credentialStoreUnavailable: "لم تتم تهيئة مخزن بيانات الاعتماد الآمن.",
-    closingService: "جارٍ إغلاق الخدمة المحلية…",
-    menuApplication: "التطبيق",
-    menuRestartService: "إعادة تشغيل الخدمة المحلية",
-    menuOpenLogs: "فتح مجلد السجلات",
-    menuQuit: "إنهاء",
-    menuView: "عرض",
-    menuReload: "إعادة تحميل",
-    menuDeveloperTools: "أدوات المطور",
-    menuActualSize: "الحجم الفعلي",
-    menuZoomIn: "تكبير",
-    menuZoomOut: "تصغير",
-    menuFullscreen: "ملء الشاشة",
-    loadingTitle: "جارٍ بدء Vibe-Trading Desktop",
-    loadingMessage: "يُجهّز تطبيق سطح المكتب الخدمة المحلية. قد يستغرق التشغيل الأول بعض الوقت.",
-    loadingRetry: "إعادة المحاولة",
-    loadingOpenLogs: "فتح مجلد السجلات",
-    loadingFailedTitle: "فشل بدء التشغيل",
-    loadingRestartingTitle: "جارٍ إعادة التشغيل",
-  },
 };
 
 export function resolveDesktopLocale(rawLocale: string | undefined): DesktopLocale {
@@ -241,9 +133,6 @@ export function resolveDesktopLocale(rawLocale: string | undefined): DesktopLoca
   if (normalized === "zh" || normalized.startsWith("zh-cn") || normalized.startsWith("zh-hans")) {
     return "zh-CN";
   }
-  if (normalized === "ja" || normalized.startsWith("ja-")) return "ja";
-  if (normalized === "ko" || normalized.startsWith("ko-")) return "ko";
-  if (normalized === "ar" || normalized.startsWith("ar-")) return "ar";
   return "en";
 }
 
@@ -255,7 +144,7 @@ export function getRendererLocale(locale: DesktopLocale): DesktopRendererLocale 
   const localeMessages = getDesktopMessages(locale);
   return {
     locale,
-    direction: locale === "ar" ? "rtl" : "ltr",
+    direction: "ltr",
     messages: {
       loadingTitle: localeMessages.loadingTitle,
       loadingMessage: localeMessages.loadingMessage,

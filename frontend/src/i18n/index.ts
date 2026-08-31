@@ -10,11 +10,6 @@ import en from "./locales/en.json";
 export const SUPPORTED_LANGUAGES = [
   { code: "en", label: "English", dir: "ltr" as const },
   { code: "zh-CN", label: "中文", dir: "ltr" as const },
-  { code: "ja", label: "日本語", dir: "ltr" as const },
-  { code: "ko", label: "한국어", dir: "ltr" as const },
-  { code: "ar", label: "العربية", dir: "rtl" as const },
-  { code: "es", label: "Español", dir: "ltr" as const },
-  { code: "de", label: "Deutsch", dir: "ltr" as const },
 ] as const;
 
 export type SupportedLanguageCode = (typeof SUPPORTED_LANGUAGES)[number]["code"];
@@ -22,11 +17,6 @@ type LazyLanguageCode = Exclude<SupportedLanguageCode, "en">;
 
 const localeLoaders = {
   "zh-CN": () => import("./locales/zh-CN.json"),
-  ja: () => import("./locales/ja.json"),
-  ko: () => import("./locales/ko.json"),
-  ar: () => import("./locales/ar.json"),
-  es: () => import("./locales/es.json"),
-  de: () => import("./locales/de.json"),
 } satisfies Record<LazyLanguageCode, () => Promise<{ default: typeof en }>>;
 
 const LANGUAGE_STORAGE_KEY = "i18nextLng";
@@ -67,12 +57,12 @@ async function loadLanguage(code: LazyLanguageCode): Promise<void> {
 }
 
 const RTL_CODES = new Set<SupportedLanguageCode>(
-  SUPPORTED_LANGUAGES.filter((l) => l.dir === "rtl").map((l) => l.code),
+  SUPPORTED_LANGUAGES.filter((l) => (l.dir as "ltr" | "rtl") === "rtl").map((l) => l.code),
 );
 
 export function isRtl(code: string): boolean {
   if (RTL_CODES.has(code as SupportedLanguageCode)) return true;
-  // Handle regional variants: "ar-EG" → match "ar", "he-IL" → match "he" (if added).
+  // Handle regional variants: e.g. "he-IL" → match "he" if an RTL language is added later.
   return [...RTL_CODES].some((rtl) => code.startsWith(rtl + "-"));
 }
 

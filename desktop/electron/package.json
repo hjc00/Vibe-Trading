@@ -37,11 +37,8 @@
     "artifactName": "Vibe-Trading-Desktop-Unofficial-${version}-${arch}.${ext}",
     "asar": true,
     "electronLanguages": [
-      "ar",
       "en-GB",
       "en-US",
-      "ja",
-      "ko",
       "zh-CN"
     ],
     "electronDist": ".cache/electron-dist",

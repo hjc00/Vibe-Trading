@@ -128,25 +128,14 @@ describe("i18n interpolation parity", () => {
 // ── utility functions ──────────────────────────────────────────
 
 describe("i18n utilities", () => {
-  it("isRtl returns true for Arabic", () => {
-    expect(isRtl("ar")).toBe(true);
-  });
-
-  it("isRtl returns true for Arabic regional variants", () => {
-    expect(isRtl("ar-EG")).toBe(true);
-    expect(isRtl("ar-SA")).toBe(true);
-  });
-
   it("isRtl returns false for LTR languages", () => {
     expect(isRtl("en")).toBe(false);
     expect(isRtl("zh-CN")).toBe(false);
-    expect(isRtl("ja")).toBe(false);
-    expect(isRtl("ko")).toBe(false);
   });
 
   it("isRtl returns false for LTR regional variants", () => {
     expect(isRtl("en-US")).toBe(false);
-    expect(isRtl("ja-JP")).toBe(false);
+    expect(isRtl("zh-TW")).toBe(false);
   });
 
   it("isRtl returns false for unknown codes", () => {
@@ -155,11 +144,8 @@ describe("i18n utilities", () => {
   });
 
   it("SUPPORTED_LANGUAGES lists every locale in switcher order", () => {
-    // The set is pinned against the locales directory above; this case pins
-    // the order the switcher renders, and that "en" stays first so the
-    // primary-match fallback in Layout resolves regional codes to it.
     const codes = SUPPORTED_LANGUAGES.map((l) => l.code);
-    expect(codes).toEqual(["en", "zh-CN", "ja", "ko", "ar", "es", "de"]);
+    expect(codes).toEqual(["en", "zh-CN"]);
   });
 
   it("accepts zh-CN as an explicit supported language", async () => {
