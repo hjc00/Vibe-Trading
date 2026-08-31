@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { Layout } from "../Layout";
+import { setNavVisibility } from "@/lib/navVisibility";
 
 const sessions = [
   {
@@ -28,9 +29,11 @@ vi.mock("react-i18next", () => ({
       "layout.mainNavigation": "Main navigation",
       "layout.newChat": "New Chat",
       "layout.noSessions": "No sessions yet",
+      "layout.optionsLab": "Options Lab",
       "layout.rename": "Rename",
       "layout.reports": "Reports",
       "layout.runtime": "Runtime",
+      "layout.scheduled": "Scheduled",
       "layout.sessions": "Sessions",
       "layout.settings": "Settings",
       "layout.sidebar": "Vibe-Trading sidebar",
@@ -150,5 +153,40 @@ describe("Layout accessibility", () => {
     fireEvent(window, new StorageEvent("storage", { key: "qa-sidebar" }));
 
     expect(sidebar).toHaveClass("w-12");
+  });
+});
+
+describe("Layout navigation visibility", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("shows all navigation items by default", () => {
+    renderLayout();
+
+    expect(screen.getByRole("link", { name: "Agent" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Options Lab" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Alpha Zoo" })).toBeInTheDocument();
+  });
+
+  it("hides navigation items marked invisible in storage", () => {
+    setNavVisibility({ "/options": false });
+    renderLayout();
+
+    expect(screen.getByRole("link", { name: "Agent" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Options Lab" })).not.toBeInTheDocument();
+  });
+
+  it("updates the sidebar when visibility changes in another tab", async () => {
+    renderLayout();
+
+    expect(screen.getByRole("link", { name: "Options Lab" })).toBeInTheDocument();
+
+    setNavVisibility({ "/options": false });
+    fireEvent(window, new StorageEvent("storage", { key: "vibe-nav-visibility" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("link", { name: "Options Lab" })).not.toBeInTheDocument();
+    });
   });
 });

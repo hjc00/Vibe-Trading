@@ -484,7 +484,11 @@
     "oauth": "OAuth",
     "authentication": "認証",
     "apiKey": "APIキー",
-    "tushareTokenDesc": "中国A株・先物・ファンド・マクロデータに使用します。未設定の場合、利用可能なところではAKShareにフォールバックします。"
+    "tushareTokenDesc": "中国A株・先物・ファンド・マクロデータに使用します。未設定の場合、利用可能なところではAKShareにフォールバックします。",
+    "navigation": {
+      "title": "ナビゲーション",
+      "description": "左サイドバーに表示するページを選択してください。"
+    }
   },
   "qveris": {
     "title": "QVeris ツールマーケットプレイス",

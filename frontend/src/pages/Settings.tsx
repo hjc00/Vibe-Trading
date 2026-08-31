@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { Database, KeyRound, Loader2, MessageSquareMore, Play, RefreshCw, RotateCcw, Save, Server, SlidersHorizontal, Square } from "lucide-react";
+import { Database, KeyRound, Loader2, Menu, MessageSquareMore, Play, RefreshCw, RotateCcw, Save, Server, SlidersHorizontal, Square } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ModelPicker } from "@/components/settings/ModelPicker";
@@ -7,6 +7,7 @@ import { QVerisSettings } from "@/components/settings/QVerisSettings"; // QVERIS
 import { SourcePrioritySettings } from "@/components/settings/SourcePrioritySettings";
 import { api, isAuthRequiredError, type ChannelRuntimeStatus, type DataSourceSettings, type LLMProviderOption, type LLMSettings } from "@/lib/api";
 import { getApiAuthKey, setApiAuthKey } from "@/lib/apiAuth";
+import { NAV_CONFIG, getNavVisibility, isNavVisible, setNavVisibility } from "@/lib/navVisibility";
 
 interface LLMFormState {
   provider: string;
@@ -56,6 +57,7 @@ export function Settings() {
   const [channelRefreshing, setChannelRefreshing] = useState(false);
   const [channelAction, setChannelAction] = useState<"start" | "stop" | null>(null);
   const [settingsLoadError, setSettingsLoadError] = useState<string | null>(null);
+  const [navVisibility, setNavVisibilityState] = useState(() => getNavVisibility());
 
   useEffect(() => {
     let alive = true;
@@ -319,6 +321,51 @@ export function Settings() {
     </form>
   );
 
+  const toggleNavItem = (to: string) => {
+    const next = { ...navVisibility, [to]: !isNavVisible(to, navVisibility) };
+    setNavVisibility(next);
+    setNavVisibilityState(next);
+  };
+
+  const navigationSection = (
+    <section className="rounded-lg border bg-card p-5 shadow-sm">
+      <div className="mb-4 space-y-1">
+        <div className="flex items-center gap-2">
+          <Menu className="h-4 w-4 text-primary" />
+          <h2 className="text-base font-semibold">{t("settings.navigation.title")}</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">{t("settings.navigation.description")}</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {NAV_CONFIG.map(({ to, i18nKey }) => {
+          const visible = isNavVisible(to, navVisibility);
+          return (
+            <label
+              key={to}
+              className="flex cursor-pointer items-center justify-between gap-3 rounded-md border bg-muted/20 px-3 py-2 transition hover:bg-muted/40"
+            >
+              <span className="text-sm">{t(i18nKey)}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={visible}
+                onClick={() => toggleNavItem(to)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                  visible ? "bg-primary" : "bg-muted-foreground/30"
+                }`}
+              >
+                <span
+                  className="inline-block h-3.5 w-3.5 rounded-full bg-background transition-transform"
+                  style={{ transform: `translateX(${visible ? 18 : 2}px)` }}
+                />
+              </button>
+            </label>
+          );
+        })}
+      </div>
+    </section>
+  );
+
   if (loading || !form || !settings || !dataSettings) {
     return (
       <div className="mx-auto max-w-5xl space-y-6 p-6">
@@ -486,6 +533,8 @@ export function Settings() {
 
       {/* QVERIS-INTEGRATION */}
       <QVerisSettings />
+
+      {navigationSection}
 
       {channelsSection}
 
