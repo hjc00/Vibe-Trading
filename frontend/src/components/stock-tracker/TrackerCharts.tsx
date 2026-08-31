@@ -22,9 +22,11 @@ export function TrackerCharts({ symbol, signals }: TrackerChartsProps) {
       periods,
       returns: periods.map((period) => symbol.period_signals[String(period)]?.metrics.return_pct ?? 0),
       signalCounts: periods.map((period) =>
-        signals.filter(
-          (signalType) => symbol.period_signals[String(period)]?.signals?.[signalType]?.triggered,
-        ).length,
+        signals
+          .filter((signalType) => signalType !== "ma_alignment")
+          .filter(
+            (signalType) => symbol.period_signals[String(period)]?.signals?.[signalType]?.triggered,
+          ).length,
       ),
     };
   }, [symbol, signals]);

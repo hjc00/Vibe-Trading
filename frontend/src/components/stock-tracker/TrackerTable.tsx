@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignalBadge } from "./SignalBadge";
-import type { SignalType, SymbolSnapshot } from "@/lib/api";
+import type { SignalType, SignalValue, SymbolSnapshot } from "@/lib/api";
 
 interface TrackerTableProps {
   symbols: SymbolSnapshot[];
@@ -65,6 +65,7 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
                           </span>
                         )}
                       </span>
+                      <GlobalMaAlignment signal={symbol.period_signals["10"]?.signals?.ma_alignment} />
                     </div>
                   </td>
                   {periods.map((period) => {
@@ -76,14 +77,16 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
                             <ReturnPill value={ps?.metrics.return_pct} />
                           </div>
                           <div className="flex flex-wrap justify-center gap-1">
-                            {signals.map((signalType) => (
-                              <SignalBadge
-                                key={signalType}
-                                type={signalType}
-                                signal={ps?.signals?.[signalType]}
-                                compact
-                              />
-                            ))}
+                            {signals
+                              .filter((signalType) => signalType !== "ma_alignment")
+                              .map((signalType) => (
+                                <SignalBadge
+                                  key={signalType}
+                                  type={signalType}
+                                  signal={ps?.signals?.[signalType]}
+                                  compact
+                                />
+                              ))}
                           </div>
                         </div>
                       </td>
@@ -114,6 +117,19 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
         </table>
       </div>
     </div>
+  );
+}
+
+function GlobalMaAlignment({ signal }: { signal: SignalValue | undefined }) {
+  const { t } = useTranslation();
+  if (!signal || !signal.triggered) return null;
+  return (
+    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary" title={signal.description}>
+      {t("stockTracker.maAlignment")}
+      {signal.value !== null && signal.value !== undefined && (
+        <span className="font-mono tabular-nums">{(signal.value * 100).toFixed(2)}%</span>
+      )}
+    </span>
   );
 }
 

@@ -17,7 +17,9 @@ export function TrackerSummary({ snapshot, signals, loading }: TrackerSummaryPro
       Object.values(symbol.period_signals).reduce((inner, ps) => {
         return (
           inner +
-          signals.filter((signalType) => ps.signals?.[signalType]?.triggered).length
+          signals
+            .filter((signalType) => signalType !== "ma_alignment")
+            .filter((signalType) => ps.signals?.[signalType]?.triggered).length
         );
       }, 0)
     );
