@@ -25,14 +25,35 @@ echo [setup] Virtual environment not found. Bootstrapping...
 echo(
 
 set "PYTHON="
-where python >nul 2>nul && set "PYTHON=python"
-if not defined PYTHON (
-    where py >nul 2>nul && set "PYTHON=py -3"
+set "PYVER="
+
+rem Prefer an explicitly versioned interpreter so a stray old 3.x on PATH
+rem (e.g. 3.8) is never picked ahead of a modern one. uv, python.org and
+rem the py launcher all install one of these names.
+for %%P in (python3.13 python3.12 python3.11) do (
+    if not defined PYTHON where %%P >nul 2>nul && set "PYTHON=%%P"
 )
+if not defined PYTHON where py >nul 2>nul && set "PYTHON=py -3"
+if not defined PYTHON where python >nul 2>nul && set "PYTHON=python"
+
 if not defined PYTHON (
     echo [error] Python 3.11+ not found on PATH.
     echo         Install it from https://www.python.org/downloads/
     echo         and check "Add python.exe to PATH" during install.
+    pause
+    exit /b 1
+)
+
+rem Verify the interpreter is actually 3.11+ (a bare `python` may be old).
+for /f "delims=" %%V in ('%PYTHON% -c "import sys; print(sys.version_info[0]*100 + sys.version_info[1])" 2^>nul') do set "PYVER=%%V"
+if not defined PYVER (
+    echo [error] Could not determine the version of: %PYTHON%
+    pause
+    exit /b 1
+)
+if %PYVER% LSS 311 (
+    echo [error] Python 3.11+ is required, but %PYTHON% is too old.
+    echo         Install Python 3.11+ from https://www.python.org/downloads/
     pause
     exit /b 1
 )
