@@ -20,6 +20,8 @@ agent/.env
 .claude/*
 !.claude/hooks.json
 CLAUDE.md
+# AI context index (kept in the fork)
+!CLAUDE.md
 .vscode/
 learn-claude-code-main/
 agent/sessions/
@@ -69,6 +71,9 @@ data/stock_tracker/
 
 # Internal docs (plans, specs)
 docs/
+# AI context index (kept in the fork; re-include the dir then the file)
+!docs/
+!docs/PROJECT_INDEX.md
 !wiki/docs/
 !wiki/docs/**
 docs/screenshots/agent-run.png
