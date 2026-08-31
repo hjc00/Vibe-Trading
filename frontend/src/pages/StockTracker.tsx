@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Plus, RefreshCw, TrendingUp } from "lucide-react";
+import { Loader2, Plus, RefreshCw, Sparkles, TrendingUp } from "lucide-react";
 import { api, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import { normalizeAShareCode } from "@/lib/stockTracker";
+import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
 import { TrackerConfigPanel } from "@/components/stock-tracker/TrackerConfigPanel";
 import { TrackerSummary } from "@/components/stock-tracker/TrackerSummary";
 import { TrackerTable } from "@/components/stock-tracker/TrackerTable";
 import { TrackerCharts } from "@/components/stock-tracker/TrackerCharts";
+import { TrackerAnalyzePanel } from "@/components/stock-tracker/TrackerAnalyzePanel";
+import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysisReport";
 
 const POLL_INTERVAL_MS = 1000;
 
@@ -20,6 +23,26 @@ export function StockTracker() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [addCode, setAddCode] = useState("");
+  const {
+    open: analyzeOpen,
+    selectedSymbols,
+    focus: analysisFocus,
+    userPrompt,
+    loading: analysisLoading,
+    report: analysisReport,
+    error: analysisError,
+    history: analysisHistory,
+    selectedId,
+    setOpen: setAnalyzeOpen,
+    setSelectedSymbols,
+    setFocus: setAnalysisFocus,
+    setUserPrompt,
+    setError: setAnalysisError,
+    run: runAnalysis,
+    loadLatest,
+    loadHistory,
+    selectAnalysis,
+  } = useStockTrackerAnalysisStore();
 
   const loadSnapshot = useCallback(async () => {
     try {
@@ -121,17 +144,24 @@ export function StockTracker() {
     [config, handleSaveConfig, selectedCode],
   );
 
+  const openAnalyze = useCallback(() => {
+    const codes = snapshot?.symbols.map((s) => s.code) ?? [];
+    setSelectedSymbols(codes);
+    setAnalysisError(null);
+    setAnalyzeOpen(true);
+  }, [snapshot, setSelectedSymbols, setAnalysisError, setAnalyzeOpen]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       setLoading(true);
-      await Promise.all([loadSettings(), loadSnapshot()]);
+      await Promise.all([loadSettings(), loadSnapshot(), loadLatest(), loadHistory()]);
       if (mounted) setLoading(false);
     })();
     return () => {
       mounted = false;
     };
-  }, [loadSettings, loadSnapshot]);
+  }, [loadSettings, loadSnapshot, loadLatest, loadHistory]);
 
   const selectedSymbol = snapshot?.symbols.find((s) => s.code === selectedCode) ?? null;
 
@@ -157,6 +187,15 @@ export function StockTracker() {
             />
             <button
               type="button"
+              onClick={openAnalyze}
+              disabled={loading || refreshing || !snapshot || snapshot.symbols.length === 0}
+              className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              <Sparkles className="h-4 w-4" />
+              {t("stockTracker.analyze")}
+            </button>
+            <button
+              type="button"
               onClick={refresh}
               disabled={refreshing}
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
@@ -174,6 +213,47 @@ export function StockTracker() {
         {error ? (
           <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{error}</div>
         ) : null}
+
+        {analyzeOpen ? (
+          <TrackerAnalyzePanel
+            symbols={snapshot?.symbols ?? []}
+            selectedSymbols={selectedSymbols}
+            onSelectedSymbolsChange={setSelectedSymbols}
+            focus={analysisFocus}
+            onFocusChange={setAnalysisFocus}
+            userPrompt={userPrompt}
+            onUserPromptChange={setUserPrompt}
+            loading={analysisLoading}
+            onRun={runAnalysis}
+            onClose={() => setAnalyzeOpen(false)}
+          />
+        ) : null}
+
+        {analysisError ? (
+          <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{analysisError}</div>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-muted-foreground">{t("stockTracker.analysisHistory")}</label>
+          {analysisHistory.length === 0 ? (
+            <span className="text-xs text-muted-foreground/70">{t("stockTracker.analysisHistoryEmpty")}</span>
+          ) : (
+            <select
+              value={selectedId ?? ""}
+              onChange={(e) => selectAnalysis(e.target.value)}
+              disabled={analysisLoading}
+              className="max-w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
+            >
+              {analysisHistory.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {formatAnalysisTimestamp(item.generated_at)} — {item.summary.slice(0, 40)}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <TrackerAnalysisReport report={analysisReport} />
 
         <section className="flex items-center gap-2">
           <input
@@ -257,6 +337,13 @@ export function StockTracker() {
       </div>
     </div>
   );
+}
+
+function formatAnalysisTimestamp(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return parsed.toLocaleString();
 }
 
 function SymbolDetail({ symbol }: { symbol: import("@/lib/api").SymbolSnapshot | null }) {

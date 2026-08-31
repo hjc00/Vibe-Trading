@@ -17,18 +17,38 @@ logger = logging.getLogger(__name__)
 
 _SETTINGS_FILENAME = "settings.json"
 _SNAPSHOTS_DIRNAME = "snapshots"
+_ANALYSES_DIRNAME = "analyses"
 _SCHEMA_VERSION = 1
+
+
+def _default_root() -> Path:
+    """Return the tracker data root.
+
+    Prefers a project-local ``data/stock_tracker`` directory so the tracker's
+    state (watchlist, snapshots, analysis) travels with the project folder and
+    can be shared across devices. Falls back to the ``VIBE_TRADING_HOME``
+    override, or ``~/.vibe-trading`` when run outside the repo (e.g. an
+    installed package).
+    """
+    env_root = os.environ.get("VIBE_TRADING_HOME", "").strip()
+    if env_root:
+        return Path(env_root).expanduser() / "stock_tracker"
+    repo_root = Path(__file__).resolve().parents[3]
+    if (repo_root / "pyproject.toml").exists():
+        return repo_root / "data" / "stock_tracker"
+    return get_runtime_root() / "stock_tracker"
 
 
 class TrackerStore:
     """JSON file store for tracker configuration and daily snapshots.
 
     All writes are atomic (temp file + ``os.replace`` + fsync) and land under
-    the runtime root so they never pollute the working tree.
+    the project-local data directory (or the runtime root when run outside the
+    repo) so they never pollute the working tree.
     """
 
     def __init__(self, root_dir: Path | str | None = None) -> None:
-        self.root = Path(root_dir) if root_dir else get_runtime_root() / "stock_tracker"
+        self.root = Path(root_dir) if root_dir else _default_root()
         self.root.mkdir(parents=True, exist_ok=True)
         self.snapshots_dir = self.root / _SNAPSHOTS_DIRNAME
         self.snapshots_dir.mkdir(parents=True, exist_ok=True)
@@ -116,6 +136,81 @@ class TrackerStore:
             path.unlink()
             return True
         return False
+
+    # ------------------------------------------------------------------
+    # LLM analysis
+    # ------------------------------------------------------------------
+
+    def save_analysis(
+        self,
+        report: Dict[str, Any],
+        trading_date: Optional[date] = None,
+        generated_at: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Persist a new LLM analysis report and return its envelope."""
+        gen = generated_at or datetime.now().astimezone()
+        analysis_id = gen.strftime("%Y%m%dT%H%M%S%f")
+        envelope = {
+            "id": analysis_id,
+            "trading_date": trading_date.isoformat() if trading_date else None,
+            "generated_at": gen.isoformat(),
+            "report": report,
+        }
+        self._write_json(self._analysis_path(analysis_id), envelope)
+        return envelope
+
+    def get_analysis(self, analysis_id: str) -> Optional[Dict[str, Any]]:
+        """Load one analysis envelope by id."""
+        path = self._analysis_path(analysis_id)
+        if not path.exists():
+            return None
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                raw = json.load(f)
+            return raw if isinstance(raw, dict) else None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to load analysis %s: %s", analysis_id, exc)
+            return None
+
+    def get_latest_analysis(self) -> Optional[Dict[str, Any]]:
+        """Load the most recently persisted analysis envelope, if any."""
+        ids = self._list_analysis_ids()
+        return self.get_analysis(ids[-1]) if ids else None
+
+    def list_analyses(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return newest-first analysis summaries for the picker."""
+        items: List[Dict[str, Any]] = []
+        for analysis_id in self._list_analysis_ids():
+            envelope = self.get_analysis(analysis_id)
+            if envelope is None:
+                continue
+            report = envelope.get("report")
+            summary = str(report.get("summary") or "") if isinstance(report, dict) else ""
+            items.append(
+                {
+                    "id": analysis_id,
+                    "trading_date": envelope.get("trading_date"),
+                    "generated_at": envelope.get("generated_at"),
+                    "summary": summary,
+                }
+            )
+        items.sort(key=lambda item: item.get("generated_at") or "", reverse=True)
+        return items[: max(1, min(limit, 200))]
+
+    def _analysis_path(self, analysis_id: str) -> Path:
+        return self.root / _ANALYSES_DIRNAME / f"{analysis_id}.json"
+
+    def _list_analysis_ids(self) -> List[str]:
+        """Return analysis ids sorted oldest-first by filename."""
+        directory = self.root / _ANALYSES_DIRNAME
+        if not directory.exists():
+            return []
+        ids = [
+            entry.stem
+            for entry in directory.iterdir()
+            if entry.is_file() and entry.suffix == ".json"
+        ]
+        return sorted(ids)
 
     # ------------------------------------------------------------------
     # Helpers

@@ -2,23 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys as _sys
 import threading
 from copy import deepcopy
+from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.engine import StockTrackerEngine
-from src.stock_tracker.models import TrackerConfig, TrackerSettings
+from src.stock_tracker.models import TrackerConfig, normalize_a_share_code
 from src.stock_tracker.store import TrackerStore
 
 logger = logging.getLogger(__name__)
 
 AuthDep = Callable[..., Any]
+
+_MAX_ANALYZE_SYMBOLS = 20
 
 _REFRESH_LOCK = threading.Lock()
 _REFRESH_OPERATION_LOCK = threading.Lock()
@@ -86,6 +91,24 @@ class SnapshotSummary(BaseModel):
     generated_at: str
 
 
+class TrackerAnalyzeRequest(BaseModel):
+    """Request body for LLM analysis over selected symbols."""
+
+    symbols: List[str]
+    focus: Literal["rank_opportunities", "risk_check", "custom"] = "rank_opportunities"
+    user_prompt: Optional[str] = None
+
+
+class TrackerAnalyzeResponse(BaseModel):
+    """Envelope returned by the analysis endpoint."""
+
+    status: str
+    report: Dict[str, Any]
+    id: Optional[str] = None
+    generated_at: Optional[str] = None
+    trading_date: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -134,6 +157,46 @@ def _set_refresh_progress(code: str, status: str, error: Optional[str] = None) -
         _REFRESH_STATE["symbols"][code] = {"status": status, "error": error}
         if status == "ok":
             _REFRESH_STATE["current"] = None
+
+
+@dataclass
+class _SelectedSymbols:
+    """Symbols to analyze plus any filtering caveats."""
+
+    symbols: List[Any] = field(default_factory=list)
+    caveats: List[str] = field(default_factory=list)
+
+
+def _select_symbols(snapshot: Any, requested: List[str]) -> _SelectedSymbols:
+    """Normalize and filter the requested codes against the latest snapshot."""
+    normalized: List[str] = []
+    for code in requested:
+        norm = normalize_a_share_code(code)
+        if norm and norm not in normalized:
+            normalized.append(norm)
+
+    if len(normalized) > _MAX_ANALYZE_SYMBOLS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"At most {_MAX_ANALYZE_SYMBOLS} symbols can be analyzed at once.",
+        )
+
+    available = {s.code: s for s in snapshot.symbols}
+    selected = _SelectedSymbols()
+    for code in normalized:
+        symbol = available.get(code)
+        if symbol is None:
+            selected.caveats.append(f"{code}: not in snapshot")
+            continue
+        if code in snapshot.unresolved:
+            selected.caveats.append(f"{code}: unresolved")
+            continue
+        if symbol.error:
+            selected.caveats.append(f"{code}: {symbol.error}")
+            continue
+        selected.symbols.append(symbol)
+
+    return selected
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +314,82 @@ def register_stock_tracker_routes(
     async def refresh_status(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
         with _REFRESH_LOCK:
             return {"status": "ok", "refresh": deepcopy(_REFRESH_STATE)}
+
+    @app.post("/api/stock-tracker/analyze", response_model=TrackerAnalyzeResponse)
+    async def analyze_snapshot(
+        request: TrackerAnalyzeRequest,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> TrackerAnalyzeResponse:
+        store = _get_store()
+        snapshot = store.get_latest_snapshot()
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail="No snapshot available. Refresh first.")
+
+        selected = _select_symbols(snapshot, request.symbols)
+        if not selected.symbols:
+            raise HTTPException(status_code=422, detail="No valid symbols selected for analysis.")
+
+        report = await asyncio.to_thread(
+            run_analysis,
+            snapshot,
+            selected.symbols,
+            request.focus,
+            request.user_prompt,
+        )
+        report["caveats"] = selected.caveats + report.get("caveats", [])
+
+        envelope = store.save_analysis(report, trading_date=snapshot.trading_date)
+
+        return TrackerAnalyzeResponse(
+            status="ok",
+            report=report,
+            id=envelope.get("id"),
+            generated_at=envelope.get("generated_at"),
+            trading_date=envelope.get("trading_date"),
+        )
+
+    @app.get("/api/stock-tracker/analyze/history")
+    async def get_analysis_history(
+        limit: int = 50,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        items = _get_store().list_analyses(limit=limit)
+        return {"status": "ok", "items": items}
+
+    @app.get("/api/stock-tracker/analyze/{analysis_id}")
+    async def get_analysis_by_id(
+        analysis_id: str,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        analysis = _get_store().get_analysis(analysis_id)
+        if analysis is None:
+            raise HTTPException(status_code=404, detail="Analysis not found.")
+        return {
+            "status": "ok",
+            "report": analysis.get("report"),
+            "id": analysis.get("id"),
+            "trading_date": analysis.get("trading_date"),
+            "generated_at": analysis.get("generated_at"),
+        }
+
+    @app.get("/api/stock-tracker/analyze")
+    async def get_latest_analysis(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
+        analysis = _get_store().get_latest_analysis()
+        if analysis is None:
+            return {
+                "status": "empty",
+                "report": None,
+                "id": None,
+                "trading_date": None,
+                "generated_at": None,
+            }
+        return {
+            "status": "ok",
+            "report": analysis.get("report"),
+            "id": analysis.get("id"),
+            "trading_date": analysis.get("trading_date"),
+            "generated_at": analysis.get("generated_at"),
+        }
 
 
 def _refresh_snapshot() -> Dict[str, Any]:

@@ -14,7 +14,7 @@ from src.stock_tracker.models import (
     TrackerSettings,
     TrackerSnapshot,
 )
-from src.stock_tracker.store import TrackerStore
+from src.stock_tracker.store import TrackerStore, _default_root
 
 
 def test_settings_roundtrip():
@@ -103,6 +103,64 @@ def test_delete_snapshot():
         assert store.delete_snapshot(date(2026, 8, 31)) is True
         assert store.get_snapshot(date(2026, 8, 31)) is None
         assert store.delete_snapshot(date(2026, 8, 31)) is False
+
+
+def test_analysis_roundtrip():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = TrackerStore(root_dir=tmp)
+        report = {"summary": "综述", "symbols": [], "portfolio": {}, "caveats": []}
+        store.save_analysis(report, trading_date=date(2026, 8, 31))
+
+        loaded = store.get_latest_analysis()
+        assert loaded is not None
+        assert loaded["report"] == report
+        assert loaded["trading_date"] == "2026-08-31"
+
+
+def test_analysis_history_lists_newest_first():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = TrackerStore(root_dir=tmp)
+        store.save_analysis(
+            {"summary": "first"},
+            generated_at=datetime(2026, 8, 30, 10, 0, tzinfo=timezone.utc),
+        )
+        store.save_analysis(
+            {"summary": "second"},
+            generated_at=datetime(2026, 8, 31, 10, 0, tzinfo=timezone.utc),
+        )
+
+        items = store.list_analyses()
+        assert [item["summary"] for item in items] == ["second", "first"]
+        assert items[0]["id"] != items[1]["id"]
+
+
+def test_get_analysis_by_id():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = TrackerStore(root_dir=tmp)
+        envelope = store.save_analysis({"summary": "hi"}, trading_date=date(2026, 8, 31))
+
+        loaded = store.get_analysis(envelope["id"])
+        assert loaded is not None
+        assert loaded["report"]["summary"] == "hi"
+        assert store.get_analysis("missing") is None
+
+
+def test_get_latest_analysis_returns_none_when_missing():
+    with tempfile.TemporaryDirectory() as tmp:
+        store = TrackerStore(root_dir=tmp)
+        assert store.get_latest_analysis() is None
+
+
+def test_default_root_is_project_local(monkeypatch):
+    monkeypatch.delenv("VIBE_TRADING_HOME", raising=False)
+    root = _default_root()
+    assert root.name == "stock_tracker"
+    assert "data" in root.parts
+
+
+def test_default_root_respects_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("VIBE_TRADING_HOME", str(tmp_path))
+    assert _default_root() == tmp_path / "stock_tracker"
 
 
 if __name__ == "__main__":

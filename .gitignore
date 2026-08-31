@@ -64,6 +64,9 @@ data/.duckdb_tmp/
 data/parquet/
 data/backup/
 
+# Stock tracker runtime state (watchlist, snapshots, analyses)
+data/stock_tracker/
+
 # Internal docs (plans, specs)
 docs/
 !wiki/docs/

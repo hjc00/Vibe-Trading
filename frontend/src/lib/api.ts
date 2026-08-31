@@ -599,6 +599,21 @@ export const api = {
     request<{ status: string; snapshots: TrackerSnapshot[] }>(
       `/api/stock-tracker/history?limit=${encodeURIComponent(String(limit))}`,
     ),
+  analyzeStockTracker: (body: TrackerAnalyzeRequest) =>
+    request<TrackerAnalyzeResponse>("/api/stock-tracker/analyze", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getStockTrackerAnalysis: () =>
+    request<{ status: string; report: TrackerAnalyzeReport | null; id?: string | null }>(
+      "/api/stock-tracker/analyze",
+    ),
+  getStockTrackerAnalysisHistory: () =>
+    request<TrackerAnalysisHistoryResponse>("/api/stock-tracker/analyze/history"),
+  getStockTrackerAnalysisById: (id: string) =>
+    request<TrackerAnalyzeResponse>(
+      `/api/stock-tracker/analyze/${encodeURIComponent(id)}`,
+    ),
 };
 
 // --- Scheduled research types ---
@@ -1823,4 +1838,58 @@ export interface StockTrackerRefreshState {
   current: string | null;
   symbols: Record<string, { status: string; error?: string | null }>;
   error?: string | null;
+}
+
+// --- Stock Tracker LLM analysis ---
+
+export type TrackerAnalysisFocus = "rank_opportunities" | "risk_check" | "custom";
+
+export interface TrackerAnalyzeRequest {
+  symbols: string[];
+  focus: TrackerAnalysisFocus;
+  user_prompt?: string | null;
+}
+
+export interface SymbolRecommendation {
+  code: string;
+  name?: string | null;
+  recommendation: string;
+  confidence: "high" | "medium" | "low";
+  rationale: string;
+  key_metrics: Record<string, unknown>;
+  risks: string[];
+  time_horizon?: string | null;
+}
+
+export interface PortfolioInsight {
+  theme: string;
+  top_pick?: string | null;
+  cautions: string[];
+}
+
+export interface TrackerAnalyzeReport {
+  summary: string;
+  symbols: SymbolRecommendation[];
+  portfolio: PortfolioInsight;
+  caveats: string[];
+}
+
+export interface TrackerAnalyzeResponse {
+  status: string;
+  report: TrackerAnalyzeReport;
+  id?: string | null;
+  generated_at?: string | null;
+  trading_date?: string | null;
+}
+
+export interface TrackerAnalysisHistoryItem {
+  id: string;
+  generated_at?: string | null;
+  trading_date?: string | null;
+  summary: string;
+}
+
+export interface TrackerAnalysisHistoryResponse {
+  status: string;
+  items: TrackerAnalysisHistoryItem[];
 }
