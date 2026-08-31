@@ -19,7 +19,7 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <th className="py-2 ps-4 pr-4 font-medium">{t("stockTracker.symbols")}</th>
@@ -103,7 +103,7 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
                           e.stopPropagation();
                           onRemoveSymbol(symbol.code);
                         }}
-                        className="rounded p-1 text-muted-foreground transition hover:bg-danger/10 hover:text-danger"
+                        className="inline-flex items-center justify-center rounded p-1.5 text-muted-foreground transition hover:bg-danger/10 hover:text-danger"
                         aria-label={t("stockTracker.delete")}
                       >
                         <Trash2 className="h-4 w-4" />

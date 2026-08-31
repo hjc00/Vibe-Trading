@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Plus, RefreshCw, Sparkles, TrendingUp } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 import { api, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import { normalizeAShareCode } from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
-import { TrackerConfigPanel } from "@/components/stock-tracker/TrackerConfigPanel";
+import { TrackerControlBar } from "@/components/stock-tracker/TrackerControlBar";
 import { TrackerSummary } from "@/components/stock-tracker/TrackerSummary";
 import { TrackerTable } from "@/components/stock-tracker/TrackerTable";
 import { TrackerCharts } from "@/components/stock-tracker/TrackerCharts";
@@ -157,11 +157,16 @@ export function StockTracker() {
     [config, handleSaveConfig, selectedCode],
   );
 
+  const analysisSectionRef = useRef<HTMLElement>(null);
+
   const openAnalyze = useCallback(() => {
     const codes = snapshot?.symbols.map((s) => s.code) ?? [];
     setSelectedSymbols(codes);
     setAnalysisError(null);
     setAnalyzeOpen(true);
+    requestAnimationFrame(() => {
+      analysisSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }, [snapshot, setSelectedSymbols, setAnalysisError, setAnalyzeOpen]);
 
   useEffect(() => {
@@ -177,11 +182,21 @@ export function StockTracker() {
   }, [loadSettings, loadSnapshot, loadLatest, loadHistory]);
 
   const selectedSymbol = snapshot?.symbols.find((s) => s.code === selectedCode) ?? null;
+  const settingsConfig = useMemo(
+    () =>
+      config ?? {
+        watchlist: [],
+        periods: [],
+        signals: [],
+        thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 },
+      },
+    [config],
+  );
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="flex flex-col gap-4 border-b pb-6 lg:flex-row lg:items-end lg:justify-between">
+        <section className="flex flex-col gap-4 border-b pb-6">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground">
               <TrendingUp className="h-3.5 w-3.5" />
@@ -192,107 +207,25 @@ export function StockTracker() {
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("stockTracker.subtitle")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <TrackerConfigPanel
-              config={config ?? { watchlist: [], periods: [], signals: [], thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 } }}
-              onSave={handleSaveConfig}
-              disabled={loading || refreshing}
-            />
-            <button
-              type="button"
-              onClick={openAnalyze}
-              disabled={loading || refreshing || !snapshot || snapshot.symbols.length === 0}
-              className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background px-4 py-2 text-sm font-medium transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              <Sparkles className="h-4 w-4" />
-              {t("stockTracker.analyze")}
-            </button>
-            <button
-              type="button"
-              onClick={refresh}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {refreshing ? t("stockTracker.refreshing") : t("stockTracker.refresh")}
-            </button>
-          </div>
         </section>
+
+        <TrackerControlBar
+          addCode={addCode}
+          onAddCodeChange={setAddCode}
+          onAdd={handleAddSymbol}
+          addDisabled={!config || loading || refreshing}
+          settingsConfig={settingsConfig}
+          onSaveConfig={handleSaveConfig}
+          settingsDisabled={loading || refreshing}
+          onAnalyze={openAnalyze}
+          analyzeDisabled={loading || refreshing || !snapshot || snapshot.symbols.length === 0}
+          onRefresh={refresh}
+          refreshing={refreshing}
+        />
 
         {error ? (
           <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{error}</div>
         ) : null}
-
-        {analyzeOpen ? (
-          <TrackerAnalyzePanel
-            symbols={snapshot?.symbols ?? []}
-            selectedSymbols={selectedSymbols}
-            onSelectedSymbolsChange={setSelectedSymbols}
-            focus={analysisFocus}
-            onFocusChange={setAnalysisFocus}
-            userPrompt={userPrompt}
-            onUserPromptChange={setUserPrompt}
-            loading={analysisLoading}
-            onRun={runAnalysis}
-            onClose={() => setAnalyzeOpen(false)}
-          />
-        ) : null}
-
-        {analysisError ? (
-          <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{analysisError}</div>
-        ) : null}
-
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs text-muted-foreground">{t("stockTracker.analysisHistory")}</label>
-          {analysisHistory.length === 0 ? (
-            <span className="text-xs text-muted-foreground/70">{t("stockTracker.analysisHistoryEmpty")}</span>
-          ) : (
-            <select
-              value={selectedId ?? ""}
-              onChange={(e) => selectAnalysis(e.target.value)}
-              disabled={analysisLoading}
-              className="max-w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
-            >
-              {analysisHistory.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {formatAnalysisTimestamp(item.generated_at)} — {item.summary.slice(0, 40)}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        <TrackerAnalysisReport report={analysisReport} />
-
-        <section className="flex items-center gap-2">
-          <input
-            type="text"
-            value={addCode}
-            onChange={(e) => setAddCode(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                handleAddSymbol();
-              }
-            }}
-            disabled={!config || loading || refreshing}
-            placeholder={t("stockTracker.addSymbolPlaceholder")}
-            className="w-48 rounded-md border bg-background px-3 py-2 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
-          />
-          <button
-            type="button"
-            onClick={handleAddSymbol}
-            disabled={!config || !addCode.trim() || loading || refreshing}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t("stockTracker.add")}
-          </button>
-        </section>
 
         {loading ? (
           <div className="space-y-4">
@@ -331,6 +264,61 @@ export function StockTracker() {
                 </div>
               </section>
             )}
+
+            {(analyzeOpen || analysisReport || analysisHistory.length > 0) ? (
+              <section ref={analysisSectionRef} className="flex flex-col gap-4 scroll-mt-6">
+                <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold">{t("stockTracker.analyzeTitle")}</h2>
+                    {analysisReport ? (
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        {t("stockTracker.analysisReport")}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-xs text-muted-foreground">{t("stockTracker.analysisHistory")}</label>
+                    {analysisHistory.length === 0 ? (
+                      <span className="text-xs text-muted-foreground/70">{t("stockTracker.analysisHistoryEmpty")}</span>
+                    ) : (
+                      <select
+                        value={selectedId ?? ""}
+                        onChange={(e) => selectAnalysis(e.target.value)}
+                        disabled={analysisLoading}
+                        className="max-w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
+                      >
+                        {analysisHistory.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {formatAnalysisTimestamp(item.generated_at)} — {item.summary.slice(0, 40)}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+
+                {analyzeOpen ? (
+                  <TrackerAnalyzePanel
+                    symbols={snapshot?.symbols ?? []}
+                    selectedSymbols={selectedSymbols}
+                    onSelectedSymbolsChange={setSelectedSymbols}
+                    focus={analysisFocus}
+                    onFocusChange={setAnalysisFocus}
+                    userPrompt={userPrompt}
+                    onUserPromptChange={setUserPrompt}
+                    loading={analysisLoading}
+                    onRun={runAnalysis}
+                    onClose={() => setAnalyzeOpen(false)}
+                  />
+                ) : null}
+
+                {analysisError ? (
+                  <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{analysisError}</div>
+                ) : null}
+
+                <TrackerAnalysisReport report={analysisReport} />
+              </section>
+            ) : null}
 
             {(snapshot?.unresolved.length || 0) > 0 || (snapshot?.data_gaps.length || 0) > 0 ? (
               <section className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
