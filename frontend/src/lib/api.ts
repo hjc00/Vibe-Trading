@@ -582,6 +582,38 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ broker }),
     }),
+
+  // Stock Tracker
+  getStockTrackerSettings: () => request<TrackerSettingsResponse>("/api/stock-tracker/settings"),
+  updateStockTrackerSettings: (settings: Partial<TrackerConfig>) =>
+    request<TrackerSettingsResponse>("/api/stock-tracker/settings", {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
+  getStockTrackerSnapshot: () => request<StockTrackerApiResponse>("/api/stock-tracker"),
+  refreshStockTracker: () =>
+    request<StockTrackerApiResponse>("/api/stock-tracker/refresh", { method: "POST" }),
+  getStockTrackerRefreshStatus: () =>
+    request<{ status: string; refresh: StockTrackerRefreshState }>("/api/stock-tracker/refresh-status"),
+  getStockTrackerHistory: (limit = 30) =>
+    request<{ status: string; snapshots: TrackerSnapshot[] }>(
+      `/api/stock-tracker/history?limit=${encodeURIComponent(String(limit))}`,
+    ),
+  analyzeStockTracker: (body: TrackerAnalyzeRequest) =>
+    request<TrackerAnalyzeResponse>("/api/stock-tracker/analyze", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+  getStockTrackerAnalysis: () =>
+    request<{ status: string; report: TrackerAnalyzeReport | null; id?: string | null }>(
+      "/api/stock-tracker/analyze",
+    ),
+  getStockTrackerAnalysisHistory: () =>
+    request<TrackerAnalysisHistoryResponse>("/api/stock-tracker/analyze/history"),
+  getStockTrackerAnalysisById: (id: string) =>
+    request<TrackerAnalyzeResponse>(
+      `/api/stock-tracker/analyze/${encodeURIComponent(id)}`,
+    ),
 };
 
 // --- Scheduled research types ---
@@ -1706,4 +1738,158 @@ export interface ToolTrailItem {
   preview?: string;
   call_id?: string;
   timestamp?: number;
+}
+
+// --- Stock Tracker types ---
+
+export interface TrackerThresholds {
+  volume_spike: number;
+  rsi_overbought: number;
+  rsi_oversold: number;
+  breakout_window: number;
+}
+
+export interface TrackerConfig {
+  watchlist: string[];
+  periods: number[];
+  signals: ("volume_spike" | "breakout" | "ma_alignment")[];
+  thresholds: TrackerThresholds;
+}
+
+export interface TrackerSettingsResponse {
+  config: TrackerConfig;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface PeriodMetrics {
+  period: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  sessions: number;
+  return_pct?: number | null;
+  annualized_volatility?: number | null;
+  volume_ratio?: number | null;
+  rsi?: number | null;
+  price_vs_ma20?: number | null;
+  ma5?: number | null;
+  ma10?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+}
+
+export interface SignalValue {
+  triggered: boolean;
+  state: "none" | "triggered" | "strong";
+  value?: number | null;
+  threshold?: number | null;
+  description: string;
+}
+
+export type SignalType = "volume_spike" | "breakout" | "ma_alignment";
+
+export interface PeriodSignals {
+  metrics: PeriodMetrics;
+  signals: Partial<Record<SignalType, SignalValue>>;
+}
+
+export interface CrossDayDiff {
+  signal_count?: Record<"prev" | "curr", number> | null;
+  return_pct?: number | null;
+  rank_return_10?: number | null;
+  rank_change_10?: number | null;
+  new_signals: string[];
+  cleared_signals: string[];
+}
+
+export interface SymbolSnapshot {
+  code: string;
+  name?: string | null;
+  market: string;
+  close?: number | null;
+  prev_close?: number | null;
+  daily_return?: number | null;
+  volume?: number | null;
+  avg_volume_20?: number | null;
+  currency: string;
+  period_signals: Record<string, PeriodSignals>;
+  diff?: CrossDayDiff | null;
+  error?: string | null;
+}
+
+export interface TrackerSnapshot {
+  generated_at: string;
+  trading_date?: string | null;
+  config: TrackerConfig;
+  symbols: SymbolSnapshot[];
+  rankings: Record<string, string[]>;
+  unresolved: string[];
+  data_gaps: Array<Record<string, unknown>>;
+}
+
+export interface StockTrackerApiResponse {
+  status: "ok" | "empty" | "refreshing";
+  snapshot?: TrackerSnapshot | null;
+  message?: string;
+}
+
+export interface StockTrackerRefreshState {
+  running: boolean;
+  current: string | null;
+  symbols: Record<string, { status: string; error?: string | null }>;
+  error?: string | null;
+}
+
+// --- Stock Tracker LLM analysis ---
+
+export type TrackerAnalysisFocus = "rank_opportunities" | "risk_check" | "custom";
+
+export interface TrackerAnalyzeRequest {
+  symbols: string[];
+  focus: TrackerAnalysisFocus;
+  user_prompt?: string | null;
+}
+
+export interface SymbolRecommendation {
+  code: string;
+  name?: string | null;
+  recommendation: string;
+  confidence: "high" | "medium" | "low";
+  rationale: string;
+  key_metrics: Record<string, unknown>;
+  risks: string[];
+  time_horizon?: string | null;
+}
+
+export interface PortfolioInsight {
+  theme: string;
+  top_pick?: string | null;
+  cautions: string[];
+}
+
+export interface TrackerAnalyzeReport {
+  summary: string;
+  symbols: SymbolRecommendation[];
+  portfolio: PortfolioInsight;
+  caveats: string[];
+}
+
+export interface TrackerAnalyzeResponse {
+  status: string;
+  report: TrackerAnalyzeReport;
+  id?: string | null;
+  generated_at?: string | null;
+  trading_date?: string | null;
+}
+
+export interface TrackerAnalysisHistoryItem {
+  id: string;
+  generated_at?: string | null;
+  trading_date?: string | null;
+  summary: string;
+}
+
+export interface TrackerAnalysisHistoryResponse {
+  status: string;
+  items: TrackerAnalysisHistoryItem[];
 }

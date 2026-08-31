@@ -309,6 +309,10 @@ try_register_openbb_routes(app)
 from src.api.scheduled_routes import register_scheduled_routes  # noqa: E402
 register_scheduled_routes(app)
 
+# --- Stock tracker ---
+from src.api.stock_tracker_routes import register_stock_tracker_routes  # noqa: E402
+register_stock_tracker_routes(app)
+
 from src.api.scheduled_routes import (  # noqa: E402, F401
     CreateRunFromPlaybookRequest,
     CreateScheduledRunRequest,

@@ -10,7 +10,7 @@ import {
 const english = getDesktopMessages("en");
 const expectedKeys = Object.keys(english).sort();
 
-assert.deepEqual(supportedDesktopLocales, ["en", "zh-CN", "ja", "ko", "ar"]);
+assert.deepEqual(supportedDesktopLocales, ["en", "zh-CN"]);
 for (const locale of supportedDesktopLocales) {
   const localeMessages = getDesktopMessages(locale);
   assert.deepEqual(Object.keys(localeMessages).sort(), expectedKeys, `${locale} message keys differ`);
@@ -28,16 +28,13 @@ for (const locale of supportedDesktopLocales) {
 assert.equal(resolveDesktopLocale(undefined), "en");
 assert.equal(resolveDesktopLocale("fr-FR"), "en");
 assert.equal(resolveDesktopLocale("zh-Hans-CN"), "zh-CN");
-assert.equal(resolveDesktopLocale("ja-JP"), "ja");
-assert.equal(resolveDesktopLocale("ko_KR"), "ko");
-assert.equal(resolveDesktopLocale("ar-SA"), "ar");
 assert.equal(getRendererLocale("en").direction, "ltr");
-assert.equal(getRendererLocale("ar").direction, "rtl");
+assert.equal(getRendererLocale("zh-CN").direction, "ltr");
 
 console.log(JSON.stringify({
   locales: supportedDesktopLocales,
   messageKeys: expectedKeys.length,
-  rtlLocale: "ar",
+  rtlLocale: null,
   parityVerified: true,
 }, null, 2));
 

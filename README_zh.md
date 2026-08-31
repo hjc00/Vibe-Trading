@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="README.md">English</a> | <b>中文</b> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_ar.md">العربية</a> | <a href="README_es.md">Español</a>
+  <a href="README.md">English</a> | <b>中文</b>
 </p>
 
 <p align="center">
@@ -1764,8 +1764,6 @@ Vibe-Trading 是 **[HKUDS](https://github.com/HKUDS)** 智能体生态的一部�
 - @miguelangelo78 — the hosted TickerAll MetaTrader 5 data source, so forex and metals backtests need no local MT5 terminal (#968)
 - @ngoanpv — Vietnam equity (HOSE) support: `.VN` no longer executes under China A-share rules (#1033)
 - @jax-novita — Novita AI registered as a built-in OpenAI-compatible provider (#1059)
-- @daviddaco1 — the Spanish locale and `README_es.md`, the sixth README (#1087)
-- @1psconstructor — German (Deutsch) UI support (#1117)
 - @x-lambda — the tencent loader building its SSL context from the certifi CA bundle, unblocking HK quotes (#1113)
 - @er-s-an — `build_registry()` reporting partial construction instead of silently returning a short tool list (#1129)
 - @straun-repo — reasoning effort passed through to the Anthropic adapter (#1115)

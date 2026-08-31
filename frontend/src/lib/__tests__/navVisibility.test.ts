@@ -36,6 +36,7 @@ describe("navVisibility", () => {
       "/portfolio",
       "/alpha-zoo",
       "/options",
+      "/stock-tracker",
       "/settings",
       "/correlation",
     ]);

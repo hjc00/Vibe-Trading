@@ -34,6 +34,9 @@ const AlphaZoo = lazy(() =>
 const OptionsLab = lazy(() =>
   import("@/pages/OptionsLab").then((m) => ({ default: m.OptionsLab })),
 );
+const StockTracker = lazy(() =>
+  import("@/pages/StockTracker").then((m) => ({ default: m.StockTracker })),
+);
 
 function PageLoader() {
   return (
@@ -68,6 +71,7 @@ export const router = createBrowserRouter([
       { path: "/correlation", element: wrap(Correlation) },
       { path: "/options", element: wrap(OptionsLab) },
       { path: "/alpha-zoo", element: wrap(AlphaZoo) },
+      { path: "/stock-tracker", element: wrap(StockTracker) },
       { path: "/alpha-zoo/bench", element: wrap(AlphaZoo) },
       { path: "/alpha-zoo/compare", element: wrap(AlphaZoo) },
       { path: "/alpha-zoo/:alphaId", element: wrap(AlphaZoo) },
