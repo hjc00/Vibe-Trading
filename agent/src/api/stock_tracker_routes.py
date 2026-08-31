@@ -297,7 +297,7 @@ def register_stock_tracker_routes(
                 )
 
             try:
-                result = _refresh_snapshot_sync()
+                result = await asyncio.to_thread(_refresh_snapshot_sync)
             except Exception as exc:  # noqa: BLE001
                 logger.exception("Tracker refresh failed")
                 with _REFRESH_LOCK:

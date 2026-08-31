@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus, RefreshCw, Sparkles, TrendingUp } from "lucide-react";
 import { api, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
@@ -12,7 +12,7 @@ import { TrackerCharts } from "@/components/stock-tracker/TrackerCharts";
 import { TrackerAnalyzePanel } from "@/components/stock-tracker/TrackerAnalyzePanel";
 import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysisReport";
 
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 2000;
 
 export function StockTracker() {
   const { t } = useTranslation();
@@ -47,17 +47,18 @@ export function StockTracker() {
   const loadSnapshot = useCallback(async () => {
     try {
       const response = await api.getStockTrackerSnapshot();
-      if (response.snapshot) {
-        setSnapshot(response.snapshot);
-        if (selectedCode === null && response.snapshot.symbols.length > 0) {
-          setSelectedCode(response.snapshot.symbols[0].code);
+      const snap = response.snapshot;
+      if (snap) {
+        setSnapshot(snap);
+        if (snap.symbols.length > 0) {
+          setSelectedCode((prev) => prev ?? snap.symbols[0].code);
         }
       }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
-  }, [selectedCode]);
+  }, []);
 
   const loadSettings = useCallback(async () => {
     try {
@@ -80,21 +81,33 @@ export function StockTracker() {
     }
   }, []);
 
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const pollRefreshStatus = useCallback(() => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     const interval = setInterval(async () => {
       try {
         const status = await api.getStockTrackerRefreshStatus();
         if (!status.refresh.running) {
           clearInterval(interval);
+          pollTimerRef.current = null;
           setRefreshing(false);
           await loadSnapshot();
         }
       } catch {
         clearInterval(interval);
+        pollTimerRef.current = null;
         setRefreshing(false);
       }
     }, POLL_INTERVAL_MS);
+    pollTimerRef.current = interval;
   }, [loadSnapshot]);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, []);
 
   const handleSaveConfig = useCallback(
     async (newConfig: TrackerConfig) => {
