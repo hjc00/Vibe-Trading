@@ -19,6 +19,7 @@ export const NAV_CONFIG = [
   { to: "/portfolio", i18nKey: "layout.portfolio" },
   { to: "/alpha-zoo", i18nKey: "layout.alphaZoo" },
   { to: "/options", i18nKey: "layout.optionsLab" },
+  { to: "/stock-tracker", i18nKey: "layout.stockTracker" },
   { to: "/settings", i18nKey: "layout.settings" },
   { to: "/correlation", i18nKey: "layout.correlation" },
 ] as const satisfies readonly NavItemConfig[];

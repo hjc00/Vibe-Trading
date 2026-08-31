@@ -1,0 +1,299 @@
+import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { Loader2, Plus, RefreshCw, TrendingUp } from "lucide-react";
+import { api, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
+import { normalizeAShareCode } from "@/lib/stockTracker";
+import { Skeleton } from "@/components/common/Skeleton";
+import { TrackerConfigPanel } from "@/components/stock-tracker/TrackerConfigPanel";
+import { TrackerSummary } from "@/components/stock-tracker/TrackerSummary";
+import { TrackerTable } from "@/components/stock-tracker/TrackerTable";
+import { TrackerCharts } from "@/components/stock-tracker/TrackerCharts";
+
+const POLL_INTERVAL_MS = 1000;
+
+export function StockTracker() {
+  const { t } = useTranslation();
+  const [snapshot, setSnapshot] = useState<TrackerSnapshot | null>(null);
+  const [config, setConfig] = useState<TrackerConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [addCode, setAddCode] = useState("");
+
+  const loadSnapshot = useCallback(async () => {
+    try {
+      const response = await api.getStockTrackerSnapshot();
+      if (response.snapshot) {
+        setSnapshot(response.snapshot);
+        if (selectedCode === null && response.snapshot.symbols.length > 0) {
+          setSelectedCode(response.snapshot.symbols[0].code);
+        }
+      }
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, [selectedCode]);
+
+  const loadSettings = useCallback(async () => {
+    try {
+      const settings = await api.getStockTrackerSettings();
+      setConfig(settings.config);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    try {
+      await api.refreshStockTracker();
+      pollRefreshStatus();
+    } catch (err) {
+      setRefreshing(false);
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const pollRefreshStatus = useCallback(() => {
+    const interval = setInterval(async () => {
+      try {
+        const status = await api.getStockTrackerRefreshStatus();
+        if (!status.refresh.running) {
+          clearInterval(interval);
+          setRefreshing(false);
+          await loadSnapshot();
+        }
+      } catch {
+        clearInterval(interval);
+        setRefreshing(false);
+      }
+    }, POLL_INTERVAL_MS);
+  }, [loadSnapshot]);
+
+  const handleSaveConfig = useCallback(
+    async (newConfig: TrackerConfig) => {
+      try {
+        await api.updateStockTrackerSettings(newConfig);
+        setConfig(newConfig);
+        await refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [refresh],
+  );
+
+  const handleAddSymbol = useCallback(async () => {
+    if (!config) return;
+    const normalized = normalizeAShareCode(addCode);
+    if (!normalized) {
+      setError(t("stockTracker.invalidSymbol"));
+      return;
+    }
+    if (config.watchlist.includes(normalized)) {
+      setError(t("stockTracker.alreadyInWatchlist", { code: normalized }));
+      return;
+    }
+    const nextConfig: TrackerConfig = {
+      ...config,
+      watchlist: [...config.watchlist, normalized],
+    };
+    setAddCode("");
+    setError(null);
+    await handleSaveConfig(nextConfig);
+  }, [addCode, config, handleSaveConfig, t]);
+
+  const handleRemoveSymbol = useCallback(
+    async (code: string) => {
+      if (!config) return;
+      const nextConfig: TrackerConfig = {
+        ...config,
+        watchlist: config.watchlist.filter((c) => c !== code),
+      };
+      if (selectedCode === code) {
+        setSelectedCode(null);
+      }
+      await handleSaveConfig(nextConfig);
+    },
+    [config, handleSaveConfig, selectedCode],
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      await Promise.all([loadSettings(), loadSnapshot()]);
+      if (mounted) setLoading(false);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [loadSettings, loadSnapshot]);
+
+  const selectedSymbol = snapshot?.symbols.find((s) => s.code === selectedCode) ?? null;
+
+  return (
+    <div className="min-h-screen p-6 lg:p-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        <section className="flex flex-col gap-4 border-b pb-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground">
+              <TrendingUp className="h-3.5 w-3.5" />
+              {t("stockTracker.badge")}
+            </div>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">{t("stockTracker.title")}</h1>
+              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("stockTracker.subtitle")}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <TrackerConfigPanel
+              config={config ?? { watchlist: [], periods: [], signals: [], thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 } }}
+              onSave={handleSaveConfig}
+              disabled={loading || refreshing}
+            />
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {refreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {refreshing ? t("stockTracker.refreshing") : t("stockTracker.refresh")}
+            </button>
+          </div>
+        </section>
+
+        {error ? (
+          <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{error}</div>
+        ) : null}
+
+        <section className="flex items-center gap-2">
+          <input
+            type="text"
+            value={addCode}
+            onChange={(e) => setAddCode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleAddSymbol();
+              }
+            }}
+            disabled={!config || loading || refreshing}
+            placeholder={t("stockTracker.addSymbolPlaceholder")}
+            className="w-48 rounded-md border bg-background px-3 py-2 text-xs outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={handleAddSymbol}
+            disabled={!config || !addCode.trim() || loading || refreshing}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            {t("stockTracker.add")}
+          </button>
+        </section>
+
+        {loading ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 rounded-xl" />
+              ))}
+            </div>
+            <Skeleton className="h-64 rounded-xl" />
+          </div>
+        ) : (
+          <>
+            <TrackerSummary
+              snapshot={snapshot}
+              signals={config?.signals ?? []}
+              loading={refreshing}
+            />
+
+            {!snapshot || snapshot.symbols.length === 0 ? (
+              <section className="rounded-xl border border-dashed p-12 text-center text-sm text-muted-foreground">
+                {t("stockTracker.noSnapshot")}
+              </section>
+            ) : (
+              <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
+                <TrackerTable
+                  symbols={snapshot.symbols}
+                  periods={config?.periods ?? []}
+                  signals={config?.signals ?? []}
+                  selectedCode={selectedCode}
+                  onSelectCode={setSelectedCode}
+                  onRemoveSymbol={handleRemoveSymbol}
+                />
+                <div className="flex flex-col gap-4">
+                  <TrackerCharts symbol={selectedSymbol} signals={config?.signals ?? []} />
+                  <SymbolDetail symbol={selectedSymbol} />
+                </div>
+              </section>
+            )}
+
+            {(snapshot?.unresolved.length || 0) > 0 || (snapshot?.data_gaps.length || 0) > 0 ? (
+              <section className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
+                <p className="font-medium text-warning">{t("stockTracker.dataGaps")}</p>
+                <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
+                  {snapshot?.unresolved.map((code) => (
+                    <li key={code}>{code}: {t("stockTracker.unresolved")}</li>
+                  ))}
+                  {snapshot?.data_gaps.map((gap, index) => (
+                    <li key={index}>{String(gap.code)}: {String(gap.reason)}</li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SymbolDetail({ symbol }: { symbol: import("@/lib/api").SymbolSnapshot | null }) {
+  const { t } = useTranslation();
+  if (!symbol) return null;
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold">{symbol.name ?? symbol.code}</span>
+          <span className="font-mono text-xs text-muted-foreground">{symbol.code}</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{symbol.close?.toFixed(2) ?? "—"}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.volumeRatio")}</p>
+          <p className="font-mono font-medium">{symbol.period_signals["10"]?.metrics.volume_ratio?.toFixed(2) ?? "—"}</p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">RSI(14)</p>
+          <p className="font-mono font-medium">{symbol.period_signals["10"]?.metrics.rsi?.toFixed(1) ?? "—"}</p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.volatility")}</p>
+          <p className="font-mono font-medium">
+            {symbol.period_signals["20"]?.metrics.annualized_volatility != null
+              ? `${(symbol.period_signals["20"].metrics.annualized_volatility * 100).toFixed(1)}%`
+              : "—"}
+          </p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">MA20</p>
+          <p className="font-mono font-medium">{symbol.period_signals["10"]?.metrics.ma20?.toFixed(2) ?? "—"}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
