@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from datetime import date
 from typing import Dict, List, Optional
 import ssl
 import urllib.request
@@ -241,4 +242,21 @@ class DataLoader:
             return None
         df = pd.concat(chunks)
         df = df[~df.index.duplicated(keep="last")].sort_index()
+
+        # Workaround: Tencent's forward-adjusted endpoint occasionally drops the
+        # most recent bar when the requested start_date lands on an ex-dividend
+        # boundary. When the request is for the current (or a future) date, re-fetch
+        # a short tail and merge to recover any missing latest bar without changing
+        # earlier history.
+        latest_date = df.index.max().strftime("%Y-%m-%d")
+        if latest_date < end_date and pd.Timestamp(end_date).date() >= date.today():
+            tail_start = (pd.Timestamp(end_date) - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+            try:
+                tail = self._request_page(code, tail_start, end_date)
+                if tail is not None and not tail.empty:
+                    df = pd.concat([df, tail])
+                    df = df[~df.index.duplicated(keep="last")].sort_index()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to backfill latest bar for %s: %s", code, exc)
+
         return df
