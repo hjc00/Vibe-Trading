@@ -1,11 +1,13 @@
 import { useTranslation } from "react-i18next";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useSearchParams } from "react-router";
 import { Activity, BarChart3, Bot, CalendarClock, CandlestickChart, Check, ChevronDown, FileText, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Settings, Layers, Loader2, WalletCards } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, type SessionItem } from "@/lib/api";
 import { safeGet, safeSet } from "@/lib/storage";
+import { NAV_CONFIG, STORAGE_KEY, getNavVisibility, isNavVisible, type NavVisibility } from "@/lib/navVisibility";
 import { useAgentStore } from "@/stores/agent";
 import { BrandMark } from "@/components/common/BrandMark";
 import { ConnectionBanner } from "@/components/layout/ConnectionBanner";
@@ -17,19 +19,39 @@ import { SUPPORTED_LANGUAGES } from "@/i18n";
 export function Layout() {
   const { t } = useTranslation();
 
+  const [navVisibility, setNavVisibility] = useState<NavVisibility>(() => getNavVisibility());
+
+  useEffect(() => {
+    const syncNavVisibility = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== STORAGE_KEY) return;
+      setNavVisibility(getNavVisibility());
+    };
+    window.addEventListener("storage", syncNavVisibility);
+    return () => window.removeEventListener("storage", syncNavVisibility);
+  }, []);
+
   // "/" is the product (chat); marketing moved to /about. The Agent entry
   // matches both "/" and legacy "/agent" deep links.
-  const NAV = [
-    { to: "/", icon: Bot, label: t('layout.agent') },
-    { to: "/runtime", icon: Activity, label: t('layout.runtime') },
-    { to: "/scheduled", icon: CalendarClock, label: t('layout.scheduled') },
-    { to: "/reports", icon: FileText, label: t('layout.reports') },
-    { to: "/portfolio", icon: WalletCards, label: t('layout.portfolio') },
-    { to: "/alpha-zoo", icon: Layers, label: t('layout.alphaZoo') },
-    { to: "/options", icon: CandlestickChart, label: t('layout.optionsLab') },
-    { to: "/settings", icon: Settings, label: t('layout.settings') },
-    { to: "/correlation", icon: BarChart3, label: t('layout.correlation') },
-  ];
+  const NAV = useMemo(() => {
+    const iconMap: Record<string, LucideIcon> = {
+      "/": Bot,
+      "/runtime": Activity,
+      "/scheduled": CalendarClock,
+      "/reports": FileText,
+      "/portfolio": WalletCards,
+      "/alpha-zoo": Layers,
+      "/options": CandlestickChart,
+      "/settings": Settings,
+      "/correlation": BarChart3,
+    };
+    return NAV_CONFIG
+      .filter(({ to }) => isNavVisible(to, navVisibility))
+      .map(({ to, i18nKey }) => ({
+        to,
+        icon: iconMap[to],
+        label: t(i18nKey),
+      }));
+  }, [t, navVisibility]);
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const { dark, toggle } = useDarkMode();

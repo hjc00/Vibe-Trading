@@ -484,7 +484,11 @@
     "oauth": "OAuth",
     "authentication": "身份验证",
     "apiKey": "API 密钥",
-    "tushareTokenDesc": "用于中国 A 股、期货、基金和宏观数据。没填的话会自动改用 AKShare 的免费数据。"
+    "tushareTokenDesc": "用于中国 A 股、期货、基金和宏观数据。没填的话会自动改用 AKShare 的免费数据。",
+    "navigation": {
+      "title": "导航",
+      "description": "选择左侧边栏中显示的页面。"
+    }
   },
   "qveris": {
     "title": "QVeris 工具市场",

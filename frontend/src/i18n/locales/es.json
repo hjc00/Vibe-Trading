@@ -489,7 +489,11 @@
     "oauth": "OAuth",
     "authentication": "Autenticación",
     "apiKey": "Clave de API",
-    "tushareTokenDesc": "Usado para datos de acciones A, futuros, fondos y macro de China. Si no se configura, el proyecto recurre a AKShare cuando está disponible."
+    "tushareTokenDesc": "Usado para datos de acciones A, futuros, fondos y macro de China. Si no se configura, el proyecto recurre a AKShare cuando está disponible.",
+    "navigation": {
+      "title": "Navegación",
+      "description": "Elige qué páginas aparecen en la barra lateral izquierda."
+    }
   },
   "qveris": {
     "title": "Mercado de herramientas QVeris",

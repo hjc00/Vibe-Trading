@@ -489,7 +489,11 @@
     "oauth": "OAuth",
     "authentication": "Authentication",
     "apiKey": "API key",
-    "tushareTokenDesc": "Used for China A-share, futures, fund, and macro data. If unset, the project falls back to AKShare where available."
+    "tushareTokenDesc": "Used for China A-share, futures, fund, and macro data. If unset, the project falls back to AKShare where available.",
+    "navigation": {
+      "title": "Navigation",
+      "description": "Choose which pages appear in the left sidebar."
+    }
   },
   "qveris": {
     "title": "QVeris Tool Marketplace",
