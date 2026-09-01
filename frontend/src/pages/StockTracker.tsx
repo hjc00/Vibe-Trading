@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { api, type SignalMeta, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
-import { normalizeAShareCode } from "@/lib/stockTracker";
+import { computePriceChange, formatQuoteUpdatedAt, normalizeAShareCode } from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
 import { TrackerControlBar } from "@/components/stock-tracker/TrackerControlBar";
@@ -21,6 +22,7 @@ export function StockTracker() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quotesUpdatedAt, setQuotesUpdatedAt] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [addCode, setAddCode] = useState("");
   const [signalMeta, setSignalMeta] = useState<SignalMeta[]>([]);
@@ -80,19 +82,48 @@ export function StockTracker() {
     }
   }, []);
 
-  const refresh = useCallback(async () => {
-    setRefreshing(true);
-    setError(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const quoteTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const loadQuotes = useCallback(async () => {
     try {
-      await api.refreshStockTracker();
-      pollRefreshStatus();
-    } catch (err) {
-      setRefreshing(false);
-      setError(err instanceof Error ? err.message : String(err));
+      const response = await api.getStockTrackerQuotes();
+      if (response.status !== "ok") return;
+
+      setSnapshot((prev) => {
+        if (!prev) return prev;
+        const quoteByCode = new Map(response.quotes.map((q) => [q.code, q]));
+        const nextSymbols = prev.symbols.map((symbol) => {
+          const quote = quoteByCode.get(symbol.code);
+          if (!quote || quote.close == null) return symbol;
+          return {
+            ...symbol,
+            close: quote.close,
+            prev_close: quote.prev_close ?? symbol.prev_close,
+            daily_return: quote.daily_return ?? symbol.daily_return,
+          };
+        });
+        return { ...prev, symbols: nextSymbols };
+      });
+      setQuotesUpdatedAt(new Date().toISOString());
+    } catch {
+      // Non-fatal: keep the last successful quote visible.
     }
   }, []);
 
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopQuotePolling = useCallback(() => {
+    if (quoteTimerRef.current) {
+      clearInterval(quoteTimerRef.current);
+      quoteTimerRef.current = null;
+    }
+  }, []);
+
+  const startQuotePolling = useCallback(() => {
+    stopQuotePolling();
+    const intervalMs = Math.max(5000, (config?.refresh_interval_seconds ?? 10) * 1000);
+    loadQuotes();
+    quoteTimerRef.current = setInterval(loadQuotes, intervalMs);
+  }, [config?.refresh_interval_seconds, loadQuotes, stopQuotePolling]);
 
   const pollRefreshStatus = useCallback(() => {
     if (pollTimerRef.current) clearInterval(pollTimerRef.current);
@@ -104,19 +135,36 @@ export function StockTracker() {
           pollTimerRef.current = null;
           setRefreshing(false);
           await loadSnapshot();
+          startQuotePolling();
         }
       } catch {
         clearInterval(interval);
         pollTimerRef.current = null;
         setRefreshing(false);
+        startQuotePolling();
       }
     }, POLL_INTERVAL_MS);
     pollTimerRef.current = interval;
-  }, [loadSnapshot]);
+  }, [loadSnapshot, startQuotePolling]);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    setError(null);
+    stopQuotePolling();
+    try {
+      await api.refreshStockTracker();
+      pollRefreshStatus();
+    } catch (err) {
+      setRefreshing(false);
+      setError(err instanceof Error ? err.message : String(err));
+      startQuotePolling();
+    }
+  }, [pollRefreshStatus, startQuotePolling, stopQuotePolling]);
 
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      stopQuotePolling();
     };
   }, []);
 
@@ -192,6 +240,14 @@ export function StockTracker() {
     };
   }, [loadSettings, loadSnapshot, loadSignals, loadLatest, loadHistory]);
 
+  useEffect(() => {
+    if (!config || loading) return undefined;
+    startQuotePolling();
+    return () => {
+      stopQuotePolling();
+    };
+  }, [config, loading, startQuotePolling, stopQuotePolling]);
+
   const selectedSymbol = snapshot?.symbols.find((s) => s.code === selectedCode) ?? null;
   const settingsConfig = useMemo(
     () =>
@@ -200,6 +256,7 @@ export function StockTracker() {
         periods: [],
         signals: [],
         thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 },
+        refresh_interval_seconds: 10,
       },
     [config],
   );
@@ -269,10 +326,11 @@ export function StockTracker() {
                   selectedCode={selectedCode}
                   onSelectCode={setSelectedCode}
                   onRemoveSymbol={handleRemoveSymbol}
+                  quotesUpdatedAt={quotesUpdatedAt}
                 />
                 <div className="flex flex-col gap-4">
                   <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
-                  <SymbolDetail symbol={selectedSymbol} />
+                  <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
                 </div>
               </section>
             )}
@@ -359,9 +417,21 @@ function formatAnalysisTimestamp(iso: string | null | undefined): string {
   return parsed.toLocaleString();
 }
 
-function SymbolDetail({ symbol }: { symbol: import("@/lib/api").SymbolSnapshot | null }) {
+function SymbolDetail({
+  symbol,
+  updatedAt,
+}: {
+  symbol: import("@/lib/api").SymbolSnapshot | null;
+  updatedAt: string | null;
+}) {
   const { t } = useTranslation();
   if (!symbol) return null;
+
+  const { changeAmount, dailyReturn } = computePriceChange(
+    symbol.close,
+    symbol.prev_close,
+    symbol.daily_return,
+  );
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
@@ -370,7 +440,43 @@ function SymbolDetail({ symbol }: { symbol: import("@/lib/api").SymbolSnapshot |
           <span className="text-sm font-semibold">{symbol.name ?? symbol.code}</span>
           <span className="font-mono text-xs text-muted-foreground">{symbol.code}</span>
         </div>
-        <span className="text-xs text-muted-foreground">{symbol.close?.toFixed(2) ?? "—"}</span>
+        <div className="flex flex-col items-end">
+          <span className="font-mono text-sm font-semibold tabular-nums">{symbol.close?.toFixed(2) ?? "—"}</span>
+          {(changeAmount !== null || dailyReturn !== null) && (
+            <span
+              className={cn(
+                "text-[10px] font-mono tabular-nums",
+                (dailyReturn ?? 0) > 0 && "text-success",
+                (dailyReturn ?? 0) < 0 && "text-danger",
+                (dailyReturn ?? 0) === 0 && "text-muted-foreground",
+              )}
+            >
+              {changeAmount !== null && (
+                <>
+                  {changeAmount > 0 ? "+" : ""}
+                  {changeAmount.toFixed(2)}
+                  {" "}
+                </>
+              )}
+              {dailyReturn !== null && (
+                <>
+                  ({dailyReturn > 0 ? "+" : ""}
+                  {(dailyReturn * 100).toFixed(2)}%)
+                </>
+              )}
+            </span>
+          )}
+          {symbol.prev_close != null && (
+            <span className="text-[10px] text-muted-foreground">
+              {t("stockTracker.prevClose")}: {symbol.prev_close.toFixed(2)}
+            </span>
+          )}
+          {updatedAt && (
+            <span className="text-[10px] text-muted-foreground">
+              {t("stockTracker.updatedAt", { when: formatQuoteUpdatedAt(updatedAt, t) })}
+            </span>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="rounded bg-muted/40 p-2">

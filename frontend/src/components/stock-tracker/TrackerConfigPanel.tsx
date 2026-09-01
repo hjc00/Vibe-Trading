@@ -144,6 +144,12 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
     }));
   };
 
+  const updateRefreshInterval = (value: string) => {
+    const num = parseInt(value, 10);
+    if (Number.isNaN(num)) return;
+    setDraft((prev) => ({ ...prev, refresh_interval_seconds: Math.max(5, num) }));
+  };
+
   const saveDisabled =
     watchlistInput.trim().length === 0 ||
     draft.signals.length === 0 ||
@@ -230,6 +236,24 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="refresh-interval">
+                {t("stockTracker.refreshInterval")}
+              </label>
+              <input
+                id="refresh-interval"
+                type="number"
+                min={5}
+                value={draft.refresh_interval_seconds}
+                onChange={(e) => updateRefreshInterval(e.target.value)}
+                className={cn(
+                  "w-full rounded-md border bg-background px-3 py-2 text-xs outline-none",
+                  "focus:border-primary focus:ring-2 focus:ring-primary/20",
+                )}
+              />
+              <p className="text-[10px] text-muted-foreground">{t("stockTracker.refreshIntervalHint")}</p>
             </div>
 
             {allParams.length > 0 && (

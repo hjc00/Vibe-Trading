@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatSignalValue, getSignalLabelKey } from "@/lib/stockTracker";
+import { computePriceChange, formatQuoteUpdatedAt, formatSignalValue, getSignalLabelKey } from "@/lib/stockTracker";
 import { SignalBadge } from "./SignalBadge";
 import type { SignalMeta, SignalValue, SymbolSnapshot } from "@/lib/api";
 
@@ -12,9 +12,10 @@ interface TrackerTableProps {
   selectedCode: string | null;
   onSelectCode: (code: string) => void;
   onRemoveSymbol?: (code: string) => void;
+  quotesUpdatedAt?: string | null;
 }
 
-export function TrackerTable({ symbols, periods, signals, selectedCode, onSelectCode, onRemoveSymbol }: TrackerTableProps) {
+export function TrackerTable({ symbols, periods, signals, selectedCode, onSelectCode, onRemoveSymbol, quotesUpdatedAt }: TrackerTableProps) {
   const { t } = useTranslation();
 
   const tableSignals = signals.filter((s) => s.show_in_table);
@@ -54,21 +55,7 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
                     <div className="flex flex-col">
                       <span className="text-xs font-medium">{symbol.name ?? symbol.code}</span>
                       <span className="font-mono text-[10px] text-muted-foreground">{symbol.code}</span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {symbol.close?.toFixed(2) ?? "—"}
-                        {symbol.daily_return !== undefined && symbol.daily_return !== null && (
-                          <span
-                            className={cn(
-                              "ms-1 font-mono tabular-nums",
-                              symbol.daily_return > 0 && "text-success",
-                              symbol.daily_return < 0 && "text-danger",
-                            )}
-                          >
-                            {symbol.daily_return > 0 ? "+" : ""}
-                            {(symbol.daily_return * 100).toFixed(2)}%
-                          </span>
-                        )}
-                      </span>
+                      <PriceCell symbol={symbol} updatedAt={quotesUpdatedAt} />
                       <div className="mt-1 flex flex-wrap gap-1">
                         {globalSignals.map((meta) => (
                           <GlobalSignalBadge
@@ -127,6 +114,55 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function PriceCell({ symbol, updatedAt }: { symbol: SymbolSnapshot; updatedAt: string | null | undefined }) {
+  const { t } = useTranslation();
+  const { changeAmount, dailyReturn } = computePriceChange(
+    symbol.close,
+    symbol.prev_close,
+    symbol.daily_return,
+  );
+
+  return (
+    <div className="mt-0.5 flex flex-col">
+      <span className="font-mono text-sm font-semibold tabular-nums">{symbol.close?.toFixed(2) ?? "—"}</span>
+      {(changeAmount !== null || dailyReturn !== null) && (
+        <span
+          className={cn(
+            "text-[10px] font-mono tabular-nums",
+            (dailyReturn ?? 0) > 0 && "text-success",
+            (dailyReturn ?? 0) < 0 && "text-danger",
+            (dailyReturn ?? 0) === 0 && "text-muted-foreground",
+          )}
+        >
+          {changeAmount !== null && (
+            <>
+              {changeAmount > 0 ? "+" : ""}
+              {changeAmount.toFixed(2)}
+              {" "}
+            </>
+          )}
+          {dailyReturn !== null && (
+            <>
+              ({dailyReturn > 0 ? "+" : ""}
+              {(dailyReturn * 100).toFixed(2)}%)
+            </>
+          )}
+        </span>
+      )}
+      {symbol.prev_close != null && (
+        <span className="text-[10px] text-muted-foreground">
+          {t("stockTracker.prevClose")}: {symbol.prev_close.toFixed(2)}
+        </span>
+      )}
+      {updatedAt && (
+        <span className="text-[10px] text-muted-foreground">
+          {t("stockTracker.updatedAt", { when: formatQuoteUpdatedAt(updatedAt, t) })}
+        </span>
+      )}
     </div>
   );
 }

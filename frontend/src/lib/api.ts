@@ -591,6 +591,7 @@ export const api = {
       body: JSON.stringify(settings),
     }),
   getStockTrackerSignalMeta: () => request<{ status: string; signals: SignalMeta[] }>("/api/stock-tracker/signals"),
+  getStockTrackerQuotes: () => request<StockTrackerQuotesResponse>("/api/stock-tracker/quotes"),
   getStockTrackerSnapshot: () => request<StockTrackerApiResponse>("/api/stock-tracker"),
   refreshStockTracker: () =>
     request<StockTrackerApiResponse>("/api/stock-tracker/refresh", { method: "POST" }),
@@ -1756,6 +1757,24 @@ export interface TrackerConfig {
   periods: number[];
   signals: SignalType[];
   thresholds: TrackerThresholds;
+  refresh_interval_seconds: number;
+}
+
+export interface StockTrackerQuote {
+  code: string;
+  name?: string | null;
+  close?: number | null;
+  prev_close?: number | null;
+  daily_return?: number | null;
+  change_amount?: number | null;
+  updated_at?: string | null;
+  error?: string | null;
+}
+
+export interface StockTrackerQuotesResponse {
+  status: string;
+  quotes: StockTrackerQuote[];
+  data_gaps: Array<Record<string, unknown>>;
 }
 
 export interface TrackerSettingsResponse {

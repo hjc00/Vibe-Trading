@@ -57,6 +57,11 @@ class TrackerConfig(BaseModel):
     periods: List[int] = Field(default_factory=lambda: list(DEFAULT_PERIODS))
     signals: List[SignalType] = Field(default_factory=lambda: list(DEFAULT_SIGNALS))
     thresholds: TrackerThresholds = Field(default_factory=TrackerThresholds)
+    refresh_interval_seconds: int = Field(
+        default=10,
+        ge=5,
+        description="Auto quote refresh interval in seconds.",
+    )
 
     @field_validator("watchlist")
     @classmethod

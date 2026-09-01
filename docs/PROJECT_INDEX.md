@@ -134,14 +134,14 @@ Vibe-Trading/
 
 | 文件 | 职责 |
 |------|------|
-| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段）+ 快照类型 + 代码归一 |
+| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段；`refresh_interval_seconds` 控制实时行情轮询间隔）+ 快照类型 + 代码归一 |
 | `signals.py` | 信号注册表 + 自描述 `SignalMeta`；内置放量/突破/均线排列/RSI 四个示例检测器 |
 | `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，计算周期指标，跑检测器，按元数据生成排名与跨日 diff |
 | `names.py` | 经腾讯行情接口解析中文名 |
 | `store.py` | `TrackerStore`：原子 JSON 文件存储 |
 | `analyzer.py` | `run_analysis` 包装 `ChatLLM` 产出结构化报告 |
 
-- **路由**（挂载于 `/api/stock-tracker/`）：`settings` GET/PUT、`signals` GET（信号元数据）、`GET /`、`history`、`refresh` POST、`refresh-status`、`analyze` POST/GET、`analyze/history`、`analyze/{id}`。
+- **路由**（挂载于 `/api/stock-tracker/`）：`settings` GET/PUT（含 `refresh_interval_seconds`）、`signals` GET（信号元数据）、`GET /`、`history`、`quotes` GET（轻量实时行情）、`refresh` POST、`refresh-status`、`analyze` POST/GET、`analyze/history`、`analyze/{id}`。
 - **扩展方式**：新增信号只需在 `signals.py` 写一个 `SignalDetector` 子类并 `register_detector`，无需改 engine/路由/前端。
 - **测试**：`tests/stock_tracker/test_{models,signals,engine,store,names,analyzer}.py` + `tests/api/test_stock_tracker_routes.py`。
 

@@ -1,4 +1,5 @@
 import type { SignalMeta, SignalType } from "@/lib/api";
+import type { TFunction } from "i18next";
 
 export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
   volume_spike: "stockTracker.volumeSpike",
@@ -56,6 +57,38 @@ function inferAShareExchange(numeric: string): "SH" | "SZ" | "BJ" | null {
  *
  * Returns null for unrecognized formats.
  */
+export interface PriceChange {
+  changeAmount: number | null;
+  dailyReturn: number | null;
+}
+
+export function computePriceChange(
+  close: number | null | undefined,
+  prevClose: number | null | undefined,
+  dailyReturn?: number | null | undefined,
+): PriceChange {
+  const changeAmount =
+    close != null && prevClose != null ? close - prevClose : null;
+  const derivedReturn =
+    changeAmount != null && prevClose ? changeAmount / prevClose : null;
+  return {
+    changeAmount,
+    dailyReturn: dailyReturn ?? derivedReturn,
+  };
+}
+
+export function formatQuoteUpdatedAt(iso: string, t: TFunction): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  const seconds = Math.floor((Date.now() - parsed.getTime()) / 1000);
+  if (seconds < 5) return t("stockTracker.updatedJustNow");
+  if (seconds < 60) return t("stockTracker.updatedSecondsAgo", { count: seconds });
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return t("stockTracker.updatedMinutesAgo", { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  return t("stockTracker.updatedHoursAgo", { count: hours });
+}
+
 export function normalizeAShareCode(code: string): string | null {
   const cleaned = code.trim().toUpperCase();
   const match = cleaned.match(/^(\d{6})(?:\.(SH|SZ|BJ))?$/);

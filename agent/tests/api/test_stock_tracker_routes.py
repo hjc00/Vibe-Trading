@@ -45,11 +45,13 @@ def test_list_signals_endpoint(client):
         assert "is_global" in signal
 
 
+def test_get_settings_default(client):
     response = client.get("/api/stock-tracker/settings")
     assert response.status_code == 200
     data = response.json()
     assert data["config"]["watchlist"] == TrackerConfig().watchlist
     assert data["config"]["periods"] == [10, 20, 60]
+    assert data["config"]["refresh_interval_seconds"] == 10
 
 
 def test_update_settings_validation(client):
@@ -87,6 +89,63 @@ def test_update_settings_success(client):
     data = response.json()
     assert data["config"]["watchlist"] == ["000001.SZ"]
     assert data["config"]["periods"] == [5, 10]
+
+
+def test_update_settings_refresh_interval(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"refresh_interval_seconds": 5},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["config"]["refresh_interval_seconds"] == 5
+
+
+def test_update_settings_refresh_interval_validation(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"refresh_interval_seconds": 3},
+    )
+    assert response.status_code == 422
+
+
+def test_quotes_endpoint(client, isolated_tracker_store):
+    isolated_tracker_store.save_settings(
+        isolated_tracker_store.get_settings().model_copy(
+            update={"config": TrackerConfig(watchlist=["600519.SH"])}
+        )
+    )
+    fake_records = {
+        "600519.SH": [
+            {
+                "code": "600519.SH",
+                "name": "贵州茅台",
+                "close": 1480.0,
+                "volume": 8000,
+            },
+            {
+                "code": "600519.SH",
+                "name": "贵州茅台",
+                "close": 1500.0,
+                "volume": 10000,
+            },
+        ],
+        "_unresolved": [],
+    }
+    with patch("src.api.stock_tracker_routes.fetch_market_data", return_value=fake_records):
+        response = client.get("/api/stock-tracker/quotes")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert len(data["quotes"]) == 1
+    quote = data["quotes"][0]
+    assert quote["code"] == "600519.SH"
+    assert quote["close"] == 1500.0
+    assert quote["prev_close"] == 1480.0
+    assert quote["change_amount"] == 20.0
+    assert round(quote["daily_return"], 4) == round(20.0 / 1480.0, 4)
+    assert quote["error"] is None
+    assert data["data_gaps"] == []
 
 
 def test_get_latest_snapshot_empty(client):

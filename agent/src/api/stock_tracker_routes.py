@@ -8,12 +8,13 @@ import sys as _sys
 import threading
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Callable, Dict, List, Literal, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
+from src.market_data import fetch_market_data
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.models import TrackerConfig, normalize_a_share_code
@@ -58,6 +59,11 @@ class TrackerSettingsRequest(BaseModel):
     periods: Optional[List[int]] = None
     signals: Optional[List[str]] = None
     thresholds: Optional[Dict[str, float]] = None
+    refresh_interval_seconds: Optional[int] = Field(
+        default=None,
+        ge=5,
+        description="Auto quote refresh interval in seconds.",
+    )
 
 
 class TrackerConfigResponse(BaseModel):
@@ -67,6 +73,7 @@ class TrackerConfigResponse(BaseModel):
     periods: List[int]
     signals: List[str]
     thresholds: Dict[str, float]
+    refresh_interval_seconds: int
 
 
 class TrackerSettingsResponse(BaseModel):
@@ -127,6 +134,8 @@ def _config_from_request(request: TrackerSettingsRequest) -> TrackerConfig:
         kwargs["signals"] = request.signals
     if request.thresholds is not None:
         kwargs["thresholds"] = current.thresholds.model_copy(update=request.thresholds)
+    if request.refresh_interval_seconds is not None:
+        kwargs["refresh_interval_seconds"] = request.refresh_interval_seconds
 
     # Merge with current config so omitted fields keep their defaults, then
     # reconstruct to re-run Pydantic validators (model_copy skips them).
@@ -198,6 +207,93 @@ def _select_symbols(snapshot: Any, requested: List[str]) -> _SelectedSymbols:
         selected.symbols.append(symbol)
 
     return selected
+
+
+class _QuoteItem(BaseModel):
+    """One real-time quote for a single symbol."""
+
+    code: str
+    name: Optional[str] = None
+    close: Optional[float] = None
+    prev_close: Optional[float] = None
+    daily_return: Optional[float] = None
+    change_amount: Optional[float] = None
+    updated_at: Optional[str] = None
+    error: Optional[str] = None
+
+
+class _QuotesResponse(BaseModel):
+    """Response envelope for the lightweight quotes endpoint."""
+
+    status: str
+    quotes: List[_QuoteItem]
+    data_gaps: List[Dict[str, Any]]
+
+
+def _fetch_quotes(codes: List[str]) -> Dict[str, Any]:
+    """Fetch the latest available price for each code via fetch_market_data.
+
+    Uses a single-day window so the loader returns the most recent bar.
+    Per-symbol failures are recorded in ``data_gaps`` rather than raising.
+    """
+    today = date.today().isoformat()
+    try:
+        raw = fetch_market_data(
+            codes=codes,
+            start_date=today,
+            end_date=today,
+            interval="1D",
+            max_rows=2,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to fetch tracker quotes")
+        return {
+            "status": "error",
+            "quotes": [],
+            "data_gaps": [{"code": "__batch__", "reason": f"fetch_failed: {exc}"}],
+        }
+
+    quotes: List[Dict[str, Any]] = []
+    data_gaps: List[Dict[str, Any]] = []
+    unresolved = set(raw.get("_unresolved", []))
+    updated_at = datetime.now().astimezone().isoformat()
+
+    for code in codes:
+        if code in unresolved:
+            data_gaps.append({"code": code, "reason": "unresolved_symbol"})
+            continue
+        records = raw.get(code)
+        if not records:
+            data_gaps.append({"code": code, "reason": "no_data"})
+            continue
+
+        try:
+            latest = records[-1]
+            prev = records[-2] if len(records) > 1 else None
+            close = float(latest["close"]) if latest.get("close") is not None else None
+            prev_close = float(prev["close"]) if prev and prev.get("close") is not None else None
+            daily_return = None
+            change_amount = None
+            if close is not None and prev_close is not None and prev_close != 0:
+                change_amount = close - prev_close
+                daily_return = change_amount / prev_close
+            quotes.append(
+                {
+                    "code": code,
+                    "name": latest.get("name"),
+                    "close": close,
+                    "prev_close": prev_close,
+                    "daily_return": daily_return,
+                    "change_amount": change_amount,
+                    "updated_at": updated_at,
+                    "error": None,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Failed to parse quote for %s", code)
+            data_gaps.append({"code": code, "reason": f"parse_error: {exc}"})
+
+    return {"status": "ok", "quotes": quotes, "data_gaps": data_gaps}
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +375,13 @@ def register_stock_tracker_routes(
             "status": "ok",
             "snapshots": [s.model_dump(mode="json") for s in snapshots],
         }
+
+    @app.get("/api/stock-tracker/quotes", response_model=_QuotesResponse)
+    async def get_quotes(principal=Depends(require_auth)) -> _QuotesResponse:  # noqa: ARG001
+        """Return lightweight real-time quotes for the current watchlist."""
+        settings = _get_store().get_settings()
+        result = await asyncio.to_thread(_fetch_quotes, settings.config.watchlist)
+        return _QuotesResponse(**result)
 
     @app.post("/api/stock-tracker/refresh")
     async def refresh_snapshot(
