@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import pandas as pd
 import pytest
 
 from src.stock_tracker.engine import StockTrackerEngine
-from src.stock_tracker.models import TrackerConfig, TrackerThresholds
+from src.stock_tracker.models import CapitalMetrics, FundFlowSnapshot, MarginSnapshot, TrackerConfig, TrackerThresholds
 
 
 def _make_df(rows: int = 80, volume_spike_idx: int | None = None) -> pd.DataFrame:
@@ -246,6 +248,77 @@ def test_config_threshold_override():
     signal = ps.signals["volume_spike"]
     # 3x spike is below the 5x threshold.
     assert signal.triggered is False
+
+
+def test_capital_metrics_attached_and_enriched():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    df = _make_df(rows=80)
+
+    capital = CapitalMetrics(
+        fund_flow=FundFlowSnapshot(
+            trade_date=date.fromisoformat("2026-08-31"),
+            main_net=1_000_000.0,
+            main_5d_net=5_000_000.0,
+        ),
+        margin=MarginSnapshot(
+            trade_date=date.fromisoformat("2026-08-31"),
+            financing_balance=100_000_000.0,
+            financing_balance_change=5_000_000.0,
+        ),
+    )
+    snapshot = engine._analyze_symbol("000001.SZ", df, capital=capital)
+
+    assert snapshot.capital is not None
+    assert snapshot.capital.fund_flow.main_net == 1_000_000.0
+    # Turnover for deterministic test data: close ~ 107.9, volume ~ 14000.
+    assert snapshot.capital.fund_flow.main_net_ratio is not None
+
+
+def test_main_force_inflow_signal_triggered():
+    config = TrackerConfig(
+        watchlist=["000001.SZ"],
+        periods=[10],
+        signals=["main_force_inflow"],
+    )
+    engine = StockTrackerEngine(config)
+    df = _make_df(rows=80)
+
+    # Volume is ~14000 on the last row; close ~107.9 -> turnover ~1.5M.
+    # main_net 1M gives ratio > 0.5, well above default 0.05.
+    capital = CapitalMetrics(
+        fund_flow=FundFlowSnapshot(main_net=1_000_000.0),
+    )
+    snapshot = engine._analyze_symbol("000001.SZ", df, capital=capital)
+
+    ps = snapshot.period_signals["10"]
+    signal = ps.signals["main_force_inflow"]
+    assert signal.triggered is True
+    assert signal.value is not None
+
+
+def test_margin_expansion_signal_triggered():
+    config = TrackerConfig(
+        watchlist=["000001.SZ"],
+        periods=[10],
+        signals=["margin_expansion"],
+    )
+    engine = StockTrackerEngine(config)
+    df = _make_df(rows=80)
+
+    # 10% increase in financing balance vs prior day.
+    capital = CapitalMetrics(
+        margin=MarginSnapshot(
+            financing_balance=110_000_000.0,
+            financing_balance_change=10_000_000.0,
+        ),
+    )
+    snapshot = engine._analyze_symbol("000001.SZ", df, capital=capital)
+
+    ps = snapshot.period_signals["10"]
+    signal = ps.signals["margin_expansion"]
+    assert signal.triggered is True
+    assert signal.value is not None
 
 
 if __name__ == "__main__":

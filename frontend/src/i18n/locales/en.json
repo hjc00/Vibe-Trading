@@ -1652,6 +1652,10 @@
     "rsi_overbought": "RSI overbought",
     "rsi_oversold": "RSI oversold",
     "breakout_window": "Breakout window",
+    "mainForceInflow": "Main force inflow",
+    "marginExpansion": "Margin expansion",
+    "main_force_inflow_threshold": "Main force inflow threshold",
+    "margin_expansion_threshold": "Margin expansion threshold",
     "save": "Save",
     "cancel": "Cancel",
     "editConfig": "Edit configuration",
@@ -1703,6 +1707,9 @@
     "timeHorizon": "Time horizon",
     "risks": "Risks",
     "caveats": "Caveats",
-    "researchDisclaimer": "Research only, not investment advice."
+    "researchDisclaimer": "Research only, not investment advice.",
+    "mainForceFlow": "Main force net inflow",
+    "financingBalance": "Financing balance change",
+    "capitalDataUnavailable": "Capital data unavailable"
   }
 }

@@ -74,6 +74,36 @@ const FALLBACK_SIGNALS: SignalMeta[] = [
     show_in_table: true,
     is_global: false,
   },
+  {
+    name: "main_force_inflow",
+    category: "capital",
+    direction: "both",
+    label: "Main force inflow",
+    description: "Main-force net inflow as a percentage of turnover reaches a threshold.",
+    params: {
+      main_force_inflow_threshold: { type: "float", min: 0, max: 1, default: 0.05, description: "Main-force net inflow / turnover ratio required to trigger." },
+    },
+    default_params: { main_force_inflow_threshold: 0.05 },
+    format: "percent",
+    ranking_enabled: true,
+    show_in_table: true,
+    is_global: false,
+  },
+  {
+    name: "margin_expansion",
+    category: "capital",
+    direction: "bullish",
+    label: "Margin expansion",
+    description: "Outstanding financing balance expanded versus the prior trading day.",
+    params: {
+      margin_expansion_threshold: { type: "float", min: 0, max: 1, default: 0.03, description: "Financing balance day-over-day change rate required to trigger." },
+    },
+    default_params: { margin_expansion_threshold: 0.03 },
+    format: "percent",
+    ranking_enabled: true,
+    show_in_table: true,
+    is_global: false,
+  },
 ];
 
 export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: TrackerConfigPanelProps) {

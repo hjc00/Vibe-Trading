@@ -85,7 +85,7 @@ def _parse_flow_row(raw: str) -> dict[str, Any] | None:
     return row
 
 
-def _fetch_symbol_flow(symbol: str, *, period: str, days: int) -> dict[str, Any]:
+def fetch_symbol_fund_flow(symbol: str, *, period: str, days: int) -> dict[str, Any]:
     """Fetch one symbol's capital-flow series and shape it into a result dict.
 
     Args:
@@ -236,7 +236,7 @@ class FundFlowTool(BaseTool):
         days = min(days, _MAX_DAYS)
 
         results = {
-            symbol: _fetch_symbol_flow(symbol, period=period, days=days)
+            symbol: fetch_symbol_fund_flow(symbol, period=period, days=days)
             for symbol in (c.strip() for c in codes)
         }
         envelope = {
@@ -249,3 +249,6 @@ class FundFlowTool(BaseTool):
             "data": results,
         }
         return json.dumps(envelope, ensure_ascii=False)
+
+
+__all__ = ["fetch_symbol_fund_flow", "FundFlowTool"]

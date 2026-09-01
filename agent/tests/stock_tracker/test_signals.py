@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from src.stock_tracker.signals import (
+    MainForceInflowDetector,
     RSIDetector,
     get_detector,
     get_detector_meta,
@@ -57,6 +58,35 @@ def test_get_detector_caches_instance() -> None:
     second = get_detector("rsi")
     assert first is second
     assert isinstance(first, RSIDetector)
+
+
+def test_registry_contains_capital_detectors() -> None:
+    names = list_detector_names()
+    assert "main_force_inflow" in names
+    assert "margin_expansion" in names
+
+
+def test_main_force_inflow_meta_declares_params() -> None:
+    meta = get_detector_meta("main_force_inflow")
+    assert meta.category == "capital"
+    assert meta.direction == "both"
+    assert "main_force_inflow_threshold" in meta.params
+    assert meta.params["main_force_inflow_threshold"]["default"] == 0.05
+
+
+def test_margin_expansion_meta_declares_params() -> None:
+    meta = get_detector_meta("margin_expansion")
+    assert meta.category == "capital"
+    assert meta.direction == "bullish"
+    assert "margin_expansion_threshold" in meta.params
+    assert meta.params["margin_expansion_threshold"]["default"] == 0.03
+
+
+def test_get_detector_caches_capital_instances() -> None:
+    first = get_detector("main_force_inflow")
+    second = get_detector("main_force_inflow")
+    assert first is second
+    assert isinstance(first, MainForceInflowDetector)
 
 
 def test_unknown_detector_raises() -> None:

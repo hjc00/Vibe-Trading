@@ -6,6 +6,8 @@ export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
   breakout: "stockTracker.breakout",
   ma_alignment: "stockTracker.maAlignment",
   rsi: "stockTracker.rsi",
+  main_force_inflow: "stockTracker.mainForceInflow",
+  margin_expansion: "stockTracker.marginExpansion",
 } as const;
 
 export function getSignalLabelKey(signal: SignalType): string {

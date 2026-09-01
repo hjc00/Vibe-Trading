@@ -125,6 +125,75 @@ def _err(message: str) -> str:
     return json.dumps({"ok": False, "error": message}, ensure_ascii=False)
 
 
+def fetch_symbol_margin_trading(code: str, *, days: int = _DEFAULT_DAYS) -> dict[str, Any]:
+    """Fetch daily A-share margin-trading rows for one symbol.
+
+    Args:
+        code: A-share stock code (bare six-digit, suffixed like ``600519.SH``,
+            or exchange-prefixed like ``sh600519``).
+        days: Number of most-recent trading days to return.
+
+    Returns:
+        On success: ``{"code": str, "rows": [...]}``.
+        On failure: ``{"code": str, "error": str}``.
+        Rows are ordered most-recent first and capped at ``days``.
+    """
+    parsed_code = _extract_code(code)
+    if parsed_code is None:
+        return {
+            "code": code,
+            "error": "Unsupported symbol: margin trading covers A-shares only "
+            "(e.g. 600519.SH or 000001.SZ).",
+        }
+    days = _clamp_days(days)
+
+    try:
+        payload = eastmoney_client.get_json(
+            _DATACENTER_URL,
+            params={
+                "reportName": _REPORT_NAME,
+                "columns": "ALL",
+                "source": "WEB",
+                "filter": f'(SCODE="{parsed_code}")',
+                "sortColumns": "DATE",
+                "sortTypes": "-1",
+                "pageNumber": "1",
+                "pageSize": str(days),
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 - surface any provider failure as envelope
+        logger.warning("eastmoney margin fetch failed for %s: %s", parsed_code, exc)
+        try:
+            fallback_data = tushare_fallbacks.fetch_margin_trading(parsed_code, days=days)
+            fallback_data["warning"] = f"eastmoney failed ({exc}); used tushare fallback"
+            return fallback_data
+        except Exception as fallback_exc:  # noqa: BLE001 - return both provider failures
+            return {
+                "code": parsed_code,
+                "error": f"Eastmoney margin request failed: {exc}",
+                "fallback_error": f"tushare fallback failed: {fallback_exc}",
+            }
+
+    result = payload.get("result") if isinstance(payload, dict) else None
+    data = result.get("data") if isinstance(result, dict) else None
+    if not isinstance(data, list) or not data:
+        try:
+            fallback_data = tushare_fallbacks.fetch_margin_trading(parsed_code, days=days)
+            fallback_data["warning"] = "eastmoney returned no rows; used tushare fallback"
+            return fallback_data
+        except Exception as fallback_exc:  # noqa: BLE001 - preserve the original empty-data error
+            return {
+                "code": parsed_code,
+                "error": f"No margin-trading data returned for {parsed_code}",
+                "fallback_error": f"tushare fallback failed: {fallback_exc}",
+            }
+
+    rows = [_normalize_row(item) for item in data if isinstance(item, dict)]
+    rows = rows[:days]
+
+    return {"code": parsed_code, "rows": rows}
+
+
 class MarginTradingTool(BaseTool):
     """Fetch daily A-share margin-financing / short-selling balances."""
 
@@ -172,78 +241,28 @@ class MarginTradingTool(BaseTool):
             "data": {"code": str, "rows": [...]}}``. On failure:
             ``{"ok": false, "error": str}``.
         """
-        code = _extract_code(kwargs.get("code", ""))
-        if code is None:
-            return _err(
-                "Unsupported symbol: margin trading covers A-shares only "
-                "(e.g. 600519.SH or 000001.SZ)."
-            )
-        days = _clamp_days(kwargs.get("days", _DEFAULT_DAYS))
+        code = kwargs.get("code", "")
+        days = kwargs.get("days", _DEFAULT_DAYS)
+        result = fetch_symbol_margin_trading(code, days=days)
 
-        try:
-            payload = eastmoney_client.get_json(
-                _DATACENTER_URL,
-                params={
-                    "reportName": _REPORT_NAME,
-                    "columns": "ALL",
-                    "source": "WEB",
-                    "filter": f'(SCODE="{code}")',
-                    "sortColumns": "DATE",
-                    "sortTypes": "-1",
-                    "pageNumber": "1",
-                    "pageSize": str(days),
-                },
-            )
-        except Exception as exc:  # noqa: BLE001 - surface any provider failure as envelope
-            logger.warning("eastmoney margin fetch failed for %s: %s", code, exc)
-            try:
-                fallback_data = tushare_fallbacks.fetch_margin_trading(code, days=days)
-            except Exception as fallback_exc:  # noqa: BLE001 - return both provider failures
-                return _err(
-                    f"Eastmoney margin request failed: {exc}; "
-                    f"tushare fallback failed: {fallback_exc}"
-                )
-            return json.dumps(
-                {
-                    "ok": True,
-                    "market": "a_share",
-                    "source": "tushare",
-                    "warnings": [f"eastmoney failed ({exc}); used tushare fallback"],
-                    "data": fallback_data,
-                },
-                ensure_ascii=False,
-            )
+        if "error" in result:
+            return _err(result["error"])
 
-        result = payload.get("result") if isinstance(payload, dict) else None
-        data = result.get("data") if isinstance(result, dict) else None
-        if not isinstance(data, list) or not data:
-            try:
-                fallback_data = tushare_fallbacks.fetch_margin_trading(code, days=days)
-            except Exception as fallback_exc:  # noqa: BLE001 - preserve the original empty-data error
-                return _err(
-                    f"No margin-trading data returned for {code}. "
-                    f"Tushare fallback failed: {fallback_exc}"
-                )
-            return json.dumps(
-                {
-                    "ok": True,
-                    "market": "a_share",
-                    "source": "tushare",
-                    "warnings": ["eastmoney returned no rows; used tushare fallback"],
-                    "data": fallback_data,
-                },
-                ensure_ascii=False,
-            )
-
-        rows = [_normalize_row(item) for item in data if isinstance(item, dict)]
-        rows = rows[:days]
+        source = "tushare" if result.get("source") == "tushare" else "eastmoney"
+        warnings = []
+        if "warning" in result:
+            warnings.append(result["warning"])
 
         return json.dumps(
             {
                 "ok": True,
                 "market": "a_share",
-                "source": "eastmoney",
-                "data": {"code": code, "rows": rows},
+                "source": source,
+                "warnings": warnings,
+                "data": {"code": result["code"], "rows": result.get("rows", [])},
             },
             ensure_ascii=False,
         )
+
+
+__all__ = ["fetch_symbol_margin_trading", "MarginTradingTool"]

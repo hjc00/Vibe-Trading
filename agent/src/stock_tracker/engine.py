@@ -9,7 +9,9 @@ from typing import Any, Callable, Dict, List, Optional
 import pandas as pd
 
 from src.market_data import fetch_market_data
+from src.stock_tracker.capital_data import CapitalDataCache, load_capital_data
 from src.stock_tracker.models import (
+    CapitalMetrics,
     CrossDayDiff,
     PeriodMetrics,
     PeriodSignals,
@@ -28,12 +30,16 @@ logger = logging.getLogger(__name__)
 # averages (especially 60-day) have enough history even with holidays.
 _BUFFER_DAYS = 90
 
+# Historical days to fetch for capital-flow lookback (must cover 5-day sum).
+_CAPITAL_DATA_DAYS = 10
+
 
 class StockTrackerEngine:
     """Fetch market data and produce a structured multi-period snapshot."""
 
     def __init__(self, config: TrackerConfig) -> None:
         self.config = config
+        self._capital_cache = CapitalDataCache()
 
     def refresh(
         self,
@@ -70,6 +76,17 @@ class StockTrackerEngine:
             logger.exception("Name resolution failed")
             names = {}
 
+        # Fetch capital-flow and margin-trading data with daily caching.
+        capital_data: Dict[str, CapitalMetrics] = {}
+        try:
+            capital_data = self._fetch_capital_data(
+                self.config.watchlist,
+                trading_date=trading_date,
+                days=_CAPITAL_DATA_DAYS,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Capital data fetch failed")
+
         symbol_snapshots: List[SymbolSnapshot] = []
         unresolved: List[str] = []
         data_gaps: List[Dict[str, Any]] = []
@@ -90,7 +107,9 @@ class StockTrackerEngine:
                 if df.empty:
                     data_gaps.append({"code": code, "reason": "empty_frame"})
                     continue
-                snapshot = self._analyze_symbol(code, df, name=names.get(code))
+                snapshot = self._analyze_symbol(
+                    code, df, name=names.get(code), capital=capital_data.get(code)
+                )
                 # Use the latest available trading date from actual data.
                 if snapshot.period_signals:
                     latest = max(
@@ -196,7 +215,27 @@ class StockTrackerEngine:
         df["close"] = pd.to_numeric(df["close"], errors="coerce")
         return df.dropna()
 
-    def _analyze_symbol(self, code: str, df: pd.DataFrame, name: Optional[str] = None) -> SymbolSnapshot:
+    def _fetch_capital_data(
+        self,
+        codes: List[str],
+        trading_date: date,
+        days: int,
+    ) -> Dict[str, CapitalMetrics]:
+        """Fetch capital-flow and margin-trading data for all configured symbols."""
+        return load_capital_data(
+            codes,
+            end_date=trading_date,
+            days=days,
+            cache=self._capital_cache,
+        )
+
+    def _analyze_symbol(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        name: Optional[str] = None,
+        capital: Optional[CapitalMetrics] = None,
+    ) -> SymbolSnapshot:
         """Compute metrics, signals, and summary for one symbol."""
         df = compute_mas(df)
         df["rsi"] = compute_rsi(df["close"])
@@ -209,6 +248,11 @@ class StockTrackerEngine:
         daily_return = (close / prev_close - 1) if prev_close else 0.0
         volume = float(latest["volume"]) if "volume" in latest and pd.notna(latest["volume"]) else None
         avg_volume_20 = float(df["volume"].tail(20).mean()) if "volume" in df.columns else None
+
+        capital = self._enrich_capital_metrics(df, capital)
+        # Make capital available to signal detectors via df attrs.
+        if capital is not None:
+            df.attrs["capital"] = capital
 
         period_signals: Dict[str, PeriodSignals] = {}
         for period in self.config.periods:
@@ -224,8 +268,40 @@ class StockTrackerEngine:
             daily_return=round(daily_return, 6),
             volume=volume,
             avg_volume_20=avg_volume_20,
+            capital=capital,
             period_signals=period_signals,
         )
+
+    @staticmethod
+    def _enrich_capital_metrics(
+        df: pd.DataFrame,
+        capital: Optional[CapitalMetrics],
+    ) -> Optional[CapitalMetrics]:
+        """Fill derived capital metrics (e.g. main-force turnover ratio) from OHLCV.
+
+        Returns a shallow copy so the cached ``CapitalMetrics`` is not mutated.
+        """
+        if capital is None or capital.fund_flow_error is not None:
+            return capital
+
+        latest = df.iloc[-1]
+        close = float(latest["close"]) if "close" in latest and pd.notna(latest["close"]) else None
+        volume = float(latest["volume"]) if "volume" in latest and pd.notna(latest["volume"]) else None
+        if (
+            close is None
+            or volume is None
+            or close <= 0
+            or volume <= 0
+            or capital.fund_flow.main_net is None
+        ):
+            return capital
+
+        turnover = close * volume
+        ratio = capital.fund_flow.main_net / turnover
+        enriched_fund_flow = capital.fund_flow.model_copy(
+            update={"main_net_ratio": round(ratio, 6)}
+        )
+        return capital.model_copy(update={"fund_flow": enriched_fund_flow})
 
     def _compute_period_metrics(self, df: pd.DataFrame, period: int) -> PeriodMetrics:
         """Return numeric metrics for the given period window."""

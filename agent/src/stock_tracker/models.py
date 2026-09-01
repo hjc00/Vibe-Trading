@@ -9,7 +9,14 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 SignalType = str
-DEFAULT_SIGNALS: List[SignalType] = ["volume_spike", "breakout", "ma_alignment", "rsi"]
+DEFAULT_SIGNALS: List[SignalType] = [
+    "volume_spike",
+    "breakout",
+    "ma_alignment",
+    "rsi",
+    "main_force_inflow",
+    "margin_expansion",
+]
 DEFAULT_PERIODS: List[int] = [10, 20, 60]
 DEFAULT_WATCHLIST: List[str] = [
     "510300.SH",
@@ -156,6 +163,40 @@ class PeriodSignals(BaseModel):
     signals: Dict[SignalType, SignalValue] = Field(default_factory=dict)
 
 
+class FundFlowSnapshot(BaseModel):
+    """Daily order-bucket capital flow snapshot for one symbol."""
+
+    trade_date: Optional[date] = None
+    main_net: Optional[float] = None
+    main_net_ratio: Optional[float] = None
+    main_5d_net: Optional[float] = None
+    small_net: Optional[float] = None
+    medium_net: Optional[float] = None
+    large_net: Optional[float] = None
+    super_large_net: Optional[float] = None
+
+
+class MarginSnapshot(BaseModel):
+    """Daily margin-trading balance snapshot for one symbol."""
+
+    trade_date: Optional[date] = None
+    financing_balance: Optional[float] = None
+    financing_balance_change: Optional[float] = None
+    margin_total_balance: Optional[float] = None
+    margin_total_change: Optional[float] = None
+
+
+class CapitalMetrics(BaseModel):
+    """Combined capital-flow and margin-trading metrics for one symbol."""
+
+    fund_flow: FundFlowSnapshot = Field(default_factory=FundFlowSnapshot)
+    margin: MarginSnapshot = Field(default_factory=MarginSnapshot)
+    fund_flow_source: str = "unavailable"
+    margin_source: str = "unavailable"
+    fund_flow_error: Optional[str] = None
+    margin_error: Optional[str] = None
+
+
 class CrossDayDiff(BaseModel):
     """Change between today and the previous trading day for one symbol."""
 
@@ -180,6 +221,7 @@ class SymbolSnapshot(BaseModel):
     avg_volume_20: Optional[float] = None
     currency: str = "CNY"
     period_signals: Dict[str, PeriodSignals] = Field(default_factory=dict)
+    capital: Optional[CapitalMetrics] = None
     diff: Optional[CrossDayDiff] = None
     error: Optional[str] = None
 
@@ -275,6 +317,9 @@ __all__ = [
     "TrackerConfig",
     "PeriodMetrics",
     "PeriodSignals",
+    "FundFlowSnapshot",
+    "MarginSnapshot",
+    "CapitalMetrics",
     "CrossDayDiff",
     "SymbolSnapshot",
     "TrackerSnapshot",
