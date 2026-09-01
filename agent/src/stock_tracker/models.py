@@ -41,6 +41,11 @@ class TrackerThresholds(BaseModel):
     rsi_overbought: float = Field(default=70.0, ge=50.0, le=100.0)
     rsi_oversold: float = Field(default=30.0, ge=0.0, le=50.0)
     breakout_window: int = Field(default=20, ge=5, le=250)
+    # Risk-metric windows and stop-loss configuration (2.3).
+    atr_period: int = Field(default=14, ge=2, le=60)
+    max_drawdown_window: int = Field(default=60, ge=20, le=250)
+    beta_window: int = Field(default=60, ge=20, le=250)
+    stop_loss_atr_multiple: float = Field(default=2.0, ge=0.5, le=5.0)
 
     def get(self, name: str, default: Any = None) -> Any:
         """Return a threshold by name, including dynamically allowed extras."""
@@ -221,6 +226,24 @@ class CapitalMetrics(BaseModel):
     margin_error: Optional[str] = None
 
 
+class RiskMetrics(BaseModel):
+    """Symbol-level risk measures for stop-loss and position sizing.
+
+    Unlike ``PeriodMetrics`` these are computed once per symbol, not per period.
+    Beta is measured against the CSI 300 index (with the CSI 300 ETF fallback),
+    reusing the same benchmark frame that powers RPS.
+    """
+
+    atr_14: Optional[float] = None  # 14-day ATR in price units
+    atr_pct: Optional[float] = None  # atr_14 / close, stop-loss distance as a fraction
+    max_drawdown_60d: Optional[float] = None  # max drawdown over 60 sessions, negative fraction
+    beta_vs_index: Optional[float] = None  # OLS slope of stock returns on benchmark returns
+    beta_window: Optional[int] = None  # trading days actually used for the beta regression
+    benchmark_code: Optional[str] = None  # benchmark code used for beta (index or ETF)
+    stop_loss_price: Optional[float] = None  # suggested stop price = close - k * ATR
+    stop_loss_atr_multiple: Optional[float] = None  # the k actually used
+
+
 class CrossDayDiff(BaseModel):
     """Change between today and the previous trading day for one symbol."""
 
@@ -246,6 +269,7 @@ class SymbolSnapshot(BaseModel):
     currency: str = "CNY"
     period_signals: Dict[str, PeriodSignals] = Field(default_factory=dict)
     capital: Optional[CapitalMetrics] = None
+    risk: Optional[RiskMetrics] = None
     diff: Optional[CrossDayDiff] = None
     sector_board: Optional[str] = None
     sector_board_source: Optional[str] = None
@@ -348,6 +372,7 @@ __all__ = [
     "FundFlowHistoryItem",
     "FundFlowSnapshot",
     "CapitalMetrics",
+    "RiskMetrics",
     "CrossDayDiff",
     "SymbolSnapshot",
     "TrackerSnapshot",

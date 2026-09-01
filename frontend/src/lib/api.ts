@@ -1884,6 +1884,17 @@ export interface PeriodSignals {
   signals: Record<string, SignalValue>;
 }
 
+export interface RiskMetrics {
+  atr_14?: number | null;
+  atr_pct?: number | null;
+  max_drawdown_60d?: number | null;
+  beta_vs_index?: number | null;
+  beta_window?: number | null;
+  benchmark_code?: string | null;
+  stop_loss_price?: number | null;
+  stop_loss_atr_multiple?: number | null;
+}
+
 export interface CrossDayDiff {
   signal_count?: Record<"prev" | "curr", number> | null;
   return_pct?: number | null;
@@ -1905,6 +1916,7 @@ export interface SymbolSnapshot {
   currency: string;
   period_signals: Record<string, PeriodSignals>;
   capital?: CapitalMetrics | null;
+  risk?: RiskMetrics | null;
   diff?: CrossDayDiff | null;
   sector_board?: string | null;
   sector_board_source?: string | null;

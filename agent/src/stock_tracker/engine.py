@@ -15,6 +15,7 @@ from src.stock_tracker.models import (
     CrossDayDiff,
     PeriodMetrics,
     PeriodSignals,
+    RiskMetrics,
     SignalType,
     SignalValue,
     SymbolSnapshot,
@@ -22,6 +23,7 @@ from src.stock_tracker.models import (
     TrackerSnapshot,
 )
 from src.stock_tracker.names import fetch_a_share_names
+from src.stock_tracker.risk import compute_atr, compute_beta, compute_max_drawdown
 from src.stock_tracker.signals import compute_mas, compute_rsi, get_detector, get_detector_meta
 from src.tools.sector_tool import resolve_industry_board
 
@@ -143,6 +145,7 @@ class StockTrackerEngine:
                     name=names.get(code),
                     capital=capital_data.get(code),
                     sector_board=sector_board,
+                    benchmark_df=benchmark_df,
                 )
                 # Use the latest available trading date from actual data.
                 if snapshot.period_signals:
@@ -306,8 +309,9 @@ class StockTrackerEngine:
         name: Optional[str] = None,
         capital: Optional[CapitalMetrics] = None,
         sector_board: Optional[str] = None,
+        benchmark_df: Optional[pd.DataFrame] = None,
     ) -> SymbolSnapshot:
-        """Compute metrics, signals, and summary for one symbol."""
+        """Compute metrics, signals, risk measures, and summary for one symbol."""
         df = compute_mas(df)
         df["rsi"] = compute_rsi(df["close"])
 
@@ -324,6 +328,8 @@ class StockTrackerEngine:
         if capital is not None:
             df.attrs["capital"] = capital
 
+        risk = self._compute_risk_metrics(df, close, benchmark_df)
+
         period_signals: Dict[str, PeriodSignals] = {}
         for period in self.config.periods:
             metrics = self._compute_period_metrics(df, period)
@@ -339,9 +345,48 @@ class StockTrackerEngine:
             volume=volume,
             avg_volume_20=avg_volume_20,
             capital=capital,
+            risk=risk,
             period_signals=period_signals,
             sector_board=sector_board,
             sector_board_source="eastmoney" if sector_board else None,
+        )
+
+    def _compute_risk_metrics(
+        self,
+        df: pd.DataFrame,
+        close: float,
+        benchmark_df: Optional[pd.DataFrame],
+    ) -> Optional[RiskMetrics]:
+        """Compute symbol-level ATR, max drawdown, and beta.
+
+        Beta reuses the RPS benchmark frame (CSI 300 index with ETF fallback).
+        Returns ``None`` when no metric can be computed so the frontend does
+        not render an empty risk card.
+        """
+        atr_period = int(self.config.thresholds.get("atr_period", 14))
+        dd_window = int(self.config.thresholds.get("max_drawdown_window", 60))
+        beta_window = int(self.config.thresholds.get("beta_window", 60))
+        stop_k = float(self.config.thresholds.get("stop_loss_atr_multiple", 2.0))
+
+        atr = compute_atr(df, atr_period)
+        atr_pct = round(atr / close, 6) if atr is not None and close else None
+        max_dd = compute_max_drawdown(df, dd_window)
+        beta = compute_beta(df, benchmark_df, beta_window)
+
+        stop_price = round(close - stop_k * atr, 3) if atr is not None and close else None
+
+        if atr is None and max_dd is None and beta is None:
+            return None
+
+        return RiskMetrics(
+            atr_14=round(atr, 4) if atr is not None else None,
+            atr_pct=atr_pct,
+            max_drawdown_60d=max_dd,
+            beta_vs_index=beta,
+            beta_window=beta_window if beta is not None else None,
+            benchmark_code=_RPS_MARKET_BENCHMARK if beta is not None else None,
+            stop_loss_price=stop_price,
+            stop_loss_atr_multiple=stop_k,
         )
 
     def _compute_period_metrics(self, df: pd.DataFrame, period: int) -> PeriodMetrics:

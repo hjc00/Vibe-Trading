@@ -7,6 +7,7 @@ from src.stock_tracker.models import (
     CrossDayDiff,
     PeriodMetrics,
     PeriodSignals,
+    RiskMetrics,
     SignalState,
     SignalType,
     SignalValue,
@@ -16,6 +17,7 @@ from src.stock_tracker.models import (
     TrackerSnapshot,
     TrackerThresholds,
 )
+from src.stock_tracker.risk import compute_atr, compute_beta, compute_max_drawdown
 from src.stock_tracker.signals import (
     BreakoutDetector,
     MaAlignmentDetector,
@@ -38,6 +40,7 @@ __all__ = [
     "PeriodMetrics",
     "PeriodSignals",
     "RSIDetector",
+    "RiskMetrics",
     "SignalState",
     "SignalType",
     "SignalValue",
@@ -49,7 +52,10 @@ __all__ = [
     "TrackerStore",
     "TrackerThresholds",
     "VolumeSpikeDetector",
+    "compute_atr",
+    "compute_beta",
     "compute_mas",
+    "compute_max_drawdown",
     "compute_rsi",
     "get_detector",
     "get_detector_meta",

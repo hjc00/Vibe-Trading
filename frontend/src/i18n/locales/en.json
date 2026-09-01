@@ -1732,6 +1732,13 @@
     "rpsExplanation": "RPS (Relative Strength Percentile) measures a stock's relative strength within the watchlist + CSI 300. ≥90 means notably stronger than the benchmark; ≤10 means notably weaker.",
     "noRpsData": "No RPS data",
     "excessReturn": "Excess return",
-    "sectorBoard": "Sector"
+    "sectorBoard": "Sector",
+    "riskTitle": "Risk metrics",
+    "riskExplanation": "ATR(14): average daily price swing (14-day true range) — volatile names need a wider stop distance. Beta: how closely the stock follows the CSI 300 (index/ETF) — >1.3 amplifies moves, <0.8 is defensive. Max drawdown: worst peak-to-trough decline in 60 sessions. Stop loss = close − 2×ATR (reference price, not advice).",
+    "noRiskData": "No risk data",
+    "atr": "ATR",
+    "maxDrawdown60": "Max drawdown (60d)",
+    "beta": "Beta",
+    "stopLoss": "Stop loss"
   }
 }

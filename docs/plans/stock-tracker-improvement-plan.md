@@ -2,7 +2,7 @@
 
 > 本文档用于跟踪 A 股多周期股票追踪器（`stock_tracker`）的后续优化方向。
 > 创建时间：2026-09-01
-> 最后更新：2026-09-01
+> 最后更新：2026-09-01（已落地 2.3 风险指标）
 
 ## 一、现状概述
 
@@ -57,11 +57,13 @@
 #### 2.3 风险指标：ATR、最大回撤、Beta
 - **目标**：为每个标的补充基础风险度量，支撑止损和仓位决策。
 - **投资人价值**：知道买多少、跌到哪该止损，是完整交易闭环的前提。
-- **涉及模块**：`agent/src/stock_tracker/engine.py`、`models.py`、前端详情卡片。
+- **涉及模块**：`agent/src/stock_tracker/engine.py`、`models.py`、新增 `risk.py`、前端新增 `RiskMetricsCard.tsx`。
 - **大致方案**：
-  1. 在 `PeriodMetrics` 或 `SymbolSnapshot` 中新增 `atr_14`、`max_drawdown_60d`、`beta_vs_index`。
-  2. Beta 以沪深 300 或中证 500 为基准，用滚动收益率回归计算。
-  3. 前端详情卡片展示 ATR 止损位建议（如 close − 2×ATR）。
+  1. 在 `SymbolSnapshot` 中新增 `risk: RiskMetrics`（标的级，非周期级），含 `atr_14`、`atr_pct`、`max_drawdown_60d`、`beta_vs_index`、`beta_window`、`benchmark_code`、`stop_loss_price`、`stop_loss_atr_multiple`。
+  2. 新增 `risk.py` 提供纯函数：`compute_atr`（Wilder 平滑）、`compute_max_drawdown`、`compute_beta`（OLS 斜率，重叠样本 ≥30 才输出）。
+  3. Beta 复用 RPS 的沪深 300 benchmark（`000300.SH` → `510300.SH` 回退），零新增网络请求。
+  4. 阈值可配置：`atr_period`、`max_drawdown_window`、`beta_window`、`stop_loss_atr_multiple`。
+  5. 前端新增 `RiskMetricsCard` stat 卡，展示 ATR/回撤/Beta 与止损参考价（close − k×ATR）。
 - **验收标准**：
   - 后端正确计算 ATR、最大回撤、Beta。
   - 前端展示风险指标和止损参考价。
@@ -193,7 +195,7 @@
 |-----|-------|------|-------|---------|---------|------|
 | 2.1 | 主力资金流向信号 | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | 东财 daykline 接口在当前网络下受限，已预留 tushare fallback；见 commit `29663f55` |
 | 2.2 | 个股相对强弱（RPS） | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | watchlist 内横截面排名 + 沪深300；行业 RPS 依赖 `sector_tool`；见当前提交 |
-| 2.3 | 风险指标（ATR/回撤/Beta） | 待开始 | - | - | - | |
+| 2.3 | 风险指标（ATR/回撤/Beta） | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | 新增 `risk.py` + `RiskMetricsCard`；Beta 复用 RPS benchmark |
 | 2.4 | 多周期共振评分 | 待开始 | - | - | - | |
 | 2.5 | 行业/板块强度看板 | 待开始 | - | - | - | |
 | 2.6 | 估值与质量指标 | 待开始 | - | - | - | |
@@ -210,8 +212,8 @@
 
 ## 五、相关文件
 
-- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`models.py`、`analyzer.py`
+- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`risk.py`、`models.py`、`analyzer.py`
 - API 路由：`agent/src/api/stock_tracker_routes.py`
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`TrackerConfigPanel.tsx`
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`TrackerConfigPanel.tsx`
 - 项目索引：`docs/PROJECT_INDEX.md`

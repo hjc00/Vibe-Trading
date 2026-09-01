@@ -502,5 +502,55 @@ def test_rps_sector_none_when_single_peer():
     assert snapshot.period_signals["10"].metrics.rps_sector is None
 
 
+def test_risk_metrics_attached_with_benchmark():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    df = _make_df(rows=80)
+    benchmark_df = _make_df_with_return(return_pct=0.02)
+
+    snapshot = engine._analyze_symbol("000001.SZ", df, benchmark_df=benchmark_df)
+
+    assert snapshot.risk is not None
+    # _make_df has a constant high-low spread of 1.0 and midpoint closes.
+    assert snapshot.risk.atr_14 == pytest.approx(1.0, abs=1e-6)
+    assert snapshot.risk.atr_pct == pytest.approx(1.0 / snapshot.close, abs=1e-6)
+    assert snapshot.risk.max_drawdown_60d is not None
+    assert snapshot.risk.max_drawdown_60d <= 0.0
+    assert snapshot.risk.beta_vs_index is not None
+    assert snapshot.risk.beta_window == 60
+    # stop loss = close - 2 * ATR (close = 100 + 0.1 * 79 = 107.9).
+    assert snapshot.risk.stop_loss_price == pytest.approx(107.9 - 2 * 1.0, abs=1e-6)
+
+
+def test_risk_beta_none_when_benchmark_missing():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snapshot = engine._analyze_symbol("000001.SZ", _make_df(rows=80), benchmark_df=None)
+
+    assert snapshot.risk is not None
+    assert snapshot.risk.beta_vs_index is None
+    assert snapshot.risk.beta_window is None
+    assert snapshot.risk.atr_14 is not None
+    assert snapshot.risk.max_drawdown_60d is not None
+    assert snapshot.risk.stop_loss_price is not None
+
+
+def test_risk_stop_loss_multiple_override():
+    config = TrackerConfig(
+        watchlist=["000001.SZ"],
+        periods=[10],
+        thresholds=TrackerThresholds(stop_loss_atr_multiple=3.0),
+    )
+    engine = StockTrackerEngine(config)
+
+    snapshot = engine._analyze_symbol("000001.SZ", _make_df(rows=80), benchmark_df=None)
+
+    assert snapshot.risk is not None
+    assert snapshot.risk.stop_loss_atr_multiple == 3.0
+    assert snapshot.risk.stop_loss_price == pytest.approx(107.9 - 3 * 1.0, abs=1e-6)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

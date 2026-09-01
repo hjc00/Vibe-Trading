@@ -40,6 +40,35 @@ export function getRpsToneClass(value: number | null | undefined): string {
   return "text-muted-foreground";
 }
 
+export function formatAtr(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  return value.toFixed(2);
+}
+
+export function formatPct(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+export function formatBeta(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  return value.toFixed(2);
+}
+
+export function getBetaToneClass(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value >= 1.3) return "text-warning";
+  if (value <= 0.8) return "text-info";
+  return "text-foreground";
+}
+
+export function getDrawdownToneClass(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value <= -0.2) return "text-danger";
+  if (value <= -0.1) return "text-warning";
+  return "text-foreground";
+}
+
 /**
  * Infer the exchange suffix from the first two digits of a 6-digit A-share code.
  */

@@ -15,6 +15,7 @@ import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysi
 import { MarginChartCard } from "@/components/stock-tracker/MarginChartCard";
 import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard";
 import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
+import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -336,10 +337,11 @@ export function StockTracker() {
                   quotesUpdatedAt={quotesUpdatedAt}
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <MarginChartCard symbol={selectedSymbol} />
                   <FundFlowChartCard symbol={selectedSymbol} />
                   <RpsChartCard symbol={selectedSymbol} />
+                  <RiskMetricsCard symbol={selectedSymbol} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
