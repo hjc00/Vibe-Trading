@@ -32,11 +32,12 @@ def compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
     """
     delta = series.diff()
     gain = delta.where(delta > 0, 0.0)
-    loss = (-delta.where(delta < 0, 0.0)).replace(0, np.nan)
+    loss = -delta.where(delta < 0, 0.0)
     avg_gain = gain.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
     avg_loss = loss.ewm(alpha=1.0 / period, min_periods=period, adjust=False).mean()
-    rs = avg_gain / avg_loss
+    rs = avg_gain / avg_loss.replace(0, np.nan)
     rsi = 100 - (100 / (1 + rs))
+    rsi = rsi.where(pd.notna(rsi), 100.0)
     return rsi
 
 
@@ -306,7 +307,7 @@ class MaAlignmentDetector(SignalDetector):
 
 
 class RSIDetector(SignalDetector):
-    """Detect RSI overbought/oversold extremes."""
+    """Detect RSI overbought/oversold extremes within the active period window."""
 
     name = "rsi"
     meta = SignalMeta(
@@ -314,7 +315,7 @@ class RSIDetector(SignalDetector):
         category="momentum",
         direction="both",
         label="RSI",
-        description="RSI reaches overbought or oversold levels.",
+        description="RSI reaches overbought or oversold levels within the period window.",
         params={
             "rsi_overbought": {
                 "type": "float",
@@ -344,10 +345,18 @@ class RSIDetector(SignalDetector):
         period: int,
         thresholds: TrackerThresholds,
     ) -> SignalValue:
-        if len(df) < 14 or "rsi" not in df.columns or pd.isna(df["rsi"].iloc[-1]):
-            return SignalValue(triggered=False, description="Need 14+ bars for RSI")
+        # Use the configured period as the RSI lookback so each column shows a
+        # period-specific value rather than the same global RSI(14).
+        lookback = max(period, 2)
+        window = df.tail(lookback)
+        if len(window) < lookback or "close" not in window.columns:
+            return SignalValue(triggered=False, description=f"Need {lookback}+ bars for RSI")
 
-        rsi = float(df["rsi"].iloc[-1])
+        rsi_series = compute_rsi(window["close"], period=lookback)
+        rsi = float(rsi_series.iloc[-1])
+        if pd.isna(rsi):
+            return SignalValue(triggered=False, description=f"Need {lookback}+ bars for RSI")
+
         overbought = float(thresholds.get("rsi_overbought", 70.0))
         oversold = float(thresholds.get("rsi_oversold", 30.0))
 
