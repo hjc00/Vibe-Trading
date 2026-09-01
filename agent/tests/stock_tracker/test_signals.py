@@ -7,9 +7,17 @@ from datetime import date, timedelta
 import pandas as pd
 import pytest
 
-from src.stock_tracker.models import CapitalMetrics, FundFlowHistoryItem, FundFlowSnapshot, TrackerThresholds
+from src.stock_tracker.models import (
+    CapitalMetrics,
+    FundFlowHistoryItem,
+    FundFlowSnapshot,
+    MarginHistoryItem,
+    MarginSnapshot,
+    TrackerThresholds,
+)
 from src.stock_tracker.signals import (
     MainForceInflowDetector,
+    MarginExpansionDetector,
     NetInflowSpikeDetector,
     RSIDetector,
     get_detector,
@@ -228,3 +236,91 @@ class TestMainForceInflowDetector:
 
         assert value.triggered is False
         assert "history" in value.description.lower()
+
+
+class TestMarginExpansionDetector:
+    """The margin-expansion signal must be period-aware, not one shared scalar."""
+
+    @staticmethod
+    def _df_with_margin(
+        history: list[MarginHistoryItem],
+        *,
+        balance: float | None = None,
+        change: float | None = None,
+    ) -> pd.DataFrame:
+        df = pd.DataFrame({"close": [100.0, 101.0]})
+        df.attrs["capital"] = CapitalMetrics(
+            margin=MarginSnapshot(
+                trade_date=history[0].trade_date if history else None,
+                financing_balance=balance,
+                financing_balance_change=change,
+                history=history,
+            )
+        )
+        return df
+
+    def test_meta_registered(self) -> None:
+        meta = get_detector_meta("margin_expansion")
+        assert meta.category == "capital"
+        assert meta.direction == "bullish"
+        assert meta.format == "percent"
+        assert meta.params["margin_expansion_threshold"]["default"] == 0.03
+
+    def test_value_differs_across_periods(self) -> None:
+        # Most-recent-first daily balances: 110 -> 105 -> 100.
+        history = [
+            MarginHistoryItem(trade_date=date(2026, 9, 1), financing_balance=110.0),
+            MarginHistoryItem(trade_date=date(2026, 8, 28), financing_balance=105.0),
+            MarginHistoryItem(trade_date=date(2026, 8, 21), financing_balance=100.0),
+        ]
+        df = self._df_with_margin(history)
+        detector = MarginExpansionDetector()
+
+        one_day = detector.detect("000001.SZ", df, 1, TrackerThresholds())
+        two_day = detector.detect("000001.SZ", df, 2, TrackerThresholds())
+
+        assert one_day.triggered is True  # (110-105)/105 = +4.76%
+        assert two_day.triggered is True  # (110-100)/100 = +10%
+        assert one_day.value != two_day.value
+        assert two_day.value == pytest.approx(0.1)
+
+    def test_below_threshold_not_triggered(self) -> None:
+        history = [
+            MarginHistoryItem(trade_date=date(2026, 9, 1), financing_balance=101.0),
+            MarginHistoryItem(trade_date=date(2026, 8, 28), financing_balance=100.0),
+        ]
+        df = self._df_with_margin(history)
+        detector = MarginExpansionDetector()
+        # (101-100)/100 = 1% < the 3% default threshold.
+        value = detector.detect("000001.SZ", df, 1, TrackerThresholds())
+        assert value.triggered is False
+        assert value.value == pytest.approx(0.01)
+
+    def test_lookback_capped_at_available_history(self) -> None:
+        # Only 3 rows but a 60-day window is requested: use the full window.
+        history = [
+            MarginHistoryItem(trade_date=date(2026, 9, 1), financing_balance=110.0),
+            MarginHistoryItem(trade_date=date(2026, 8, 28), financing_balance=105.0),
+            MarginHistoryItem(trade_date=date(2026, 8, 21), financing_balance=100.0),
+        ]
+        df = self._df_with_margin(history)
+        detector = MarginExpansionDetector()
+        value = detector.detect("000001.SZ", df, 60, TrackerThresholds())
+        assert value.triggered is True
+        assert value.value == pytest.approx(0.1)
+
+    def test_falls_back_to_day_over_day_scalar_without_history(self) -> None:
+        # No daily history: use the precomputed day-over-day change scalar.
+        df = self._df_with_margin([], balance=110.0, change=10.0)
+        detector = MarginExpansionDetector()
+        value = detector.detect("000001.SZ", df, 20, TrackerThresholds())
+        assert value.triggered is True
+        assert value.value == pytest.approx(0.1)
+
+    def test_no_margin_data_returns_no_trigger(self) -> None:
+        df = pd.DataFrame({"close": [100.0, 101.0]})
+        df.attrs["capital"] = CapitalMetrics()
+        detector = MarginExpansionDetector()
+        value = detector.detect("000001.SZ", df, 10, TrackerThresholds())
+        assert value.triggered is False
+        assert "margin" in value.description.lower()

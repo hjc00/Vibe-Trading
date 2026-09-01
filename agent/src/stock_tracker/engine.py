@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 _BUFFER_DAYS = 90
 
 # Historical days to fetch for capital data (fund-flow + margin-trading).
-# Must cover the 30-day fund-flow lookback used by the spike detector.
+# Must cover the 30-day fund-flow lookback used by the spike detector. The
+# margin-trading window is widened per-refresh to cover the longest configured
+# period so the margin-expansion signal can be computed over that window.
 _CAPITAL_DATA_DAYS = max(10, _FUND_FLOW_LOOKBACK)
 
 # Market benchmark for RPS computation. The index is preferred; the ETF fallback
@@ -101,13 +103,15 @@ class StockTrackerEngine:
         except Exception:  # noqa: BLE001
             logger.exception("Benchmark data fetch failed")
 
-        # Fetch margin-trading data with daily caching.
+        # Fetch margin-trading data with daily caching. Request enough history
+        # to cover the longest configured period so the margin-expansion signal
+        # can be computed per period; fund flow keeps its own 30-day lookback.
         capital_data: Dict[str, CapitalMetrics] = {}
         try:
             capital_data = self._fetch_capital_data(
                 self.config.watchlist,
                 trading_date=trading_date,
-                days=_CAPITAL_DATA_DAYS,
+                days=max(_CAPITAL_DATA_DAYS, max(self.config.periods) + 1),
             )
         except Exception:  # noqa: BLE001
             logger.exception("Capital data fetch failed")

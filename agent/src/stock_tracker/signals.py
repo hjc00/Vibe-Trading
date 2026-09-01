@@ -555,7 +555,13 @@ def register_detector(cls: Type[SignalDetector]) -> Type[SignalDetector]:
 
 
 class MarginExpansionDetector(SignalDetector):
-    """Detect financing-balance expansion versus the previous trading day."""
+    """Detect financing-balance expansion over the requested period window.
+
+    The daily margin history is indexed most-recent-first, so ``history[0]`` is
+    today's balance and ``history[period]`` is the balance ``period`` sessions
+    earlier. The change rate is computed over that window, which makes the
+    signal period-aware like the other detectors (volume spike, breakout, RSI).
+    """
 
     name = "margin_expansion"
     meta = SignalMeta(
@@ -563,14 +569,14 @@ class MarginExpansionDetector(SignalDetector):
         category="capital",
         direction="bullish",
         label="Margin expansion",
-        description="Outstanding financing balance expanded versus the prior trading day.",
+        description="Outstanding financing balance expanded over the period window.",
         params={
             "margin_expansion_threshold": {
                 "type": "float",
                 "min": 0.0,
                 "max": 1.0,
                 "default": 0.03,
-                "description": "Financing balance day-over-day change rate required to trigger.",
+                "description": "Financing balance change rate over the period window required to trigger.",
             }
         },
         default_params={"margin_expansion_threshold": 0.03},
@@ -587,16 +593,33 @@ class MarginExpansionDetector(SignalDetector):
         thresholds: TrackerThresholds,
     ) -> SignalValue:
         capital = df.attrs.get("capital")
-        if capital is None or capital.margin.financing_balance_change is None:
-            return SignalValue(triggered=False, description="No margin change data")
+        if capital is None:
+            return SignalValue(triggered=False, description="No margin data")
 
-        change = capital.margin.financing_balance_change
-        balance = capital.margin.financing_balance
-        prior = balance - change if balance is not None else None
-        if prior is None or prior <= 0:
-            return SignalValue(triggered=False, description="Cannot compute margin change rate")
+        margin = capital.margin
+        history = margin.history
+        now_balance = history[0].financing_balance if history else None
 
-        change_pct = change / prior
+        if now_balance is None:
+            # No daily history (or the latest row is unparseable): fall back to
+            # the precomputed day-over-day change scalar.
+            change = margin.financing_balance_change
+            balance = margin.financing_balance
+            prior = balance - change if balance is not None else None
+            if prior is None or prior <= 0:
+                return SignalValue(triggered=False, description="No margin change data")
+            change_pct = change / prior
+            window_sessions = 1
+        else:
+            # Period-aware: change over the requested window, capped at the
+            # available daily history.
+            lookback = min(period, len(history) - 1)
+            prior_balance = history[lookback].financing_balance
+            if prior_balance is None or prior_balance <= 0:
+                return SignalValue(triggered=False, description="Cannot compute margin change rate")
+            change_pct = (now_balance - prior_balance) / prior_balance
+            window_sessions = lookback
+
         threshold = float(thresholds.get("margin_expansion_threshold", 0.03))
 
         if change_pct >= threshold:
@@ -606,7 +629,10 @@ class MarginExpansionDetector(SignalDetector):
                 state=state,
                 value=round(change_pct, 5),
                 threshold=threshold,
-                description=f"Financing balance +{change_pct * 100:.2f}% (>= {threshold * 100:.2f}%)",
+                description=(
+                    f"Financing balance +{change_pct * 100:.2f}% over "
+                    f"{window_sessions} session(s) (>= {threshold * 100:.2f}%)"
+                ),
             )
 
         return SignalValue(
@@ -614,7 +640,10 @@ class MarginExpansionDetector(SignalDetector):
             state=SignalState.NONE,
             value=round(change_pct, 5),
             threshold=threshold,
-            description=f"Financing balance {change_pct * 100:+.2f}%",
+            description=(
+                f"Financing balance {change_pct * 100:+.2f}% over "
+                f"{window_sessions} session(s)"
+            ),
         )
 
 
