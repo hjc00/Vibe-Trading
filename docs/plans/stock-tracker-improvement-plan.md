@@ -188,7 +188,7 @@
 
 | 序号 | 改进项 | 状态 | 负责人 | 开始时间 | 完成时间 | 备注 |
 |-----|-------|------|-------|---------|---------|------|
-| 2.1 | 主力资金流向信号 | 待开始 | - | - | - | |
+| 2.1 | 主力资金流向信号 | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | 东财 daykline 接口在当前网络下受限，已预留 tushare fallback；见 commit `29663f55` |
 | 2.2 | 个股相对强弱（RPS） | 待开始 | - | - | - | |
 | 2.3 | 风险指标（ATR/回撤/Beta） | 待开始 | - | - | - | |
 | 2.4 | 多周期共振评分 | 待开始 | - | - | - | |
@@ -210,5 +210,5 @@
 - 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`models.py`、`analyzer.py`
 - API 路由：`agent/src/api/stock_tracker_routes.py`
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`TrackerConfigPanel.tsx`
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`TrackerConfigPanel.tsx`
 - 项目索引：`docs/PROJECT_INDEX.md`
