@@ -1648,6 +1648,7 @@
     "volumeSpike": "Volume spike",
     "breakout": "Breakout",
     "maAlignment": "MA alignment",
+    "rsi_period": "RSI period",
     "rsi_overbought": "RSI overbought",
     "rsi_oversold": "RSI oversold",
     "breakout_window": "Breakout window",

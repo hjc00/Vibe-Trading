@@ -1648,6 +1648,7 @@
     "volumeSpike": "放量",
     "breakout": "突破",
     "maAlignment": "均线排列",
+    "rsi_period": "RSI 周期",
     "rsi_overbought": "RSI 超买",
     "rsi_oversold": "RSI 超卖",
     "breakout_window": "突破窗口",

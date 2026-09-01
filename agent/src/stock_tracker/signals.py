@@ -315,8 +315,15 @@ class RSIDetector(SignalDetector):
         category="momentum",
         direction="both",
         label="RSI",
-        description="RSI reaches overbought or oversold levels within the period window.",
+        description="RSI reaches overbought or oversold levels using a configurable lookback.",
         params={
+            "rsi_period": {
+                "type": "int",
+                "min": 2,
+                "max": 250,
+                "default": 14,
+                "description": "RSI lookback period in trading days.",
+            },
             "rsi_overbought": {
                 "type": "float",
                 "min": 50.0,
@@ -332,7 +339,7 @@ class RSIDetector(SignalDetector):
                 "description": "RSI level considered oversold.",
             },
         },
-        default_params={"rsi_overbought": 70.0, "rsi_oversold": 30.0},
+        default_params={"rsi_period": 14.0, "rsi_overbought": 70.0, "rsi_oversold": 30.0},
         format="raw",
         ranking_enabled=True,
         ranking_extractor=lambda sv: abs((sv.value or 50.0) - 50.0),
@@ -345,9 +352,10 @@ class RSIDetector(SignalDetector):
         period: int,
         thresholds: TrackerThresholds,
     ) -> SignalValue:
-        # Use the configured period as the RSI lookback so each column shows a
-        # period-specific value rather than the same global RSI(14).
-        lookback = max(period, 2)
+        # Use a configurable RSI lookback (default 14) across all period columns
+        # instead of tying the lookback to the tracker period.
+        lookback = int(thresholds.get("rsi_period", 14))
+        lookback = max(2, min(lookback, 250))
         window = df.tail(lookback)
         if len(window) < lookback or "close" not in window.columns:
             return SignalValue(triggered=False, description=f"Need {lookback}+ bars for RSI")
