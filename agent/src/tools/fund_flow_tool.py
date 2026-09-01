@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 
 from backtest.loaders.eastmoney_client import get_json, resolve_secid
@@ -121,9 +122,26 @@ def fetch_symbol_fund_flow(symbol: str, *, period: str, days: int) -> dict[str, 
         "klt": "101" if is_daily else "1",
         "lmt": "0" if is_daily else "0",
     }
-    try:
-        payload = get_json(url, params=params)
-    except Exception as exc:  # noqa: BLE001 - one bad symbol must not kill the batch
+    # Bypass system-level proxies for Eastmoney fund-flow endpoints; corporate
+    # proxies often reject or throttle push2his.eastmoney.com while direct
+    # internet access works fine.
+    headers = {"Referer": "https://quote.eastmoney.com/"}
+    last_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            payload = get_json(
+                url,
+                params=params,
+                headers=headers,
+                proxies={"http": None, "https": None},
+            )
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+    else:
+        exc = last_error or Exception("unknown fund flow fetch error")
         logger.warning("fund flow fetch failed for %s: %s", symbol, exc)
         if period == "daily":
             try:

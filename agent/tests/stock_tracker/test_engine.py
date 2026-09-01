@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pandas as pd
 import pytest
 
 from src.stock_tracker.engine import StockTrackerEngine
-from src.stock_tracker.models import CapitalMetrics, MarginSnapshot, TrackerConfig, TrackerThresholds
+from src.stock_tracker.models import (
+    CapitalMetrics,
+    FundFlowHistoryItem,
+    FundFlowSnapshot,
+    MarginSnapshot,
+    TrackerConfig,
+    TrackerThresholds,
+)
 
 
 def _make_df(rows: int = 80, volume_spike_idx: int | None = None) -> pd.DataFrame:
@@ -290,6 +297,92 @@ def test_margin_expansion_signal_triggered():
     signal = ps.signals["margin_expansion"]
     assert signal.triggered is True
     assert signal.value is not None
+
+
+def _make_fund_flow_capital(days: int = 30, *, spike_main: float | None = None) -> CapitalMetrics:
+    """Build ``CapitalMetrics`` with a fund-flow history ending today."""
+    base_date = date(2026, 8, 31)
+    history: list[FundFlowHistoryItem] = []
+    for i in range(days):
+        trade_date = base_date - timedelta(days=days - 1 - i)
+        if i == days - 1 and spike_main is not None:
+            main_net = spike_main
+        else:
+            # Mostly positive so both signals can be exercised.
+            main_net = 100_000.0 + i * 10_000.0
+        history.append(
+            FundFlowHistoryItem(
+                trade_date=trade_date,
+                main_net=main_net,
+                super_large_net=main_net * 0.5,
+                large_net=main_net * 0.3,
+                medium_net=-main_net * 0.1,
+                small_net=-main_net * 0.1,
+            )
+        )
+
+    snapshot = FundFlowSnapshot(
+        trade_date=base_date,
+        main_net=history[-1].main_net,
+        history=history,
+    )
+    return CapitalMetrics(fund_flow=snapshot)
+
+
+def test_net_inflow_spike_signal_triggered():
+    config = TrackerConfig(
+        watchlist=["000001.SZ"],
+        periods=[10],
+        signals=["net_inflow_spike"],
+    )
+    engine = StockTrackerEngine(config)
+    df = _make_df(rows=80)
+    capital = _make_fund_flow_capital(30, spike_main=10_000_000.0)
+
+    snapshot = engine._analyze_symbol("000001.SZ", df, capital=capital)
+
+    ps = snapshot.period_signals["10"]
+    signal = ps.signals["net_inflow_spike"]
+    assert signal.triggered is True
+    assert signal.value is not None
+
+
+def test_main_force_inflow_signal_triggered():
+    config = TrackerConfig(
+        watchlist=["000001.SZ"],
+        periods=[10],
+        signals=["main_force_inflow"],
+    )
+    engine = StockTrackerEngine(config)
+    df = _make_df(rows=80)
+    capital = _make_fund_flow_capital(30)
+
+    snapshot = engine._analyze_symbol("000001.SZ", df, capital=capital)
+
+    ps = snapshot.period_signals["10"]
+    signal = ps.signals["main_force_inflow"]
+    assert signal.triggered is True
+    assert signal.value is not None
+
+
+def test_compute_rankings_includes_new_capital_signals():
+    config = TrackerConfig(
+        watchlist=["000001.SZ", "000002.SZ"],
+        periods=[10],
+        signals=["net_inflow_spike", "main_force_inflow"],
+    )
+    engine = StockTrackerEngine(config)
+
+    df_a = _make_df(rows=80)
+    df_b = _make_df(rows=80)
+    snap_a = engine._analyze_symbol("000001.SZ", df_a, capital=_make_fund_flow_capital(30, spike_main=10_000_000.0))
+    snap_b = engine._analyze_symbol("000002.SZ", df_b, capital=_make_fund_flow_capital(30))
+
+    rankings = StockTrackerEngine._compute_rankings([snap_a, snap_b])
+    assert "net_inflow_spike" in rankings
+    assert "main_force_inflow" in rankings
+    # The spike should rank higher than the steady inflow.
+    assert rankings["net_inflow_spike"][0] == "000001.SZ"
 
 
 if __name__ == "__main__":

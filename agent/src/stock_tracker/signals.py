@@ -243,6 +243,154 @@ class BreakoutDetector(SignalDetector):
         )
 
 
+class NetInflowSpikeDetector(SignalDetector):
+    """Detect when today's main-force net inflow spikes vs the recent average."""
+
+    name = "net_inflow_spike"
+    meta = SignalMeta(
+        name="net_inflow_spike",
+        category="capital",
+        direction="both",
+        label="Inflow spike",
+        description="Today's main-force net inflow is unusually large versus the recent 20-day average absolute inflow.",
+        params={
+            "net_inflow_spike_multiple": {
+                "type": "float",
+                "min": 1.0,
+                "default": 2.0,
+                "description": "Ratio of |today main_net| to the mean |main_net| over the last 20 trading days.",
+            }
+        },
+        default_params={"net_inflow_spike_multiple": 2.0},
+        format="multiple",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: abs(sv.value or 0.0),
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        capital = df.attrs.get("capital")
+        if capital is None:
+            return SignalValue(triggered=False, description="No capital data")
+
+        fund_flow = capital.fund_flow
+        today_main = fund_flow.main_net
+        if today_main is None:
+            return SignalValue(triggered=False, description="No main net inflow data")
+
+        history = fund_flow.history
+        if len(history) < 21:
+            return SignalValue(triggered=False, description="Insufficient fund-flow history for spike detection")
+
+        main_values = [item.main_net for item in history[-21:]]
+        if any(v is None for v in main_values):
+            return SignalValue(triggered=False, description="Missing main_net values in history")
+
+        abs_values = [abs(v) for v in main_values]  # type: ignore[misc]
+        mean_abs = float(sum(abs_values) / len(abs_values))
+        if mean_abs == 0:
+            return SignalValue(triggered=False, description="Zero average absolute main net")
+
+        multiple = abs(today_main) / mean_abs
+        threshold = float(thresholds.get("net_inflow_spike_multiple", 2.0))
+        triggered = multiple >= threshold
+        state = SignalState.NONE
+
+        if triggered:
+            state = SignalState.STRONG if multiple >= threshold * 1.5 else SignalState.TRIGGERED
+            direction = "inflow" if today_main > 0 else "outflow"
+            return SignalValue(
+                triggered=True,
+                state=state,
+                value=round(multiple, 3),
+                threshold=threshold,
+                description=f"Main-force {direction} spike {multiple:.2f}x the 20-day average",
+            )
+
+        return SignalValue(
+            triggered=False,
+            state=state,
+            value=round(multiple, 3),
+            threshold=threshold,
+            description=f"Main-force net {multiple:.2f}x average, below {threshold}x threshold",
+        )
+
+
+class MainForceInflowDetector(SignalDetector):
+    """Detect consecutive days of positive main-force net inflow."""
+
+    name = "main_force_inflow"
+    meta = SignalMeta(
+        name="main_force_inflow",
+        category="capital",
+        direction="bullish",
+        label="Main force inflow",
+        description="Main-force net inflow has been positive for N consecutive trading days.",
+        params={
+            "main_force_inflow_days": {
+                "type": "int",
+                "min": 2,
+                "max": 10,
+                "default": 3,
+                "description": "Minimum consecutive days of positive main-force net inflow.",
+            }
+        },
+        default_params={"main_force_inflow_days": 3.0},
+        format="raw",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: sv.value or 0.0,
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        capital = df.attrs.get("capital")
+        if capital is None:
+            return SignalValue(triggered=False, description="No capital data")
+
+        history = capital.fund_flow.history
+        if not history:
+            return SignalValue(triggered=False, description="No fund-flow history")
+
+        threshold = int(thresholds.get("main_force_inflow_days", 3))
+        threshold = max(2, min(threshold, 10))
+        if len(history) < threshold:
+            return SignalValue(triggered=False, description=f"Need {threshold}+ days of fund-flow history")
+
+        # Count consecutive positive main_net from the latest bar backwards.
+        consecutive = 0
+        for item in reversed(history):
+            if item.main_net is None or item.main_net <= 0:
+                break
+            consecutive += 1
+
+        triggered = consecutive >= threshold
+        state = SignalState.NONE
+        if triggered:
+            state = SignalState.STRONG if consecutive >= threshold + 2 else SignalState.TRIGGERED
+
+        return SignalValue(
+            triggered=triggered,
+            state=state,
+            value=consecutive,
+            threshold=float(threshold),
+            description=(
+                f"Main-force inflow for {consecutive} consecutive days"
+                if triggered
+                else f"Main-force inflow {consecutive} consecutive days, below {threshold}"
+            ),
+        )
+
+
 class MaAlignmentDetector(SignalDetector):
     """Detect moving-average bullish/bearish alignment."""
 
@@ -475,6 +623,8 @@ register_detector(BreakoutDetector)
 register_detector(MaAlignmentDetector)
 register_detector(RSIDetector)
 register_detector(MarginExpansionDetector)
+register_detector(NetInflowSpikeDetector)
+register_detector(MainForceInflowDetector)
 
 
 def list_detector_names() -> List[SignalType]:
@@ -520,6 +670,8 @@ __all__ = [
     "MaAlignmentDetector",
     "RSIDetector",
     "MarginExpansionDetector",
+    "NetInflowSpikeDetector",
+    "MainForceInflowDetector",
     "get_detector",
     "get_detector_meta",
     "list_detector_meta",

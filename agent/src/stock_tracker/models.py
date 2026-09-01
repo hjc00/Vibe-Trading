@@ -181,11 +181,39 @@ class MarginSnapshot(BaseModel):
     history: List[MarginHistoryItem] = Field(default_factory=list)
 
 
-class CapitalMetrics(BaseModel):
-    """Margin-trading metrics for one symbol."""
+class FundFlowHistoryItem(BaseModel):
+    """One daily fund-flow observation by order bucket."""
 
+    trade_date: Optional[date] = None
+    main_net: Optional[float] = None
+    super_large_net: Optional[float] = None
+    large_net: Optional[float] = None
+    medium_net: Optional[float] = None
+    small_net: Optional[float] = None
+
+
+class FundFlowSnapshot(BaseModel):
+    """Daily main-force/net-inflow snapshot for one symbol."""
+
+    trade_date: Optional[date] = None
+    main_net: Optional[float] = None
+    main_net_ratio: Optional[float] = None  # main_net / turnover, display only
+    main_5d_net: Optional[float] = None  # sum of main_net over the latest 5 days
+    super_large_net: Optional[float] = None
+    large_net: Optional[float] = None
+    medium_net: Optional[float] = None
+    small_net: Optional[float] = None
+    history: List[FundFlowHistoryItem] = Field(default_factory=list)
+
+
+class CapitalMetrics(BaseModel):
+    """Capital metrics for one symbol (fund-flow + margin-trading)."""
+
+    fund_flow: FundFlowSnapshot = Field(default_factory=FundFlowSnapshot)
     margin: MarginSnapshot = Field(default_factory=MarginSnapshot)
+    fund_flow_source: str = "unavailable"
     margin_source: str = "unavailable"
+    fund_flow_error: Optional[str] = None
     margin_error: Optional[str] = None
 
 
@@ -311,6 +339,8 @@ __all__ = [
     "PeriodSignals",
     "MarginHistoryItem",
     "MarginSnapshot",
+    "FundFlowHistoryItem",
+    "FundFlowSnapshot",
     "CapitalMetrics",
     "CrossDayDiff",
     "SymbolSnapshot",

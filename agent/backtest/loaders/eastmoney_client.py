@@ -78,12 +78,21 @@ def _min_interval() -> float:
     return resolve_min_interval(_MIN_INTERVAL_ENV, _DEFAULT_MIN_INTERVAL)
 
 
-def get_json(url: str, *, params: dict[str, Any]) -> Any:
+def get_json(
+    url: str,
+    *,
+    params: dict[str, Any],
+    headers: dict[str, str] | None = None,
+    proxies: dict[str, str | None] | None = None,
+) -> Any:
     """Issue a throttled Eastmoney GET and decode the body as JSON.
 
     Args:
         url: Fully-qualified Eastmoney endpoint URL.
         params: Query parameters for the request.
+        headers: Optional headers merged over the default browser UA.
+        proxies: Optional proxies mapping forwarded to ``requests``. Pass
+            ``{"http": None, "https": None}`` to bypass system-level proxies.
 
     Returns:
         The decoded JSON payload (typically a ``dict``).
@@ -99,6 +108,8 @@ def get_json(url: str, *, params: dict[str, Any]) -> Any:
         host_key=_HOST_KEY,
         min_interval=_min_interval(),
         params=params,
+        headers=headers,
+        proxies=proxies,
     )
 
 

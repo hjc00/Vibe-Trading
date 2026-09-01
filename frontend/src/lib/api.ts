@@ -1814,9 +1814,33 @@ export interface MarginSnapshot {
   history: MarginHistoryItem[];
 }
 
+export interface FundFlowHistoryItem {
+  trade_date?: string | null;
+  main_net?: number | null;
+  super_large_net?: number | null;
+  large_net?: number | null;
+  medium_net?: number | null;
+  small_net?: number | null;
+}
+
+export interface FundFlowSnapshot {
+  trade_date?: string | null;
+  main_net?: number | null;
+  main_net_ratio?: number | null;
+  main_5d_net?: number | null;
+  super_large_net?: number | null;
+  large_net?: number | null;
+  medium_net?: number | null;
+  small_net?: number | null;
+  history: FundFlowHistoryItem[];
+}
+
 export interface CapitalMetrics {
+  fund_flow: FundFlowSnapshot;
   margin: MarginSnapshot;
+  fund_flow_source: string;
   margin_source: string;
+  fund_flow_error?: string | null;
   margin_error?: string | null;
 }
 

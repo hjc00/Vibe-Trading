@@ -146,6 +146,7 @@ def throttled_get(
     params: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout: float = 15.0,
+    proxies: dict[str, str | None] | None = None,
 ) -> requests.Response:
     """GET ``url`` after waiting out the per-host minimum interval.
 
@@ -157,6 +158,8 @@ def throttled_get(
         params: Optional query parameters.
         headers: Optional headers merged over the default browser UA.
         timeout: Per-request socket timeout in seconds.
+        proxies: Optional proxies mapping forwarded to ``requests``. Pass
+            ``{"http": None, "https": None}`` to bypass system-level proxies.
 
     Returns:
         The :class:`requests.Response`; the caller decides how to parse it.
@@ -170,7 +173,13 @@ def throttled_get(
         merged_headers.update(headers)
     _THROTTLE.wait(host_key, min_interval)
     session = _session_for(host_key)
-    return session.get(url, params=params, headers=merged_headers, timeout=timeout)
+    return session.get(
+        url,
+        params=params,
+        headers=merged_headers,
+        timeout=timeout,
+        proxies=proxies,
+    )
 
 
 def throttled_get_json(
@@ -181,6 +190,7 @@ def throttled_get_json(
     params: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout: float = 15.0,
+    proxies: dict[str, str | None] | None = None,
 ) -> Any:
     """Throttled GET that decodes the response body as JSON.
 
@@ -195,6 +205,7 @@ def throttled_get_json(
         params=params,
         headers=headers,
         timeout=timeout,
+        proxies=proxies,
     )
     response.raise_for_status()
     return response.json()

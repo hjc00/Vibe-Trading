@@ -135,10 +135,10 @@ Vibe-Trading/
 
 | 文件 | 职责 |
 |------|------|
-| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段；`refresh_interval_seconds` 控制实时行情轮询间隔）+ 快照类型 + 代码归一；资金相关模型 `CapitalMetrics`/`MarginSnapshot`/`MarginHistoryItem` |
-| `signals.py` | 信号注册表 + 自描述 `SignalMeta`；内置放量/突破/均线排列/RSI，以及 `margin_expansion` 资金信号检测器 |
-| `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，拉取融资融券数据，计算周期指标，跑检测器，按元数据生成排名与跨日 diff |
-| `capital_data.py` | 批量抓取个股融资融券数据，按交易日 + namespace 缓存，per-symbol 错误隔离，返回历史序列 `margin.history` |
+| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段；`refresh_interval_seconds` 控制实时行情轮询间隔）+ 快照类型 + 代码归一；资金相关模型 `CapitalMetrics`（含 `FundFlowSnapshot`/`MarginSnapshot` 双维度）/`FundFlowHistoryItem`/`MarginHistoryItem` |
+| `signals.py` | 信号注册表 + 自描述 `SignalMeta`；内置放量/突破/均线排列/RSI，`margin_expansion` 与 `net_inflow_spike`/`main_force_inflow` 资金信号检测器 |
+| `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，拉取资金流向+融资融券数据，计算周期指标，跑检测器，按元数据生成排名与跨日 diff |
+| `capital_data.py` | 批量抓取个股资金流向（东财分单）与融资融券数据，按交易日 + namespace 缓存，per-symbol 错误隔离，返回历史序列 `fund_flow.history` 与 `margin.history` |
 | `names.py` | 经腾讯行情接口解析中文名 |
 | `store.py` | `TrackerStore`：原子 JSON 文件存储 |
 | `analyzer.py` | `run_analysis` 包装 `ChatLLM` 产出结构化报告 |

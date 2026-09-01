@@ -1711,6 +1711,16 @@
     "marginTotalBalance": "Short selling balance",
     "capitalDataUnavailable": "Capital data unavailable",
     "marginChartTitle": "Margin balance trend",
-    "noMarginData": "No margin data"
+    "noMarginData": "No margin data",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "price": "Price",
+    "change": "Change",
+    "mainForceNetInflow": "Main force net inflow",
+    "mainForce5dNetInflow": "Main force 5D net",
+    "fundFlowChartTitle": "Main-force capital flow trend",
+    "netInflowSpike": "Inflow spike",
+    "mainForceInflow": "Main force inflow",
+    "fundFlowDataUnavailable": "Fund flow data unavailable"
   }
 }

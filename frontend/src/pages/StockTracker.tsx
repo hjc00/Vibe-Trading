@@ -13,6 +13,7 @@ import { TrackerCharts } from "@/components/stock-tracker/TrackerCharts";
 import { TrackerAnalyzePanel } from "@/components/stock-tracker/TrackerAnalyzePanel";
 import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysisReport";
 import { MarginChartCard } from "@/components/stock-tracker/MarginChartCard";
+import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -319,7 +320,7 @@ export function StockTracker() {
                 {t("stockTracker.noSnapshot")}
               </section>
             ) : (
-              <section className="grid gap-4 lg:grid-cols-[1fr_380px]">
+              <section className="flex flex-col gap-4">
                 <TrackerTable
                   symbols={snapshot.symbols}
                   periods={config?.periods ?? []}
@@ -329,10 +330,15 @@ export function StockTracker() {
                   onRemoveSymbol={handleRemoveSymbol}
                   quotesUpdatedAt={quotesUpdatedAt}
                 />
-                <div className="flex flex-col gap-4">
-                  <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
-                  <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <MarginChartCard symbol={selectedSymbol} />
+                  <FundFlowChartCard symbol={selectedSymbol} />
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
+                  <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
+                  <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
                 </div>
               </section>
             )}

@@ -9,7 +9,7 @@ from typing import Any, Callable, Dict, List, Optional
 import pandas as pd
 
 from src.market_data import fetch_market_data
-from src.stock_tracker.capital_data import CapitalDataCache, load_capital_data
+from src.stock_tracker.capital_data import _FUND_FLOW_LOOKBACK, CapitalDataCache, load_capital_data
 from src.stock_tracker.models import (
     CapitalMetrics,
     CrossDayDiff,
@@ -30,8 +30,9 @@ logger = logging.getLogger(__name__)
 # averages (especially 60-day) have enough history even with holidays.
 _BUFFER_DAYS = 90
 
-# Historical days to fetch for margin-trading lookback.
-_CAPITAL_DATA_DAYS = 10
+# Historical days to fetch for capital data (fund-flow + margin-trading).
+# Must cover the 30-day fund-flow lookback used by the spike detector.
+_CAPITAL_DATA_DAYS = max(10, _FUND_FLOW_LOOKBACK)
 
 
 class StockTrackerEngine:
