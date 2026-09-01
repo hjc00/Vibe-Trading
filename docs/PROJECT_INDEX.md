@@ -2,7 +2,7 @@
 
 > 深度逐模块索引，按需读取（由根 [CLAUDE.md](../CLAUDE.md) 指向，不随会话自动加载）。
 > 代码改动后请同步更新本文件对应模块（见 CLAUDE.md「文档同步约定」）。
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 一、项目总览
 
@@ -35,7 +35,8 @@ Vibe-Trading/
 ├── start-web.bat                 # Windows 一键启动
 ├── docker-compose.yml Dockerfile # 容器化
 ├── pyproject.toml                # 构建/测试/lint 配置
-└── CLAUDE.md docs/               # AI 上下文索引（本文件 + 精简地图）
+├── CLAUDE.md docs/               # AI 上下文索引（本文件 + 精简地图）
+│   └── plans/                    # 功能改进计划文档
 ```
 
 ## 三、后端 agent/src/ 逐模块
@@ -144,6 +145,7 @@ Vibe-Trading/
 
 - **路由**（挂载于 `/api/stock-tracker/`）：`settings` GET/PUT（含 `refresh_interval_seconds`）、`signals` GET（信号元数据）、`GET /`、`history`、`quotes` GET（轻量实时行情）、`refresh` POST、`refresh-status`、`analyze` POST/GET、`analyze/history`、`analyze/{id}`。
 - **扩展方式**：新增信号只需在 `signals.py` 写一个 `SignalDetector` 子类并 `register_detector`；若信号依赖资金数据，在 `capital_data.py` 中返回对应字段，engine 会自动写入 `SymbolSnapshot.capital`，无需改路由。
+- **改进计划**：详见 [`docs/plans/stock-tracker-improvement-plan.md`](plans/stock-tracker-improvement-plan.md)。
 - **测试**：`tests/stock_tracker/test_{models,signals,engine,store,names,analyzer,capital_data}.py` + `tests/api/test_stock_tracker_routes.py`。
 
 ## 六、前端 frontend/

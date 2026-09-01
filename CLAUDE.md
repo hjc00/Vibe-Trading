@@ -1,7 +1,7 @@
 # Vibe-Trading — 项目导航
 
 > 本文件是 AI 上下文索引，每次会话自动加载。改动代码后请同步更新本文件或 [docs/PROJECT_INDEX.md](docs/PROJECT_INDEX.md)（见文末「文档同步约定」）。
-> 最后更新：2026-08-31
+> 最后更新：2026-09-01
 
 ## 项目定位
 
@@ -24,6 +24,7 @@
 | `frontend/` | Vite + React 前端 |
 | `desktop/electron/` | Electron 桌面壳 |
 | `data/` | 运行时产物（含 `stock_tracker/` 快照） |
+| `docs/` | 文档索引与改进计划（含 `PROJECT_INDEX.md`、`plans/`） |
 | `artifacts/`、`bear_advocate/`、`factor_out/`、`factor_output/` | 生成 / scratch 目录 |
 | `assets/` | 仓库媒体（截图 / 图标 / demo） |
 | `wiki/` | 独立文档站源码（vibetrading.wiki） |
