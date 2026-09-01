@@ -134,14 +134,15 @@ Vibe-Trading/
 
 | 文件 | 职责 |
 |------|------|
-| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`）+ 快照类型（`PeriodMetrics`/`PeriodSignals`/`SignalValue`/`SymbolSnapshot`/`TrackerSnapshot`/`CrossDayDiff`）+ 代码归一（`000001`→`000001.SZ`） |
-| `signals.py` | 3 个可插拔检测器（放量、N 日突破、均线排列）+ `compute_rsi`/`compute_mas` |
-| `engine.py` | `StockTrackerEngine.refresh`：经 `src.market_data.fetch_market_data` 取 OHLCV，计算 10/20/60d 周期指标，跑检测器，算排名 + 跨日 diff |
+| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段）+ 快照类型 + 代码归一 |
+| `signals.py` | 信号注册表 + 自描述 `SignalMeta`；内置放量/突破/均线排列/RSI 四个示例检测器 |
+| `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，计算周期指标，跑检测器，按元数据生成排名与跨日 diff |
 | `names.py` | 经腾讯行情接口解析中文名 |
-| `store.py` | `TrackerStore`：`data/stock_tracker/` 下原子 JSON 文件存储（settings/snapshots/analyses） |
-| `analyzer.py` | `run_analysis` 包装 `ChatLLM` 产出结构化中文 JSON 报告（summary/symbols/portfolio/caveats） |
+| `store.py` | `TrackerStore`：原子 JSON 文件存储 |
+| `analyzer.py` | `run_analysis` 包装 `ChatLLM` 产出结构化报告 |
 
-- **路由**（挂载于 `/api/stock-tracker/`）：`settings` GET/PUT、`GET /`(最新快照)、`history`、`refresh` POST、`refresh-status`、`analyze` POST(LLM，`asyncio.to_thread` 卸载)/GET、`analyze/history`、`analyze/{id}`。
+- **路由**（挂载于 `/api/stock-tracker/`）：`settings` GET/PUT、`signals` GET（信号元数据）、`GET /`、`history`、`refresh` POST、`refresh-status`、`analyze` POST/GET、`analyze/history`、`analyze/{id}`。
+- **扩展方式**：新增信号只需在 `signals.py` 写一个 `SignalDetector` 子类并 `register_detector`，无需改 engine/路由/前端。
 - **测试**：`tests/stock_tracker/test_{models,signals,engine,store,names,analyzer}.py` + `tests/api/test_stock_tracker_routes.py`。
 
 ## 六、前端 frontend/

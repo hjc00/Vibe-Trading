@@ -590,6 +590,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(settings),
     }),
+  getStockTrackerSignalMeta: () => request<{ status: string; signals: SignalMeta[] }>("/api/stock-tracker/signals"),
   getStockTrackerSnapshot: () => request<StockTrackerApiResponse>("/api/stock-tracker"),
   refreshStockTracker: () =>
     request<StockTrackerApiResponse>("/api/stock-tracker/refresh", { method: "POST" }),
@@ -1747,12 +1748,13 @@ export interface TrackerThresholds {
   rsi_overbought: number;
   rsi_oversold: number;
   breakout_window: number;
+  [key: string]: number;
 }
 
 export interface TrackerConfig {
   watchlist: string[];
   periods: number[];
-  signals: ("volume_spike" | "breakout" | "ma_alignment")[];
+  signals: SignalType[];
   thresholds: TrackerThresholds;
 }
 
@@ -1786,11 +1788,33 @@ export interface SignalValue {
   description: string;
 }
 
-export type SignalType = "volume_spike" | "breakout" | "ma_alignment";
+export type SignalType = string;
+
+export interface SignalMetaParam {
+  type: string;
+  min?: number;
+  max?: number;
+  default: number;
+  description?: string;
+}
+
+export interface SignalMeta {
+  name: string;
+  category: string;
+  direction: "bullish" | "bearish" | "neutral" | "both";
+  label: string;
+  description: string;
+  params: Record<string, SignalMetaParam>;
+  default_params: Record<string, number>;
+  format: "percent" | "multiple" | "raw" | "price";
+  ranking_enabled: boolean;
+  show_in_table: boolean;
+  is_global: boolean;
+}
 
 export interface PeriodSignals {
   metrics: PeriodMetrics;
-  signals: Partial<Record<SignalType, SignalValue>>;
+  signals: Record<string, SignalValue>;
 }
 
 export interface CrossDayDiff {

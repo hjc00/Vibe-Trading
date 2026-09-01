@@ -4,7 +4,36 @@ from __future__ import annotations
 
 import pytest
 
-from src.stock_tracker.models import TrackerConfig, normalize_a_share_code
+from src.stock_tracker.models import TrackerConfig, TrackerThresholds, normalize_a_share_code
+
+
+def test_tracker_thresholds_dynamic_key_preserved() -> None:
+    thresholds = TrackerThresholds(volume_spike=3.0, custom_param=5.0)
+    assert thresholds.get("volume_spike") == 3.0
+    assert thresholds.get("custom_param") == 5.0
+    dumped = thresholds.model_dump()
+    assert dumped["volume_spike"] == 3.0
+    assert dumped["custom_param"] == 5.0
+
+
+def test_tracker_thresholds_defaults() -> None:
+    thresholds = TrackerThresholds()
+    assert thresholds.get("volume_spike") == 2.0
+    assert thresholds.get("rsi_overbought") == 70.0
+    assert thresholds.get("rsi_oversold") == 30.0
+    assert thresholds.get("breakout_window") == 20
+    assert thresholds.get("missing", "fallback") == "fallback"
+
+
+def test_tracker_config_rejects_unknown_signal() -> None:
+    with pytest.raises(ValueError, match="Unknown signal"):
+        TrackerConfig(signals=["not_a_signal"])
+
+
+def test_tracker_config_accepts_rsi() -> None:
+    config = TrackerConfig(signals=["volume_spike", "rsi"])
+    assert "rsi" in config.signals
+    assert "volume_spike" in config.signals
 
 
 @pytest.mark.parametrize(

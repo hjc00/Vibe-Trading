@@ -19,11 +19,15 @@ from src.stock_tracker.models import (
 from src.stock_tracker.signals import (
     BreakoutDetector,
     MaAlignmentDetector,
+    RSIDetector,
     VolumeSpikeDetector,
     compute_mas,
     compute_rsi,
     get_detector,
-    list_detectors,
+    get_detector_meta,
+    list_detector_meta,
+    list_detector_names,
+    register_detector,
 )
 from src.stock_tracker.store import TrackerStore
 
@@ -33,6 +37,7 @@ __all__ = [
     "MaAlignmentDetector",
     "PeriodMetrics",
     "PeriodSignals",
+    "RSIDetector",
     "SignalState",
     "SignalType",
     "SignalValue",
@@ -47,5 +52,8 @@ __all__ = [
     "compute_mas",
     "compute_rsi",
     "get_detector",
-    "list_detectors",
+    "get_detector_meta",
+    "list_detector_meta",
+    "list_detector_names",
+    "register_detector",
 ]

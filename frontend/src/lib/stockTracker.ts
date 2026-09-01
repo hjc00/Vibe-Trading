@@ -1,16 +1,21 @@
-import type { SignalType } from "@/lib/api";
+import type { SignalMeta, SignalType } from "@/lib/api";
 
-export const SIGNAL_LABEL_KEYS: Record<
-  SignalType,
-  "stockTracker.volumeSpike" | "stockTracker.breakout" | "stockTracker.maAlignment"
-> = {
+export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
   volume_spike: "stockTracker.volumeSpike",
   breakout: "stockTracker.breakout",
   ma_alignment: "stockTracker.maAlignment",
+  rsi: "stockTracker.rsi",
 } as const;
 
-export function getSignalLabelKey(signal: SignalType): (typeof SIGNAL_LABEL_KEYS)[SignalType] {
-  return SIGNAL_LABEL_KEYS[signal];
+export function getSignalLabelKey(signal: SignalType): string {
+  return SIGNAL_LABEL_KEYS[signal] ?? signal;
+}
+
+export function formatSignalValue(format: SignalMeta["format"] | undefined, value: number): string {
+  if (format === "multiple") return `${value.toFixed(2)}x`;
+  if (format === "percent") return `${(value * 100).toFixed(2)}%`;
+  if (format === "price") return value.toFixed(2);
+  return String(value);
 }
 
 /**

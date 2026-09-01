@@ -1,14 +1,16 @@
 import { useTranslation } from "react-i18next";
-import type { SignalType, TrackerSnapshot } from "@/lib/api";
+import type { SignalMeta, TrackerSnapshot } from "@/lib/api";
 
 interface TrackerSummaryProps {
   snapshot: TrackerSnapshot | null;
-  signals: SignalType[];
+  signals: SignalMeta[];
   loading: boolean;
 }
 
 export function TrackerSummary({ snapshot, signals, loading }: TrackerSummaryProps) {
   const { t } = useTranslation();
+
+  const visibleSignalNames = new Set(signals.filter((s) => s.show_in_table).map((s) => s.name));
 
   const symbolCount = snapshot?.symbols.length ?? 0;
   const triggeredSignals = snapshot?.symbols.reduce((count, symbol) => {
@@ -17,9 +19,8 @@ export function TrackerSummary({ snapshot, signals, loading }: TrackerSummaryPro
       Object.values(symbol.period_signals).reduce((inner, ps) => {
         return (
           inner +
-          signals
-            .filter((signalType) => signalType !== "ma_alignment")
-            .filter((signalType) => ps.signals?.[signalType]?.triggered).length
+          Object.entries(ps.signals)
+            .filter(([signalType, signal]) => visibleSignalNames.has(signalType) && signal?.triggered).length
         );
       }, 0)
     );

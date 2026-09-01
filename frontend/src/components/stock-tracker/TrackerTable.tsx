@@ -1,13 +1,14 @@
 import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatSignalValue, getSignalLabelKey } from "@/lib/stockTracker";
 import { SignalBadge } from "./SignalBadge";
-import type { SignalType, SignalValue, SymbolSnapshot } from "@/lib/api";
+import type { SignalMeta, SignalValue, SymbolSnapshot } from "@/lib/api";
 
 interface TrackerTableProps {
   symbols: SymbolSnapshot[];
   periods: number[];
-  signals: SignalType[];
+  signals: SignalMeta[];
   selectedCode: string | null;
   onSelectCode: (code: string) => void;
   onRemoveSymbol?: (code: string) => void;
@@ -15,6 +16,9 @@ interface TrackerTableProps {
 
 export function TrackerTable({ symbols, periods, signals, selectedCode, onSelectCode, onRemoveSymbol }: TrackerTableProps) {
   const { t } = useTranslation();
+
+  const tableSignals = signals.filter((s) => s.show_in_table);
+  const globalSignals = signals.filter((s) => s.is_global);
 
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
@@ -65,7 +69,15 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
                           </span>
                         )}
                       </span>
-                      <GlobalMaAlignment signal={symbol.period_signals["10"]?.signals?.ma_alignment} />
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {globalSignals.map((meta) => (
+                          <GlobalSignalBadge
+                            key={meta.name}
+                            meta={meta}
+                            signal={symbol.period_signals["10"]?.signals?.[meta.name]}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </td>
                   {periods.map((period) => {
@@ -77,16 +89,15 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
                             <ReturnPill value={ps?.metrics.return_pct} />
                           </div>
                           <div className="flex flex-wrap justify-center gap-1">
-                            {signals
-                              .filter((signalType) => signalType !== "ma_alignment")
-                              .map((signalType) => (
-                                <SignalBadge
-                                  key={signalType}
-                                  type={signalType}
-                                  signal={ps?.signals?.[signalType]}
-                                  compact
-                                />
-                              ))}
+                            {tableSignals.map((meta) => (
+                              <SignalBadge
+                                key={meta.name}
+                                type={meta.name}
+                                signal={ps?.signals?.[meta.name]}
+                                meta={meta}
+                                compact
+                              />
+                            ))}
                           </div>
                         </div>
                       </td>
@@ -120,14 +131,17 @@ export function TrackerTable({ symbols, periods, signals, selectedCode, onSelect
   );
 }
 
-function GlobalMaAlignment({ signal }: { signal: SignalValue | undefined }) {
+function GlobalSignalBadge({ signal, meta }: { signal: SignalValue | undefined; meta: SignalMeta }) {
   const { t } = useTranslation();
   if (!signal || !signal.triggered) return null;
   return (
-    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary" title={signal.description}>
-      {t("stockTracker.maAlignment")}
+    <span
+      className="inline-flex w-fit items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+      title={signal.description}
+    >
+      {t(getSignalLabelKey(meta.name) as never)}
       {signal.value !== null && signal.value !== undefined && (
-        <span className="font-mono tabular-nums">{(signal.value * 100).toFixed(2)}%</span>
+        <span className="font-mono tabular-nums">{formatSignalValue(meta.format, signal.value)}</span>
       )}
     </span>
   );
@@ -167,12 +181,12 @@ function CrossDayDiffCell({ diff }: { diff: SymbolSnapshot["diff"] }) {
       )}
       {diff.new_signals.length > 0 && (
         <span className="text-success">
-          {t("stockTracker.newSignals")}: {diff.new_signals.join(", ")}
+          {t("stockTracker.newSignals")}: {diff.new_signals.map((s) => t(getSignalLabelKey(s) as never)).join(", ")}
         </span>
       )}
       {diff.cleared_signals.length > 0 && (
         <span className="text-muted-foreground">
-          {t("stockTracker.clearedSignals")}: {diff.cleared_signals.join(", ")}
+          {t("stockTracker.clearedSignals")}: {diff.cleared_signals.map((s) => t(getSignalLabelKey(s) as never)).join(", ")}
         </span>
       )}
       {diff.new_signals.length === 0 && diff.cleared_signals.length === 0 && (

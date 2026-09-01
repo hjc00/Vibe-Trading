@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Type
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Literal, Optional, Type
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,9 @@ from src.stock_tracker.models import (
     SignalValue,
     TrackerThresholds,
 )
+
+SignalDirection = Literal["bullish", "bearish", "neutral", "both"]
+SignalFormat = Literal["percent", "multiple", "raw", "price"]
 
 
 def compute_rsi(series: pd.Series, period: int = 14) -> pd.Series:
@@ -46,10 +50,55 @@ def compute_mas(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+@dataclass
+class SignalMeta:
+    """Self-describing metadata for a signal detector.
+
+    This is what allows the frontend and engine to handle a new signal without
+    hard-coding its name, formatting, or ranking behaviour.
+    """
+
+    name: str
+    category: str
+    direction: SignalDirection
+    label: str
+    description: str
+    params: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    default_params: Dict[str, float] = field(default_factory=dict)
+    format: SignalFormat = "raw"
+    ranking_enabled: bool = True
+    ranking_extractor: Optional[Callable[[SignalValue], float]] = None
+    show_in_table: bool = True
+    is_global: bool = False
+
+    def model_dump(self) -> Dict[str, Any]:
+        """Return a JSON-safe dict (callables are omitted)."""
+        return {
+            "name": self.name,
+            "category": self.category,
+            "direction": self.direction,
+            "label": self.label,
+            "description": self.description,
+            "params": self.params,
+            "default_params": self.default_params,
+            "format": self.format,
+            "ranking_enabled": self.ranking_enabled,
+            "show_in_table": self.show_in_table,
+            "is_global": self.is_global,
+        }
+
+
 class SignalDetector(ABC):
     """Base class for a signal detector."""
 
     name: SignalType = ""  # type: ignore[assignment]
+    meta: SignalMeta = SignalMeta(
+        name="",
+        category="custom",
+        direction="neutral",
+        label="",
+        description="",
+    )
 
     @abstractmethod
     def detect(
@@ -66,6 +115,25 @@ class VolumeSpikeDetector(SignalDetector):
     """Detect unusual volume expansion over a lookback window."""
 
     name = "volume_spike"
+    meta = SignalMeta(
+        name="volume_spike",
+        category="volume",
+        direction="neutral",
+        label="Volume spike",
+        description="Latest volume is unusually large versus the recent average.",
+        params={
+            "volume_spike": {
+                "type": "float",
+                "min": 1.0,
+                "default": 2.0,
+                "description": "Volume ratio versus recent average required to trigger.",
+            }
+        },
+        default_params={"volume_spike": 2.0},
+        format="multiple",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: sv.value or 0.0,
+    )
 
     def detect(
         self,
@@ -84,7 +152,7 @@ class VolumeSpikeDetector(SignalDetector):
 
         avg_volume = float(recent.mean())
         ratio = latest_volume / avg_volume
-        threshold = thresholds.volume_spike
+        threshold = thresholds.get("volume_spike", 2.0)
         triggered = ratio >= threshold
 
         state = SignalState.NONE
@@ -108,6 +176,26 @@ class BreakoutDetector(SignalDetector):
     """Detect when price breaks the recent N-day high or low."""
 
     name = "breakout"
+    meta = SignalMeta(
+        name="breakout",
+        category="momentum",
+        direction="both",
+        label="Breakout",
+        description="Price closes above the recent high or below the recent low.",
+        params={
+            "breakout_window": {
+                "type": "int",
+                "min": 5,
+                "max": 250,
+                "default": 20,
+                "description": "Number of days used to define the recent high/low range.",
+            }
+        },
+        default_params={"breakout_window": 20.0},
+        format="percent",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: abs(sv.value or 0.0),
+    )
 
     def detect(
         self,
@@ -116,7 +204,7 @@ class BreakoutDetector(SignalDetector):
         period: int,
         thresholds: TrackerThresholds,
     ) -> SignalValue:
-        window = thresholds.breakout_window
+        window = int(thresholds.get("breakout_window", 20))
         if len(df) < window + 1 or "close" not in df.columns or "high" not in df.columns or "low" not in df.columns:
             return SignalValue(triggered=False, description="Insufficient data for breakout")
 
@@ -158,6 +246,19 @@ class MaAlignmentDetector(SignalDetector):
     """Detect moving-average bullish/bearish alignment."""
 
     name = "ma_alignment"
+    meta = SignalMeta(
+        name="ma_alignment",
+        category="trend",
+        direction="both",
+        label="MA alignment",
+        description="Moving averages are aligned bullishly or bearishly.",
+        params={},
+        default_params={},
+        format="percent",
+        ranking_enabled=False,
+        show_in_table=False,
+        is_global=True,
+    )
 
     def detect(
         self,
@@ -204,19 +305,115 @@ class MaAlignmentDetector(SignalDetector):
         )
 
 
+class RSIDetector(SignalDetector):
+    """Detect RSI overbought/oversold extremes."""
+
+    name = "rsi"
+    meta = SignalMeta(
+        name="rsi",
+        category="momentum",
+        direction="both",
+        label="RSI",
+        description="RSI reaches overbought or oversold levels.",
+        params={
+            "rsi_overbought": {
+                "type": "float",
+                "min": 50.0,
+                "max": 100.0,
+                "default": 70.0,
+                "description": "RSI level considered overbought.",
+            },
+            "rsi_oversold": {
+                "type": "float",
+                "min": 0.0,
+                "max": 50.0,
+                "default": 30.0,
+                "description": "RSI level considered oversold.",
+            },
+        },
+        default_params={"rsi_overbought": 70.0, "rsi_oversold": 30.0},
+        format="raw",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: abs((sv.value or 50.0) - 50.0),
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        if len(df) < 14 or "rsi" not in df.columns or pd.isna(df["rsi"].iloc[-1]):
+            return SignalValue(triggered=False, description="Need 14+ bars for RSI")
+
+        rsi = float(df["rsi"].iloc[-1])
+        overbought = float(thresholds.get("rsi_overbought", 70.0))
+        oversold = float(thresholds.get("rsi_oversold", 30.0))
+
+        if rsi >= overbought:
+            return SignalValue(
+                triggered=True,
+                state=SignalState.STRONG,
+                value=round(rsi, 2),
+                threshold=overbought,
+                description=f"RSI overbought {rsi:.1f} (>= {overbought})",
+            )
+        if rsi <= oversold:
+            return SignalValue(
+                triggered=True,
+                state=SignalState.TRIGGERED,
+                value=round(rsi, 2),
+                threshold=oversold,
+                description=f"RSI oversold {rsi:.1f} (<= {oversold})",
+            )
+
+        return SignalValue(
+            triggered=False,
+            state=SignalState.NONE,
+            value=round(rsi, 2),
+            threshold=None,
+            description=f"RSI {rsi:.1f}",
+        )
+
+
 # Global detector registry. New detectors are added here and picked up automatically.
 _DETECTOR_REGISTRY: Dict[SignalType, Type[SignalDetector]] = {}
-_DETECTOR_INSTANCES: Dict[SignalType, SignalDetector] = {}
+_DETECTOR_META: Dict[SignalType, SignalMeta] = {}
 
 
-def _register_detector(cls: Type[SignalDetector]) -> Type[SignalDetector]:
+def register_detector(cls: Type[SignalDetector]) -> Type[SignalDetector]:
+    """Register a detector class and its metadata."""
     _DETECTOR_REGISTRY[cls.name] = cls
+    _DETECTOR_META[cls.name] = cls.meta
     return cls
 
 
-_register_detector(VolumeSpikeDetector)
-_register_detector(BreakoutDetector)
-_register_detector(MaAlignmentDetector)
+register_detector(VolumeSpikeDetector)
+register_detector(BreakoutDetector)
+register_detector(MaAlignmentDetector)
+register_detector(RSIDetector)
+
+
+def list_detector_names() -> List[SignalType]:
+    """Return all registered detector names."""
+    return list(_DETECTOR_REGISTRY.keys())
+
+
+def list_detector_meta() -> List[SignalMeta]:
+    """Return metadata for all registered detectors."""
+    return list(_DETECTOR_META.values())
+
+
+def get_detector_meta(name: SignalType) -> SignalMeta:
+    """Return metadata for a single detector."""
+    try:
+        return _DETECTOR_META[name]
+    except KeyError as exc:
+        raise ValueError(f"Unknown signal type: {name}") from exc
+
+
+_DETECTOR_INSTANCES: Dict[SignalType, SignalDetector] = {}
 
 
 def get_detector(name: SignalType) -> SignalDetector:
@@ -231,18 +428,18 @@ def get_detector(name: SignalType) -> SignalDetector:
     return instance
 
 
-def list_detectors() -> List[Type[SignalDetector]]:
-    """Return all registered detector classes."""
-    return list(_DETECTOR_REGISTRY.values())
-
-
 __all__ = [
     "compute_rsi",
     "compute_mas",
+    "SignalMeta",
     "SignalDetector",
     "VolumeSpikeDetector",
     "BreakoutDetector",
     "MaAlignmentDetector",
+    "RSIDetector",
     "get_detector",
-    "list_detectors",
+    "get_detector_meta",
+    "list_detector_meta",
+    "list_detector_names",
+    "register_detector",
 ]

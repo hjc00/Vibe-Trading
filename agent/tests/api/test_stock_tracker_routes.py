@@ -28,7 +28,23 @@ def isolated_tracker_store():
             yield store
 
 
-def test_get_settings_defaults(client):
+def test_list_signals_endpoint(client):
+    response = client.get("/api/stock-tracker/signals")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    names = {s["name"] for s in data["signals"]}
+    assert "volume_spike" in names
+    assert "breakout" in names
+    assert "ma_alignment" in names
+    assert "rsi" in names
+    for signal in data["signals"]:
+        assert "params" in signal
+        assert "format" in signal
+        assert "show_in_table" in signal
+        assert "is_global" in signal
+
+
     response = client.get("/api/stock-tracker/settings")
     assert response.status_code == 200
     data = response.json()

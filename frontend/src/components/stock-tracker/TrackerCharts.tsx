@@ -2,16 +2,21 @@ import { useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useChartLifecycle } from "@/hooks/useChartLifecycle";
 import { getChartTheme } from "@/lib/chart-theme";
-import type { SignalType, SymbolSnapshot } from "@/lib/api";
+import type { SignalMeta, SymbolSnapshot } from "@/lib/api";
 
 interface TrackerChartsProps {
   symbol: SymbolSnapshot | null;
-  signals: SignalType[];
+  signals: SignalMeta[];
 }
 
 export function TrackerCharts({ symbol, signals }: TrackerChartsProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
+
+  const visibleSignalNames = useMemo(
+    () => new Set(signals.filter((s) => s.show_in_table).map((s) => s.name)),
+    [signals],
+  );
 
   const data = useMemo(() => {
     if (!symbol) return null;
@@ -22,14 +27,12 @@ export function TrackerCharts({ symbol, signals }: TrackerChartsProps) {
       periods,
       returns: periods.map((period) => symbol.period_signals[String(period)]?.metrics.return_pct ?? 0),
       signalCounts: periods.map((period) =>
-        signals
-          .filter((signalType) => signalType !== "ma_alignment")
-          .filter(
-            (signalType) => symbol.period_signals[String(period)]?.signals?.[signalType]?.triggered,
-          ).length,
+        Object.entries(symbol.period_signals[String(period)]?.signals ?? {}).filter(
+          ([signalType, signal]) => visibleSignalNames.has(signalType) && signal?.triggered,
+        ).length,
       ),
     };
-  }, [symbol, signals]);
+  }, [symbol, visibleSignalNames]);
 
   useChartLifecycle(
     ref,

@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { TrackerConfigPanel } from "./TrackerConfigPanel";
-import type { TrackerConfig } from "@/lib/api";
+import type { SignalMeta, TrackerConfig } from "@/lib/api";
 
 interface TrackerControlBarProps {
   addCode: string;
@@ -11,6 +11,7 @@ interface TrackerControlBarProps {
   settingsConfig: TrackerConfig;
   onSaveConfig: (config: TrackerConfig) => void;
   settingsDisabled: boolean;
+  signalMeta?: SignalMeta[];
   onAnalyze: () => void;
   analyzeDisabled: boolean;
   onRefresh: () => void;
@@ -25,6 +26,7 @@ export function TrackerControlBar({
   settingsConfig,
   onSaveConfig,
   settingsDisabled,
+  signalMeta,
   onAnalyze,
   analyzeDisabled,
   onRefresh,
@@ -65,6 +67,7 @@ export function TrackerControlBar({
           config={settingsConfig}
           onSave={onSaveConfig}
           disabled={settingsDisabled}
+          signalMeta={signalMeta}
         />
         <button
           type="button"

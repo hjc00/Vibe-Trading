@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 
@@ -20,7 +20,7 @@ from src.stock_tracker.models import (
     TrackerSnapshot,
 )
 from src.stock_tracker.names import fetch_a_share_names
-from src.stock_tracker.signals import compute_mas, compute_rsi, get_detector
+from src.stock_tracker.signals import compute_mas, compute_rsi, get_detector, get_detector_meta
 
 logger = logging.getLogger(__name__)
 
@@ -296,7 +296,7 @@ class StockTrackerEngine:
 
     @staticmethod
     def _compute_rankings(snapshots: List[SymbolSnapshot]) -> Dict[str, List[str]]:
-        """Rank symbols by return, volume spike, and signal count per period."""
+        """Rank symbols by return, enabled signals, and total triggered count."""
         rankings: Dict[str, List[str]] = {}
         if not snapshots:
             return rankings
@@ -316,19 +316,31 @@ class StockTrackerEngine:
             )
             rankings[f"return_{period}"] = [s.code for s in sorted_symbols]
 
-        # Volume spike ranking (uses the shortest period ratio if available).
-        shortest_period = str(periods[0]) if periods else "10"
+        # Per-signal rankings for enabled detectors that opt in.
+        baseline_period = str(periods[0]) if periods else "10"
+        all_signal_names: set[str] = set()
+        if snapshots and periods:
+            all_signal_names = set().union(
+                *(set(s.period_signals[baseline_period].signals.keys()) for s in snapshots)
+            )
 
-        def _volume_ratio(snapshot: SymbolSnapshot) -> float:
-            ps = snapshot.period_signals.get(shortest_period)
-            if ps is None:
-                return 0.0
-            signal = ps.signals.get("volume_spike")
-            return signal.value or 0.0 if signal else 0.0
+        for signal_name in all_signal_names:
+            meta = get_detector_meta(signal_name)
+            if not meta.ranking_enabled:
+                continue
+            extractor = meta.ranking_extractor or (lambda sv: 1.0 if sv.triggered else 0.0)
 
-        rankings["volume_spike"] = [
-            s.code for s in sorted(snapshots, key=_volume_ratio, reverse=True)
-        ]
+            def _signal_score(snapshot: SymbolSnapshot, name: str = signal_name, fn: Callable[[SignalValue], float] = extractor) -> float:
+                score = 0.0
+                for ps in snapshot.period_signals.values():
+                    signal = ps.signals.get(name)
+                    if signal:
+                        score += fn(signal)
+                return score
+
+            rankings[signal_name] = [
+                s.code for s in sorted(snapshots, key=_signal_score, reverse=True)
+            ]
 
         # Total triggered signal count across all periods.
         def _signal_count(snapshot: SymbolSnapshot) -> int:

@@ -1,28 +1,30 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
-import { getSignalLabelKey } from "@/lib/stockTracker";
-import type { SignalType, SignalValue } from "@/lib/api";
+import { getSignalLabelKey, formatSignalValue } from "@/lib/stockTracker";
+import type { SignalMeta, SignalType, SignalValue } from "@/lib/api";
 
 interface SignalBadgeProps {
   type: SignalType;
   signal: SignalValue | undefined;
   compact?: boolean;
+  meta?: SignalMeta;
 }
 
-export function SignalBadge({ type, signal, compact = false }: SignalBadgeProps) {
+export function SignalBadge({ type, signal, compact = false, meta }: SignalBadgeProps) {
   const { t } = useTranslation();
 
   if (!signal || !signal.triggered) {
     return compact ? null : (
       <span className="inline-flex items-center rounded px-2 py-0.5 text-[10px] text-muted-foreground">
-        {t(getSignalLabelKey(type))}: {t("stockTracker.none")}
+        {t(getSignalLabelKey(type) as never)}: {t("stockTracker.none")}
       </span>
     );
   }
 
   const isStrong = signal.state === "strong";
-  const isBullish = signal.description.toLowerCase().includes("bullish") || signal.description.toLowerCase().includes("above");
-  const isBearish = signal.description.toLowerCase().includes("bearish") || signal.description.toLowerCase().includes("below");
+  const direction = meta?.direction ?? inferDirectionFromDescription(signal.description);
+  const isBullish = direction === "bullish" || (direction === "both" && isBullishDescription(signal.description));
+  const isBearish = direction === "bearish" || (direction === "both" && isBearishDescription(signal.description));
 
   return (
     <span
@@ -35,17 +37,25 @@ export function SignalBadge({ type, signal, compact = false }: SignalBadgeProps)
       )}
       title={signal.description}
     >
-      {t(getSignalLabelKey(type))}
+      {t(getSignalLabelKey(type) as never)}
       {signal.value !== null && signal.value !== undefined && (
-        <span className="font-mono tabular-nums">{formatSignalValue(type, signal.value)}</span>
+        <span className="font-mono tabular-nums">{formatSignalValue(meta?.format, signal.value)}</span>
       )}
     </span>
   );
 }
 
-function formatSignalValue(type: SignalType, value: number): string {
-  if (type === "volume_spike") return `${value.toFixed(2)}x`;
-  if (type === "breakout") return `${(value * 100).toFixed(2)}%`;
-  if (type === "ma_alignment") return `${(value * 100).toFixed(2)}%`;
-  return String(value);
+function inferDirectionFromDescription(description: string): "bullish" | "bearish" | "neutral" {
+  const lower = description.toLowerCase();
+  if (isBullishDescription(lower)) return "bullish";
+  if (isBearishDescription(lower)) return "bearish";
+  return "neutral";
+}
+
+function isBullishDescription(description: string): boolean {
+  return /bullish|above|overbought/.test(description.toLowerCase());
+}
+
+function isBearishDescription(description: string): boolean {
+  return /bearish|below|oversold/.test(description.toLowerCase());
 }

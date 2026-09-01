@@ -99,6 +99,79 @@ def test_records_to_dataframe_parses_date_column():
     assert df.index[0].date().isoformat() == "2026-08-27"
 
 
+def _make_oscillating_df(rows: int = 80, final_close_multiplier: float = 1.0) -> pd.DataFrame:
+    """Build a DataFrame with up/down closes so RSI is well-defined."""
+    dates = pd.date_range(end="2026-08-31", periods=rows, freq="B")
+    close = 100.0
+    closes = []
+    for i in range(rows):
+        # Alternate small up/down days to keep RSI in a neutral, computable range.
+        change = 0.2 if i % 2 == 0 else -0.1
+        close += change
+        closes.append(close)
+    closes[-1] *= final_close_multiplier
+
+    base = pd.DataFrame(
+        {
+            "open": [c - 0.1 for c in closes],
+            "high": [c + 0.3 for c in closes],
+            "low": [c - 0.3 for c in closes],
+            "close": closes,
+            "volume": [10000 + (i % 5) * 1000 for i in range(rows)],
+        },
+        index=dates,
+    )
+    return base
+
+
+def test_rsi_overbought_triggered():
+    df = _make_oscillating_df(rows=80, final_close_multiplier=1.5)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    snapshot = engine._analyze_symbol("000001.SZ", df)
+
+    ps = snapshot.period_signals["10"]
+    signal = ps.signals["rsi"]
+    assert signal.triggered is True
+    assert "overbought" in signal.description.lower()
+
+
+def test_rsi_not_triggered_in_neutral_zone():
+    df = _make_oscillating_df(rows=80)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    snapshot = engine._analyze_symbol("000001.SZ", df)
+
+    ps = snapshot.period_signals["10"]
+    signal = ps.signals["rsi"]
+    assert signal.triggered is False
+    assert signal.value is not None
+
+
+def test_compute_diff_detects_new_rsi_signal():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    df_neutral = _make_oscillating_df(rows=80)
+    df_overbought = _make_oscillating_df(rows=80, final_close_multiplier=1.5)
+
+    previous = engine._analyze_symbol("000001.SZ", df_neutral)
+    current = engine._analyze_symbol("000001.SZ", df_overbought)
+
+    from datetime import datetime, timezone
+    from src.stock_tracker.models import TrackerSnapshot
+
+    previous_snapshot = TrackerSnapshot(
+        generated_at=datetime.now(timezone.utc),
+        trading_date=None,
+        config=config,
+        symbols=[previous],
+    )
+    diff_map = engine._compute_diff_map([current], previous_snapshot)
+    diff = diff_map["000001.SZ"]
+    assert "rsi" in diff.new_signals
+
+
 def test_compute_rankings_by_return():
     config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])
     engine = StockTrackerEngine(config)
@@ -114,6 +187,22 @@ def test_compute_rankings_by_return():
     rankings = StockTrackerEngine._compute_rankings([snap_a, snap_b])
     assert rankings["return_10"][0] == "000002.SZ"
     assert rankings["return_10"][1] == "000001.SZ"
+
+
+def test_compute_rankings_includes_enabled_signals():
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snap_a = engine._analyze_symbol("000001.SZ", _make_df(rows=80))
+    snap_b = engine._analyze_symbol("000002.SZ", _make_df(rows=80))
+
+    rankings = StockTrackerEngine._compute_rankings([snap_a, snap_b])
+    assert "return_10" in rankings
+    assert "volume_spike" in rankings
+    assert "rsi" in rankings
+    assert "signal_count" in rankings
+    # ma_alignment opts out of ranking.
+    assert "ma_alignment" not in rankings
 
 
 def test_compute_diff_detects_new_signal():

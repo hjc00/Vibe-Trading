@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
-import { api, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
+import { api, type SignalMeta, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import { normalizeAShareCode } from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
@@ -23,6 +23,7 @@ export function StockTracker() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [addCode, setAddCode] = useState("");
+  const [signalMeta, setSignalMeta] = useState<SignalMeta[]>([]);
   const {
     open: analyzeOpen,
     selectedSymbols,
@@ -66,6 +67,16 @@ export function StockTracker() {
       setConfig(settings.config);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    }
+  }, []);
+
+  const loadSignals = useCallback(async () => {
+    try {
+      const response = await api.getStockTrackerSignalMeta();
+      setSignalMeta(response.signals);
+    } catch (err) {
+      // Non-fatal: components fall back to hard-wired metadata.
+      setSignalMeta([]);
     }
   }, []);
 
@@ -173,13 +184,13 @@ export function StockTracker() {
     let mounted = true;
     (async () => {
       setLoading(true);
-      await Promise.all([loadSettings(), loadSnapshot(), loadLatest(), loadHistory()]);
+      await Promise.all([loadSettings(), loadSnapshot(), loadSignals(), loadLatest(), loadHistory()]);
       if (mounted) setLoading(false);
     })();
     return () => {
       mounted = false;
     };
-  }, [loadSettings, loadSnapshot, loadLatest, loadHistory]);
+  }, [loadSettings, loadSnapshot, loadSignals, loadLatest, loadHistory]);
 
   const selectedSymbol = snapshot?.symbols.find((s) => s.code === selectedCode) ?? null;
   const settingsConfig = useMemo(
@@ -217,6 +228,7 @@ export function StockTracker() {
           settingsConfig={settingsConfig}
           onSaveConfig={handleSaveConfig}
           settingsDisabled={loading || refreshing}
+          signalMeta={signalMeta}
           onAnalyze={openAnalyze}
           analyzeDisabled={loading || refreshing || !snapshot || snapshot.symbols.length === 0}
           onRefresh={refresh}
@@ -240,7 +252,7 @@ export function StockTracker() {
           <>
             <TrackerSummary
               snapshot={snapshot}
-              signals={config?.signals ?? []}
+              signals={signalMeta}
               loading={refreshing}
             />
 
@@ -253,13 +265,13 @@ export function StockTracker() {
                 <TrackerTable
                   symbols={snapshot.symbols}
                   periods={config?.periods ?? []}
-                  signals={config?.signals ?? []}
+                  signals={signalMeta}
                   selectedCode={selectedCode}
                   onSelectCode={setSelectedCode}
                   onRemoveSymbol={handleRemoveSymbol}
                 />
                 <div className="flex flex-col gap-4">
-                  <TrackerCharts symbol={selectedSymbol} signals={config?.signals ?? []} />
+                  <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
                   <SymbolDetail symbol={selectedSymbol} />
                 </div>
               </section>

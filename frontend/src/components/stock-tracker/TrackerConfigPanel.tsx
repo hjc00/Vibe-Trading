@@ -1,24 +1,98 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSignalLabelKey, normalizeAShareCode } from "@/lib/stockTracker";
-import type { SignalType, TrackerConfig } from "@/lib/api";
+import type { SignalMeta, TrackerConfig } from "@/lib/api";
 
 interface TrackerConfigPanelProps {
   config: TrackerConfig;
   onSave: (config: TrackerConfig) => void;
   disabled?: boolean;
+  signalMeta?: SignalMeta[];
 }
 
-const ALL_SIGNALS: SignalType[] = ["volume_spike", "breakout", "ma_alignment"];
 const PERIOD_PRESETS = [5, 10, 20, 60];
 
-export function TrackerConfigPanel({ config, onSave, disabled }: TrackerConfigPanelProps) {
+const FALLBACK_SIGNALS: SignalMeta[] = [
+  {
+    name: "volume_spike",
+    category: "volume",
+    direction: "neutral",
+    label: "Volume spike",
+    description: "Latest volume is unusually large versus the recent average.",
+    params: {
+      volume_spike: { type: "float", min: 1, default: 2, description: "Volume ratio versus recent average." },
+    },
+    default_params: { volume_spike: 2 },
+    format: "multiple",
+    ranking_enabled: true,
+    show_in_table: true,
+    is_global: false,
+  },
+  {
+    name: "breakout",
+    category: "momentum",
+    direction: "both",
+    label: "Breakout",
+    description: "Price closes above the recent high or below the recent low.",
+    params: {
+      breakout_window: { type: "int", min: 5, max: 250, default: 20, description: "Days used to define the recent range." },
+    },
+    default_params: { breakout_window: 20 },
+    format: "percent",
+    ranking_enabled: true,
+    show_in_table: true,
+    is_global: false,
+  },
+  {
+    name: "ma_alignment",
+    category: "trend",
+    direction: "both",
+    label: "MA alignment",
+    description: "Moving averages are aligned bullishly or bearishly.",
+    params: {},
+    default_params: {},
+    format: "percent",
+    ranking_enabled: false,
+    show_in_table: false,
+    is_global: true,
+  },
+  {
+    name: "rsi",
+    category: "momentum",
+    direction: "both",
+    label: "RSI",
+    description: "RSI reaches overbought or oversold levels.",
+    params: {
+      rsi_overbought: { type: "float", min: 50, max: 100, default: 70, description: "RSI level considered overbought." },
+      rsi_oversold: { type: "float", min: 0, max: 50, default: 30, description: "RSI level considered oversold." },
+    },
+    default_params: { rsi_overbought: 70, rsi_oversold: 30 },
+    format: "raw",
+    ranking_enabled: true,
+    show_in_table: true,
+    is_global: false,
+  },
+];
+
+export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: TrackerConfigPanelProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<TrackerConfig>(config);
   const [watchlistInput, setWatchlistInput] = useState(config.watchlist.join(", "));
+
+  const signals = signalMeta ?? FALLBACK_SIGNALS;
+  const allParams = useMemo(() => {
+    const params: { key: string; meta: SignalMeta; param: SignalMeta["params"][string] }[] = [];
+    for (const meta of signals) {
+      if (!draft.signals.includes(meta.name)) continue;
+      for (const [key, param] of Object.entries(meta.params)) {
+        params.push({ key, meta, param });
+      }
+    }
+    return params;
+  }, [signals, draft.signals]);
 
   useEffect(() => {
     if (open) {
@@ -43,11 +117,11 @@ export function TrackerConfigPanel({ config, onSave, disabled }: TrackerConfigPa
     setOpen(false);
   };
 
-  const toggleSignal = (signal: SignalType) => {
+  const toggleSignal = (signalName: string) => {
     setDraft((prev) => {
-      const next = prev.signals.includes(signal)
-        ? prev.signals.filter((s) => s !== signal)
-        : [...prev.signals, signal];
+      const next = prev.signals.includes(signalName)
+        ? prev.signals.filter((s) => s !== signalName)
+        : [...prev.signals, signalName];
       return { ...prev, signals: next };
     });
   };
@@ -61,7 +135,7 @@ export function TrackerConfigPanel({ config, onSave, disabled }: TrackerConfigPa
     });
   };
 
-  const updateThreshold = (key: keyof TrackerConfig["thresholds"], value: string) => {
+  const updateThreshold = (key: string, value: string) => {
     const num = parseFloat(value);
     if (Number.isNaN(num)) return;
     setDraft((prev) => ({
@@ -139,39 +213,40 @@ export function TrackerConfigPanel({ config, onSave, disabled }: TrackerConfigPa
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">{t("stockTracker.signals")}</label>
               <div className="flex flex-wrap gap-2">
-                {ALL_SIGNALS.map((signal) => (
+                {signals.map((signal) => (
                   <button
-                    key={signal}
+                    key={signal.name}
                     type="button"
-                    onClick={() => toggleSignal(signal)}
+                    onClick={() => toggleSignal(signal.name)}
                     className={cn(
                       "rounded-full px-2.5 py-1 text-xs transition",
-                      draft.signals.includes(signal)
+                      draft.signals.includes(signal.name)
                         ? "bg-primary text-primary-foreground"
                         : "border bg-background text-muted-foreground hover:bg-muted",
                     )}
+                    title={signal.description}
                   >
-                    {t(getSignalLabelKey(signal))}
+                    {t(getSignalLabelKey(signal.name) as never)}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">{t("stockTracker.thresholds")}</label>
-              <div className="grid grid-cols-2 gap-2">
-                <ThresholdInput
-                  label={t("stockTracker.volumeSpike")}
-                  value={draft.thresholds.volume_spike}
-                  onChange={(v) => updateThreshold("volume_spike", v)}
-                />
-                <ThresholdInput
-                  label={t("stockTracker.breakout")}
-                  value={draft.thresholds.breakout_window}
-                  onChange={(v) => updateThreshold("breakout_window", v)}
-                />
+            {allParams.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">{t("stockTracker.thresholds")}</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {allParams.map(({ key, param }) => (
+                    <ThresholdInput
+                      key={key}
+                      label={t(getSignalLabelKey(key) as never)}
+                      value={draft.thresholds[key] ?? param.default}
+                      onChange={(v) => updateThreshold(key, v)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="mt-4 flex justify-end gap-2">

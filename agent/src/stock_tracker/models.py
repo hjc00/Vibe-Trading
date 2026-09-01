@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-SignalType = Literal["volume_spike", "breakout", "ma_alignment"]
-DEFAULT_SIGNALS: List[SignalType] = ["volume_spike", "breakout", "ma_alignment"]
+SignalType = str
+DEFAULT_SIGNALS: List[SignalType] = ["volume_spike", "breakout", "ma_alignment", "rsi"]
 DEFAULT_PERIODS: List[int] = [10, 20, 60]
 DEFAULT_WATCHLIST: List[str] = [
     "510300.SH",
@@ -21,12 +21,33 @@ DEFAULT_WATCHLIST: List[str] = [
 
 
 class TrackerThresholds(BaseModel):
-    """User-overridable thresholds for signal detection."""
+    """User-overridable thresholds for signal detection.
+
+    Known thresholds are declared as typed fields so they appear in docs and
+    get range validation. Additional per-signal parameters are accepted via
+    ``ConfigDict(extra="allow")`` and flattened into the serialized output so
+    consumers see a single flat threshold map.
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     volume_spike: float = Field(default=2.0, ge=1.0, description="Volume vs avg ratio to trigger a spike.")
     rsi_overbought: float = Field(default=70.0, ge=50.0, le=100.0)
     rsi_oversold: float = Field(default=30.0, ge=0.0, le=50.0)
     breakout_window: int = Field(default=20, ge=5, le=250)
+
+    def get(self, name: str, default: Any = None) -> Any:
+        """Return a threshold by name, including dynamically allowed extras."""
+        return getattr(self, name, default)
+
+    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+        """Flatten known fields and extra fields into a single dict."""
+        data = super().model_dump(**kwargs)
+        known = set(type(self).model_fields.keys())
+        for key, value in self.__dict__.items():
+            if key not in known and not key.startswith("_"):
+                data[key] = value
+        return data
 
 
 class TrackerConfig(BaseModel):
@@ -65,10 +86,16 @@ class TrackerConfig(BaseModel):
 
     @field_validator("signals")
     @classmethod
-    def _validate_signals(cls, value: List[SignalType]) -> List[SignalType]:
-        unique = []
-        seen = set()
+    def _validate_signals(cls, value: List[str]) -> List[SignalType]:
+        """Validate signal names against the detector registry at runtime."""
+        from src.stock_tracker.signals import list_detector_names
+
+        known = set(list_detector_names())
+        unique: List[SignalType] = []
+        seen: set[str] = set()
         for signal in value:
+            if signal not in known:
+                raise ValueError(f"Unknown signal: {signal}")
             if signal not in seen:
                 seen.add(signal)
                 unique.append(signal)

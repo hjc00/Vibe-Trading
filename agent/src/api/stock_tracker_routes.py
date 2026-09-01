@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.models import TrackerConfig, normalize_a_share_code
+from src.stock_tracker.signals import list_detector_meta
 from src.stock_tracker.store import TrackerStore
 
 logger = logging.getLogger(__name__)
@@ -226,6 +227,14 @@ def register_stock_tracker_routes(
             created_at=settings.created_at.isoformat() if settings.created_at else None,
             updated_at=settings.updated_at.isoformat() if settings.updated_at else None,
         )
+
+    @app.get("/api/stock-tracker/signals")
+    async def list_signals(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
+        """Return metadata for all registered signal detectors."""
+        return {
+            "status": "ok",
+            "signals": [meta.model_dump() for meta in list_detector_meta()],
+        }
 
     @app.put("/api/stock-tracker/settings", response_model=TrackerSettingsResponse)
     async def update_settings(
