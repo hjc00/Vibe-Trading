@@ -6,7 +6,6 @@ export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
   breakout: "stockTracker.breakout",
   ma_alignment: "stockTracker.maAlignment",
   rsi: "stockTracker.rsi",
-  main_force_inflow: "stockTracker.mainForceInflow",
   margin_expansion: "stockTracker.marginExpansion",
 } as const;
 
@@ -19,6 +18,14 @@ export function formatSignalValue(format: SignalMeta["format"] | undefined, valu
   if (format === "percent") return `${(value * 100).toFixed(2)}%`;
   if (format === "price") return value.toFixed(2);
   return String(value);
+}
+
+export function formatCapitalAmount(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  const absValue = Math.abs(value);
+  if (absValue >= 1e8) return `${(value / 1e8).toFixed(2)}亿`;
+  if (absValue >= 1e4) return `${(value / 1e4).toFixed(2)}万`;
+  return value.toFixed(0);
 }
 
 /**

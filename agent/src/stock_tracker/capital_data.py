@@ -208,7 +208,7 @@ def load_capital_data(
     days: int = _DEFAULT_DAYS,
     cache: Optional[CapitalDataCache] = None,
 ) -> Dict[str, CapitalMetrics]:
-    """Load combined fund-flow and margin-trading metrics for ``codes``.
+    """Load margin-trading metrics for ``codes``.
 
     Args:
         codes: A-share symbols like ``["600519.SH", "000001.SZ"]``.
@@ -218,37 +218,18 @@ def load_capital_data(
 
     Returns:
         Dict mapping symbol to ``CapitalMetrics``. Missing or failed symbols
-        are still present with error fields populated.
+        are still present with ``margin_error`` populated.
     """
-    if end_date is None:
-        end_date = date.today()
-    if cache is None:
-        cache = CapitalDataCache()
-
-    fund_results = fetch_fund_flow_batch(codes, days=days, cache=cache, trading_date=end_date)
-    margin_results = fetch_margin_trading_batch(
+    return fetch_margin_trading_batch(
         codes,
-        days=max(days, _FUND_FLOW_LOOKBACK),
+        days=max(days, 2),
         cache=cache,
         trading_date=end_date,
     )
 
-    combined: Dict[str, CapitalMetrics] = {}
-    for code in codes:
-        fund = fund_results.get(
-            code, CapitalMetrics(fund_flow_error="not fetched", fund_flow_source="unavailable")
-        )
-        margin = margin_results.get(
-            code, CapitalMetrics(margin_error="not fetched", margin_source="unavailable")
-        )
-        combined[code] = _merge_metrics(fund, margin)
-
-    return combined
-
 
 __all__ = [
     "CapitalDataCache",
-    "fetch_fund_flow_batch",
     "fetch_margin_trading_batch",
     "load_capital_data",
 ]

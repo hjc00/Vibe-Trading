@@ -1652,9 +1652,7 @@
     "rsi_overbought": "RSI 超买",
     "rsi_oversold": "RSI 超卖",
     "breakout_window": "突破窗口",
-    "mainForceInflow": "主力流入",
     "marginExpansion": "融资扩张",
-    "main_force_inflow_threshold": "主力流入阈值",
     "margin_expansion_threshold": "融资扩张阈值",
     "save": "保存",
     "cancel": "取消",
@@ -1708,8 +1706,11 @@
     "risks": "风险提示",
     "caveats": "局限性说明",
     "researchDisclaimer": "以上内容仅作研究参考，不构成投资建议。",
-    "mainForceFlow": "主力净流入",
-    "financingBalance": "融资余额变化",
-    "capitalDataUnavailable": "资金数据暂不可用"
+    "financingBalance": "融资余额",
+    "financingBalanceChange": "融资余额变化",
+    "marginTotalBalance": "融券余额",
+    "capitalDataUnavailable": "资金数据暂不可用",
+    "marginChartTitle": "融资融券余额趋势",
+    "noMarginData": "暂无融资融券数据"
   }
 }

@@ -406,80 +406,6 @@ def register_detector(cls: Type[SignalDetector]) -> Type[SignalDetector]:
     return cls
 
 
-class MainForceInflowDetector(SignalDetector):
-    """Detect when main-force net inflow is unusually large versus turnover."""
-
-    name = "main_force_inflow"
-    meta = SignalMeta(
-        name="main_force_inflow",
-        category="capital",
-        direction="both",
-        label="Main force inflow",
-        description="Main-force net inflow as a percentage of today's turnover reaches a threshold.",
-        params={
-            "main_force_inflow_threshold": {
-                "type": "float",
-                "min": 0.0,
-                "max": 1.0,
-                "default": 0.05,
-                "description": "Main-force net inflow / turnover ratio required to trigger.",
-            }
-        },
-        default_params={"main_force_inflow_threshold": 0.05},
-        format="percent",
-        ranking_enabled=True,
-        ranking_extractor=lambda sv: abs(sv.value or 0.0),
-    )
-
-    def detect(
-        self,
-        code: str,
-        df: pd.DataFrame,
-        period: int,
-        thresholds: TrackerThresholds,
-    ) -> SignalValue:
-        capital = df.attrs.get("capital")
-        if capital is None or capital.fund_flow.main_net is None:
-            return SignalValue(triggered=False, description="No main-force flow data")
-
-        latest = df.iloc[-1]
-        close = float(latest["close"]) if "close" in latest and pd.notna(latest["close"]) else None
-        volume = float(latest["volume"]) if "volume" in latest and pd.notna(latest["volume"]) else None
-        if close is None or volume is None or close <= 0 or volume <= 0:
-            return SignalValue(triggered=False, description="No price/volume data for ratio")
-
-        turnover = close * volume
-        ratio = capital.fund_flow.main_net / turnover
-        threshold = float(thresholds.get("main_force_inflow_threshold", 0.05))
-
-        if ratio >= threshold:
-            state = SignalState.STRONG if ratio >= threshold * 1.5 else SignalState.TRIGGERED
-            return SignalValue(
-                triggered=True,
-                state=state,
-                value=round(ratio, 5),
-                threshold=threshold,
-                description=f"Main-force inflow {ratio * 100:.2f}% of turnover (>= {threshold * 100:.2f}%)",
-            )
-        if ratio <= -threshold:
-            state = SignalState.STRONG if ratio <= -threshold * 1.5 else SignalState.TRIGGERED
-            return SignalValue(
-                triggered=True,
-                state=state,
-                value=round(ratio, 5),
-                threshold=threshold,
-                description=f"Main-force outflow {abs(ratio) * 100:.2f}% of turnover (<= -{threshold * 100:.2f}%)",
-            )
-
-        return SignalValue(
-            triggered=False,
-            state=SignalState.NONE,
-            value=round(ratio, 5),
-            threshold=threshold,
-            description=f"Main-force flow {ratio * 100:.2f}% of turnover",
-        )
-
-
 class MarginExpansionDetector(SignalDetector):
     """Detect financing-balance expansion versus the previous trading day."""
 
@@ -548,7 +474,6 @@ register_detector(VolumeSpikeDetector)
 register_detector(BreakoutDetector)
 register_detector(MaAlignmentDetector)
 register_detector(RSIDetector)
-register_detector(MainForceInflowDetector)
 register_detector(MarginExpansionDetector)
 
 
@@ -594,7 +519,6 @@ __all__ = [
     "BreakoutDetector",
     "MaAlignmentDetector",
     "RSIDetector",
-    "MainForceInflowDetector",
     "MarginExpansionDetector",
     "get_detector",
     "get_detector_meta",

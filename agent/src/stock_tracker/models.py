@@ -14,7 +14,6 @@ DEFAULT_SIGNALS: List[SignalType] = [
     "breakout",
     "ma_alignment",
     "rsi",
-    "main_force_inflow",
     "margin_expansion",
 ]
 DEFAULT_PERIODS: List[int] = [10, 20, 60]
@@ -163,17 +162,12 @@ class PeriodSignals(BaseModel):
     signals: Dict[SignalType, SignalValue] = Field(default_factory=dict)
 
 
-class FundFlowSnapshot(BaseModel):
-    """Daily order-bucket capital flow snapshot for one symbol."""
+class MarginHistoryItem(BaseModel):
+    """One daily margin-trading balance observation for charting."""
 
     trade_date: Optional[date] = None
-    main_net: Optional[float] = None
-    main_net_ratio: Optional[float] = None
-    main_5d_net: Optional[float] = None
-    small_net: Optional[float] = None
-    medium_net: Optional[float] = None
-    large_net: Optional[float] = None
-    super_large_net: Optional[float] = None
+    financing_balance: Optional[float] = None
+    margin_total_balance: Optional[float] = None
 
 
 class MarginSnapshot(BaseModel):
@@ -184,16 +178,14 @@ class MarginSnapshot(BaseModel):
     financing_balance_change: Optional[float] = None
     margin_total_balance: Optional[float] = None
     margin_total_change: Optional[float] = None
+    history: List[MarginHistoryItem] = Field(default_factory=list)
 
 
 class CapitalMetrics(BaseModel):
-    """Combined capital-flow and margin-trading metrics for one symbol."""
+    """Margin-trading metrics for one symbol."""
 
-    fund_flow: FundFlowSnapshot = Field(default_factory=FundFlowSnapshot)
     margin: MarginSnapshot = Field(default_factory=MarginSnapshot)
-    fund_flow_source: str = "unavailable"
     margin_source: str = "unavailable"
-    fund_flow_error: Optional[str] = None
     margin_error: Optional[str] = None
 
 
@@ -317,7 +309,7 @@ __all__ = [
     "TrackerConfig",
     "PeriodMetrics",
     "PeriodSignals",
-    "FundFlowSnapshot",
+    "MarginHistoryItem",
     "MarginSnapshot",
     "CapitalMetrics",
     "CrossDayDiff",

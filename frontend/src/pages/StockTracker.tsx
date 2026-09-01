@@ -12,6 +12,7 @@ import { TrackerTable } from "@/components/stock-tracker/TrackerTable";
 import { TrackerCharts } from "@/components/stock-tracker/TrackerCharts";
 import { TrackerAnalyzePanel } from "@/components/stock-tracker/TrackerAnalyzePanel";
 import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysisReport";
+import { MarginChartCard } from "@/components/stock-tracker/MarginChartCard";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -331,6 +332,7 @@ export function StockTracker() {
                 <div className="flex flex-col gap-4">
                   <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
                   <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
+                  <MarginChartCard symbol={selectedSymbol} />
                 </div>
               </section>
             )}

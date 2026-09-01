@@ -1,7 +1,13 @@
 import { useTranslation } from "react-i18next";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { computePriceChange, formatQuoteUpdatedAt, formatSignalValue, getSignalLabelKey } from "@/lib/stockTracker";
+import {
+  computePriceChange,
+  formatCapitalAmount,
+  formatQuoteUpdatedAt,
+  formatSignalValue,
+  getSignalLabelKey,
+} from "@/lib/stockTracker";
 import { SignalBadge } from "./SignalBadge";
 import type { SignalMeta, SignalValue, SymbolSnapshot } from "@/lib/api";
 
@@ -168,64 +174,39 @@ function PriceCell({ symbol, updatedAt }: { symbol: SymbolSnapshot; updatedAt: s
   );
 }
 
-function formatCapitalAmount(value: number | null | undefined): string {
-  if (value === undefined || value === null) return "—";
-  const absValue = Math.abs(value);
-  if (absValue >= 1e8) return `${(value / 1e8).toFixed(2)}亿`;
-  if (absValue >= 1e4) return `${(value / 1e4).toFixed(2)}万`;
-  return value.toFixed(0);
-}
-
 function CapitalCell({ symbol }: { symbol: SymbolSnapshot }) {
   const { t } = useTranslation();
   const capital = symbol.capital;
   if (!capital) return null;
 
-  const fundError = capital.fund_flow_error;
   const marginError = capital.margin_error;
-  const mainNet = capital.fund_flow.main_net;
-  const mainRatio = capital.fund_flow.main_net_ratio;
   const financingChange = capital.margin.financing_balance_change;
 
-  if (!fundError && mainNet === null && !marginError && financingChange === null) {
+  if (financingChange === null || financingChange === undefined) {
+    if (marginError) {
+      return (
+        <div className="mt-1 flex flex-col gap-0.5 text-[10px]">
+          <span className="text-muted-foreground">{t("stockTracker.capitalDataUnavailable")}</span>
+        </div>
+      );
+    }
     return null;
   }
 
   return (
     <div className="mt-1 flex flex-col gap-0.5 text-[10px]">
-      {mainNet !== null && mainNet !== undefined && (
-        <span
-          className={cn(
-            "font-mono tabular-nums",
-            mainNet > 0 && "text-success",
-            mainNet < 0 && "text-danger",
-            mainNet === 0 && "text-muted-foreground",
-          )}
-        >
-          {t("stockTracker.mainForceFlow")}: {mainNet > 0 ? "+" : ""}
-          {formatCapitalAmount(mainNet)}
-          {mainRatio !== null && mainRatio !== undefined && (
-            <span className="ms-1 text-muted-foreground">
-              ({mainRatio > 0 ? "+" : ""}
-              {(mainRatio * 100).toFixed(2)}%)
-            </span>
-          )}
-        </span>
-      )}
-      {financingChange !== null && financingChange !== undefined && (
-        <span
-          className={cn(
-            "font-mono tabular-nums",
-            financingChange > 0 && "text-success",
-            financingChange < 0 && "text-danger",
-            financingChange === 0 && "text-muted-foreground",
-          )}
-        >
-          {t("stockTracker.financingBalance")}: {financingChange > 0 ? "+" : ""}
-          {formatCapitalAmount(financingChange)}
-        </span>
-      )}
-      {(fundError || marginError) && (
+      <span
+        className={cn(
+          "font-mono tabular-nums",
+          financingChange > 0 && "text-success",
+          financingChange < 0 && "text-danger",
+          financingChange === 0 && "text-muted-foreground",
+        )}
+      >
+        {t("stockTracker.financingBalanceChange")}: {financingChange > 0 ? "+" : ""}
+        {formatCapitalAmount(financingChange)}
+      </span>
+      {marginError && (
         <span className="text-muted-foreground">{t("stockTracker.capitalDataUnavailable")}</span>
       )}
     </div>

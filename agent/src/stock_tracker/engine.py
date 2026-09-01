@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # averages (especially 60-day) have enough history even with holidays.
 _BUFFER_DAYS = 90
 
-# Historical days to fetch for capital-flow lookback (must cover 5-day sum).
+# Historical days to fetch for margin-trading lookback.
 _CAPITAL_DATA_DAYS = 10
 
 
@@ -76,7 +76,7 @@ class StockTrackerEngine:
             logger.exception("Name resolution failed")
             names = {}
 
-        # Fetch capital-flow and margin-trading data with daily caching.
+        # Fetch margin-trading data with daily caching.
         capital_data: Dict[str, CapitalMetrics] = {}
         try:
             capital_data = self._fetch_capital_data(
@@ -221,7 +221,7 @@ class StockTrackerEngine:
         trading_date: date,
         days: int,
     ) -> Dict[str, CapitalMetrics]:
-        """Fetch capital-flow and margin-trading data for all configured symbols."""
+        """Fetch margin-trading data for all configured symbols."""
         return load_capital_data(
             codes,
             end_date=trading_date,
@@ -249,7 +249,6 @@ class StockTrackerEngine:
         volume = float(latest["volume"]) if "volume" in latest and pd.notna(latest["volume"]) else None
         avg_volume_20 = float(df["volume"].tail(20).mean()) if "volume" in df.columns else None
 
-        capital = self._enrich_capital_metrics(df, capital)
         # Make capital available to signal detectors via df attrs.
         if capital is not None:
             df.attrs["capital"] = capital
@@ -271,37 +270,6 @@ class StockTrackerEngine:
             capital=capital,
             period_signals=period_signals,
         )
-
-    @staticmethod
-    def _enrich_capital_metrics(
-        df: pd.DataFrame,
-        capital: Optional[CapitalMetrics],
-    ) -> Optional[CapitalMetrics]:
-        """Fill derived capital metrics (e.g. main-force turnover ratio) from OHLCV.
-
-        Returns a shallow copy so the cached ``CapitalMetrics`` is not mutated.
-        """
-        if capital is None or capital.fund_flow_error is not None:
-            return capital
-
-        latest = df.iloc[-1]
-        close = float(latest["close"]) if "close" in latest and pd.notna(latest["close"]) else None
-        volume = float(latest["volume"]) if "volume" in latest and pd.notna(latest["volume"]) else None
-        if (
-            close is None
-            or volume is None
-            or close <= 0
-            or volume <= 0
-            or capital.fund_flow.main_net is None
-        ):
-            return capital
-
-        turnover = close * volume
-        ratio = capital.fund_flow.main_net / turnover
-        enriched_fund_flow = capital.fund_flow.model_copy(
-            update={"main_net_ratio": round(ratio, 6)}
-        )
-        return capital.model_copy(update={"fund_flow": enriched_fund_flow})
 
     def _compute_period_metrics(self, df: pd.DataFrame, period: int) -> PeriodMetrics:
         """Return numeric metrics for the given period window."""

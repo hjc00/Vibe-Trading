@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 
 from src.stock_tracker.signals import (
-    MainForceInflowDetector,
     RSIDetector,
     get_detector,
     get_detector_meta,
@@ -60,18 +59,9 @@ def test_get_detector_caches_instance() -> None:
     assert isinstance(first, RSIDetector)
 
 
-def test_registry_contains_capital_detectors() -> None:
+def test_registry_contains_margin_detector() -> None:
     names = list_detector_names()
-    assert "main_force_inflow" in names
     assert "margin_expansion" in names
-
-
-def test_main_force_inflow_meta_declares_params() -> None:
-    meta = get_detector_meta("main_force_inflow")
-    assert meta.category == "capital"
-    assert meta.direction == "both"
-    assert "main_force_inflow_threshold" in meta.params
-    assert meta.params["main_force_inflow_threshold"]["default"] == 0.05
 
 
 def test_margin_expansion_meta_declares_params() -> None:
@@ -82,11 +72,13 @@ def test_margin_expansion_meta_declares_params() -> None:
     assert meta.params["margin_expansion_threshold"]["default"] == 0.03
 
 
-def test_get_detector_caches_capital_instances() -> None:
-    first = get_detector("main_force_inflow")
-    second = get_detector("main_force_inflow")
+def test_get_detector_caches_margin_instance() -> None:
+    from src.stock_tracker.signals import MarginExpansionDetector
+
+    first = get_detector("margin_expansion")
+    second = get_detector("margin_expansion")
     assert first is second
-    assert isinstance(first, MainForceInflowDetector)
+    assert isinstance(first, MarginExpansionDetector)
 
 
 def test_unknown_detector_raises() -> None:
