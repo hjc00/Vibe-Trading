@@ -1684,6 +1684,7 @@
     "delete": "Delete",
     "invalidSymbol": "Invalid A-share code",
     "alreadyInWatchlist": "{{code}} is already in the watchlist",
+    "cannotRemoveLastSymbol": "The watchlist must keep at least one symbol",
     "analyze": "AI Analyze",
     "analyzeTitle": "AI Analysis",
     "selectSymbols": "Select symbols to analyze",

@@ -207,6 +207,10 @@ export function StockTracker() {
   const handleRemoveSymbol = useCallback(
     async (code: string) => {
       if (!config) return;
+      if (config.watchlist.length <= 1) {
+        setError(t("stockTracker.cannotRemoveLastSymbol"));
+        return;
+      }
       const nextConfig: TrackerConfig = {
         ...config,
         watchlist: config.watchlist.filter((c) => c !== code),

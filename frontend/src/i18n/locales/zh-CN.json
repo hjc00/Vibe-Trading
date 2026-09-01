@@ -1684,6 +1684,7 @@
     "delete": "删除",
     "invalidSymbol": "无效的 A 股代码",
     "alreadyInWatchlist": "{{code}} 已在股票列表中",
+    "cannotRemoveLastSymbol": "股票列表至少保留一个标的",
     "analyze": "AI 分析",
     "analyzeTitle": "AI 分析",
     "selectSymbols": "选择要分析的标的",
