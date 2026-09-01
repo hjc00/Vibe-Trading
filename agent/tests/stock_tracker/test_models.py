@@ -74,3 +74,31 @@ def test_normalize_a_share_code_rejects_invalid(input_code: str) -> None:
 def test_tracker_config_corrects_wrong_suffix() -> None:
     config = TrackerConfig(watchlist=["000938.SH"])
     assert config.watchlist == ["000938.SZ"]
+
+
+def test_period_metrics_serializes_rps_fields() -> None:
+    from src.stock_tracker.models import PeriodMetrics
+
+    metrics = PeriodMetrics(
+        period=10,
+        rps_market=85.5,
+        rps_sector=92.0,
+        benchmark_return_pct=0.02,
+    )
+    dumped = metrics.model_dump(mode="json")
+    assert dumped["rps_market"] == 85.5
+    assert dumped["rps_sector"] == 92.0
+    assert dumped["benchmark_return_pct"] == 0.02
+
+
+def test_symbol_snapshot_serializes_sector_board() -> None:
+    from src.stock_tracker.models import SymbolSnapshot
+
+    snapshot = SymbolSnapshot(
+        code="600519.SH",
+        sector_board="白酒II",
+        sector_board_source="eastmoney",
+    )
+    dumped = snapshot.model_dump(mode="json")
+    assert dumped["sector_board"] == "白酒II"
+    assert dumped["sector_board_source"] == "eastmoney"

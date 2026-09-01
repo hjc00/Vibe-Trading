@@ -6,7 +6,9 @@ import {
   computePriceChange,
   formatCapitalAmount,
   formatQuoteUpdatedAt,
+  formatRps,
   formatSignalValue,
+  getRpsToneClass,
   getSignalLabelKey,
 } from "@/lib/stockTracker";
 import { SignalBadge } from "./SignalBadge";
@@ -84,6 +86,7 @@ export function TrackerTable({
               <th className="py-2 ps-4 pr-4 font-medium">{t("stockTracker.symbols")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.price")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.change")}</th>
+              <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.rps")}</th>
               <th className="py-2 pr-4 text-right font-medium">{t("stockTracker.delete")}</th>
             </tr>
           </thead>
@@ -122,6 +125,9 @@ export function TrackerTable({
                         <div className="flex flex-col">
                           <span className="text-xs font-medium">{symbol.name ?? symbol.code}</span>
                           <span className="font-mono text-[10px] text-muted-foreground">{symbol.code}</span>
+                          {symbol.sector_board && (
+                            <span className="text-[10px] text-muted-foreground/80">{symbol.sector_board}</span>
+                          )}
                           <div className="mt-1 flex flex-wrap gap-1">
                             {globalSignals.map((meta) => (
                               <GlobalSignalBadge
@@ -150,6 +156,9 @@ export function TrackerTable({
                       <CompactChangeCell symbol={symbol} />
                     </td>
                     <td className="py-3 pr-4 text-right">
+                      <RpsPill symbol={symbol} />
+                    </td>
+                    <td className="py-3 pr-4 text-right">
                       {onRemoveSymbol && (
                         <button
                           type="button"
@@ -170,7 +179,7 @@ export function TrackerTable({
                       key={`${symbol.code}-expanded`}
                       className={cn("border-b last:border-0", isSelected ? "bg-primary/10" : "bg-muted/5")}
                     >
-                      <td colSpan={4} className="p-0">
+                      <td colSpan={5} className="p-0">
                         <div className="grid grid-cols-1 gap-4 px-4 py-3 sm:grid-cols-[1fr_auto]">
                           <div className="flex flex-col gap-2">
                             {quotesUpdatedAt && (
@@ -192,6 +201,20 @@ export function TrackerTable({
                                     </span>
                                     <div className="flex items-center gap-2">
                                       <ReturnPill value={ps?.metrics.return_pct} />
+                                    </div>
+                                    <div className="flex flex-col gap-0.5 text-[10px]">
+                                      <span className="text-muted-foreground">
+                                        {t("stockTracker.rpsMarket")}: {" "}
+                                        <span className={cn("font-mono tabular-nums", getRpsToneClass(ps?.metrics.rps_market))}>
+                                          {formatRps(ps?.metrics.rps_market)}
+                                        </span>
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        {t("stockTracker.rpsSector")}: {" "}
+                                        <span className={cn("font-mono tabular-nums", getRpsToneClass(ps?.metrics.rps_sector))}>
+                                          {formatRps(ps?.metrics.rps_sector)}
+                                        </span>
+                                      </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1">
                                       {tableSignals.map((meta) => (
@@ -356,6 +379,24 @@ function GlobalSignalBadge({ signal, meta }: { signal: SignalValue | undefined; 
         <span className="font-mono tabular-nums">{formatSignalValue(meta.format, signal.value)}</span>
       )}
     </span>
+  );
+}
+
+function RpsPill({ symbol }: { symbol: SymbolSnapshot }) {
+  const { t } = useTranslation();
+  const periods = Object.keys(symbol.period_signals)
+    .map((p) => Number(p))
+    .sort((a, b) => a - b);
+  const baselinePeriod = String(periods[0] ?? "10");
+  const value = symbol.period_signals[baselinePeriod]?.metrics?.rps_market;
+
+  return (
+    <div className="flex flex-col items-end">
+      <span className={cn("font-mono text-xs tabular-nums", getRpsToneClass(value))}>
+        {formatRps(value)}
+      </span>
+      <span className="text-[10px] text-muted-foreground">{t("stockTracker.rpsMarket")}</span>
+    </div>
   );
 }
 

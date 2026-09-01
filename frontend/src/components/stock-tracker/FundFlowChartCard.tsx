@@ -4,6 +4,7 @@ import { TrendingUp } from "lucide-react";
 import { useChartLifecycle } from "@/hooks/useChartLifecycle";
 import { getChartTheme } from "@/lib/chart-theme";
 import { formatCapitalAmount } from "@/lib/stockTracker";
+import { ChartCardHeader } from "./ChartCardHeader";
 import type { SymbolSnapshot } from "@/lib/api";
 
 interface FundFlowChartCardProps {
@@ -121,10 +122,12 @@ export function FundFlowChartCard({ symbol }: FundFlowChartCardProps) {
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">{t("stockTracker.fundFlowChartTitle")}</h3>
-      </div>
-      <div ref={ref} className="relative h-[240px] w-full">
+      <ChartCardHeader
+        title={t("stockTracker.fundFlowChartTitle")}
+        helpText={t("stockTracker.fundFlowExplanation")}
+      />
+      <div className="relative h-[240px] w-full">
+        <div ref={ref} className="absolute inset-0" />
         {!hasData && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
             <TrendingUp className="h-8 w-8 opacity-40" />

@@ -28,6 +28,18 @@ export function formatCapitalAmount(value: number | null | undefined): string {
   return value.toFixed(0);
 }
 
+export function formatRps(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  return `${value.toFixed(1)}%`;
+}
+
+export function getRpsToneClass(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value >= 90) return "text-success";
+  if (value <= 10) return "text-danger";
+  return "text-muted-foreground";
+}
+
 /**
  * Infer the exchange suffix from the first two digits of a 6-digit A-share code.
  */

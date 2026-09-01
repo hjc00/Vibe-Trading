@@ -1,7 +1,7 @@
 # Vibe-Trading — 项目导航
 
 > 本文件是 AI 上下文索引，每次会话自动加载。改动代码后请同步更新本文件或 [docs/PROJECT_INDEX.md](docs/PROJECT_INDEX.md)（见文末「文档同步约定」）。
-> 最后更新：2026-09-01
+> 最后更新：2026-09-01（已落地 2.2 RPS）
 
 ## 项目定位
 
@@ -35,7 +35,7 @@
 ### 运行
 
 - 开发（前后端一起）：`scripts/dev up` → 后端 127.0.0.1:8899 + 前端 dev 5899
-- 一键（后端静态托管前端）：`start-web.bat` → `vibe-trading serve --port 8899`
+- 一键（后端静态托管前端）：`start-web.bat` → 每次启动先 `npm run build` 再 `vibe-trading serve --port 8899`
 - Docker：`docker-compose.yml`（后端 127.0.0.1:8899）
 
 ### 测试 & lint
@@ -53,7 +53,7 @@
 
 **组合与交易**：`portfolio`(只读多券商聚合)、`trading`(连接器 profiles / 操作)、`live`(有界自主实盘)、`shadow_account`(盈利模式 → 回测 → 渲染)
 
-**扩展与技能**：`skills`(90 个打包技能)、`strategy_discovery`(Alpha Zoo + SDM 实证门控 facade)、`strategy_store`(策略开发管理器 + 衰减)、`scheduled_research`(定时研究 + playbooks)、`ui_services.py`(前端 run 分析整形)、`stock_tracker`(A股多周期追踪，活跃功能)
+**扩展与技能**：`skills`(90 个打包技能)、`strategy_discovery`(Alpha Zoo + SDM 实证门控 facade)、`strategy_store`(策略开发管理器 + 衰减)、`scheduled_research`(定时研究 + playbooks)、`ui_services.py`(前端 run 分析整形)、`stock_tracker`(A股多周期追踪，活跃功能；已支持资金流信号与个股相对强弱 RPS)
 
 **通道与集成**：`channels`(多 IM 插件适配)、`channelsui`(WebUI 兼容)、`api`(HTTP 路由包)、`utils`(media_decode)
 

@@ -1711,16 +1711,26 @@
     "marginTotalBalance": "Short selling balance",
     "capitalDataUnavailable": "Capital data unavailable",
     "marginChartTitle": "Margin balance trend",
+    "marginExplanation": "Shows financing balance (money borrowed to buy) and short selling balance over time. Rising financing often means leveraged bullish positioning.",
     "noMarginData": "No margin data",
+    "fundFlowChartTitle": "Main-force capital flow trend",
+    "fundFlowExplanation": "Daily net inflow by main-force order buckets. Positive values suggest institutional or large-order buying pressure.",
     "expand": "Expand",
     "collapse": "Collapse",
     "price": "Price",
     "change": "Change",
     "mainForceNetInflow": "Main force net inflow",
     "mainForce5dNetInflow": "Main force 5D net",
-    "fundFlowChartTitle": "Main-force capital flow trend",
     "netInflowSpike": "Inflow spike",
     "mainForceInflow": "Main force inflow",
-    "fundFlowDataUnavailable": "Fund flow data unavailable"
+    "fundFlowDataUnavailable": "Fund flow data unavailable",
+    "rps": "RPS",
+    "rpsMarket": "RPS Market",
+    "rpsSector": "RPS Sector",
+    "rpsChartTitle": "RPS trend",
+    "rpsExplanation": "RPS (Relative Strength Percentile) measures a stock's relative strength within the watchlist + CSI 300. ≥90 means notably stronger than the benchmark; ≤10 means notably weaker.",
+    "noRpsData": "No RPS data",
+    "excessReturn": "Excess return",
+    "sectorBoard": "Sector"
   }
 }

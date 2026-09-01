@@ -83,6 +83,20 @@ if not exist "agent\.env" (
     exit /b 1
 )
 
+rem ---- 2b) Build the frontend on every launch so the UI stays current ----
+echo(
+echo [frontend] Building frontend...
+cd /d "%ROOT%\frontend"
+call npm run build >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [warning] Frontend build failed. Serving any existing  frontend\dist  if present.
+    echo           Run  cd frontend ^&^& npm run build  manually to see the error.
+) else (
+    echo [frontend] Build OK.
+)
+cd /d "%ROOT%"
+echo(
+
 rem ---- 3) Launch the server ----
 echo(
 echo ======================================================

@@ -153,6 +153,10 @@ class PeriodMetrics(BaseModel):
     ma10: Optional[float] = None
     ma20: Optional[float] = None
     ma60: Optional[float] = None
+    # Relative strength percentiles (0-100) within the watchlist universe.
+    rps_market: Optional[float] = None
+    rps_sector: Optional[float] = None
+    benchmark_return_pct: Optional[float] = None
 
 
 class PeriodSignals(BaseModel):
@@ -243,6 +247,8 @@ class SymbolSnapshot(BaseModel):
     period_signals: Dict[str, PeriodSignals] = Field(default_factory=dict)
     capital: Optional[CapitalMetrics] = None
     diff: Optional[CrossDayDiff] = None
+    sector_board: Optional[str] = None
+    sector_board_source: Optional[str] = None
     error: Optional[str] = None
 
 

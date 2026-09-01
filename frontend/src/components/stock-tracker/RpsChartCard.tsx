@@ -3,30 +3,30 @@ import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
 import { useChartLifecycle } from "@/hooks/useChartLifecycle";
 import { getChartTheme } from "@/lib/chart-theme";
-import { formatCapitalAmount } from "@/lib/stockTracker";
+import { formatRps } from "@/lib/stockTracker";
 import { ChartCardHeader } from "./ChartCardHeader";
 import type { SymbolSnapshot } from "@/lib/api";
 
-interface MarginChartCardProps {
+interface RpsChartCardProps {
   symbol: SymbolSnapshot | null;
 }
 
-export function MarginChartCard({ symbol }: MarginChartCardProps) {
+export function RpsChartCard({ symbol }: RpsChartCardProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
 
   const data = useMemo(() => {
-    const history = symbol?.capital?.margin?.history;
-    if (!history || history.length === 0) return null;
-    const chronological = [...history].reverse();
+    if (!symbol) return null;
+    const periods = Object.keys(symbol.period_signals)
+      .map((period) => Number(period))
+      .sort((a, b) => a - b);
+    if (periods.length === 0) return null;
     return {
-      dates: chronological.map((h) => h.trade_date ?? ""),
-      financing: chronological.map((h) => h.financing_balance ?? null),
-      marginTotal: chronological.map((h) => h.margin_total_balance ?? null),
+      periods,
+      market: periods.map((period) => symbol.period_signals[String(period)]?.metrics.rps_market ?? null),
+      sector: periods.map((period) => symbol.period_signals[String(period)]?.metrics.rps_sector ?? null),
     };
   }, [symbol]);
-
-  const hasData = data != null && (data.financing.some((v) => v != null) || data.marginTotal.some((v) => v != null));
 
   useChartLifecycle(
     ref,
@@ -36,7 +36,7 @@ export function MarginChartCard({ symbol }: MarginChartCardProps) {
         return {
           backgroundColor: "transparent",
           title: {
-            text: t("stockTracker.noMarginData"),
+            text: t("stockTracker.noRpsData"),
             left: "center",
             top: "center",
             textStyle: { color: theme.textColor, fontSize: 14 },
@@ -44,7 +44,20 @@ export function MarginChartCard({ symbol }: MarginChartCardProps) {
         };
       }
 
-      const hasMarginTotal = data.marginTotal.some((v) => v != null);
+      const hasMarket = data.market.some((v) => v != null);
+      const hasSector = data.sector.some((v) => v != null);
+
+      if (!hasMarket && !hasSector) {
+        return {
+          backgroundColor: "transparent",
+          title: {
+            text: t("stockTracker.noRpsData"),
+            left: "center",
+            top: "center",
+            textStyle: { color: theme.textColor, fontSize: 14 },
+          },
+        };
+      }
 
       return {
         backgroundColor: "transparent",
@@ -67,7 +80,7 @@ export function MarginChartCard({ symbol }: MarginChartCardProps) {
                 return `<div style="display:flex;align-items:center;gap:6px">
                   <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color ?? theme.infoColor}"></span>
                   <span>${seriesName}:</span>
-                  <strong>${formatCapitalAmount(value)}</strong>
+                  <strong>${formatRps(value)}</strong>
                 </div>`;
               })
               .join("");
@@ -78,48 +91,62 @@ export function MarginChartCard({ symbol }: MarginChartCardProps) {
           },
         },
         legend: {
-          data: hasMarginTotal
-            ? [t("stockTracker.financingBalance"), t("stockTracker.marginTotalBalance")]
-            : [t("stockTracker.financingBalance")],
+          data: [
+            ...(hasMarket ? [t("stockTracker.rpsMarket")] : []),
+            ...(hasSector ? [t("stockTracker.rpsSector")] : []),
+          ],
           textStyle: { color: theme.textColor, fontSize: 11 },
           top: 0,
         },
-        grid: { left: 50, right: 20, top: 34, bottom: 24 },
+        grid: { left: 40, right: 20, top: 34, bottom: 24 },
         xAxis: {
           type: "category",
-          data: data.dates,
+          data: data.periods.map((period) => `${period}${t("stockTracker.period")}`),
           axisLine: { lineStyle: { color: theme.axisColor } },
           axisLabel: { color: theme.textColor, fontSize: 10 },
         },
         yAxis: {
           type: "value",
+          min: 0,
+          max: 100,
           axisLabel: {
             color: theme.textColor,
             fontSize: 10,
-            formatter: (value: number) => formatCapitalAmount(value),
+            formatter: (value: number) => `${value}`,
           },
           splitLine: { lineStyle: { color: theme.gridColor } },
         },
         series: [
-          {
-            name: t("stockTracker.financingBalance"),
-            type: "line",
-            data: data.financing,
-            smooth: true,
-            symbol: "circle",
-            lineStyle: { color: theme.upColor, width: 2 },
-            itemStyle: { color: theme.upColor },
-          },
-          ...(hasMarginTotal
+          ...(hasMarket
             ? [
                 {
-                  name: t("stockTracker.marginTotalBalance"),
-                  type: "line",
-                  data: data.marginTotal,
+                  name: t("stockTracker.rpsMarket"),
+                  type: "line" as const,
+                  data: data.market,
                   smooth: true,
                   symbol: "circle",
-                  lineStyle: { color: theme.infoColor, width: 2, type: "dashed" as const },
+                  lineStyle: { color: theme.infoColor, width: 2 },
                   itemStyle: { color: theme.infoColor },
+                  markLine: {
+                    data: [
+                      { yAxis: 90, lineStyle: { color: theme.upColor, type: "dashed" }, label: { show: false } },
+                      { yAxis: 10, lineStyle: { color: theme.downColor, type: "dashed" }, label: { show: false } },
+                    ],
+                    symbol: "none",
+                  },
+                },
+              ]
+            : []),
+          ...(hasSector
+            ? [
+                {
+                  name: t("stockTracker.rpsSector"),
+                  type: "line" as const,
+                  data: data.sector,
+                  smooth: true,
+                  symbol: "circle",
+                  lineStyle: { color: theme.warningColor, width: 2, type: "dashed" as const },
+                  itemStyle: { color: theme.warningColor },
                 },
               ]
             : []),
@@ -129,18 +156,20 @@ export function MarginChartCard({ symbol }: MarginChartCardProps) {
     [data, t],
   );
 
+  const hasData = data != null && (data.market.some((v) => v != null) || data.sector.some((v) => v != null));
+
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
       <ChartCardHeader
-        title={t("stockTracker.marginChartTitle")}
-        helpText={t("stockTracker.marginExplanation")}
+        title={t("stockTracker.rpsChartTitle")}
+        helpText={t("stockTracker.rpsExplanation")}
       />
       <div className="relative h-[240px] w-full">
         <div ref={ref} className="absolute inset-0" />
         {!hasData && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
             <TrendingUp className="h-8 w-8 opacity-40" />
-            <span className="text-xs">{t("stockTracker.noMarginData")}</span>
+            <span className="text-xs">{t("stockTracker.noRpsData")}</span>
           </div>
         )}
       </div>

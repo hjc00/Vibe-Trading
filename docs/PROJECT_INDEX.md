@@ -135,9 +135,9 @@ Vibe-Trading/
 
 | 文件 | 职责 |
 |------|------|
-| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段；`refresh_interval_seconds` 控制实时行情轮询间隔）+ 快照类型 + 代码归一；资金相关模型 `CapitalMetrics`（含 `FundFlowSnapshot`/`MarginSnapshot` 双维度）/`FundFlowHistoryItem`/`MarginHistoryItem` |
+| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段；`refresh_interval_seconds` 控制实时行情轮询间隔）+ 快照类型 + 代码归一；`PeriodMetrics` 已含 RPS 分位（`rps_market`/`rps_sector`/`benchmark_return_pct`），`SymbolSnapshot` 已含行业板块（`sector_board`）；资金相关模型 `CapitalMetrics`（含 `FundFlowSnapshot`/`MarginSnapshot` 双维度）/`FundFlowHistoryItem`/`MarginHistoryItem` |
 | `signals.py` | 信号注册表 + 自描述 `SignalMeta`；内置放量/突破/均线排列/RSI，`margin_expansion` 与 `net_inflow_spike`/`main_force_inflow` 资金信号检测器 |
-| `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，拉取资金流向+融资融券数据，计算周期指标，跑检测器，按元数据生成排名与跨日 diff |
+| `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，拉取资金流向+融资融券数据，解析沪深300基准与行业板块，计算周期指标与 RPS 分位，跑检测器，按元数据生成排名（含 `rps_market_{period}`/`rps_sector_{period}`）与跨日 diff |
 | `capital_data.py` | 批量抓取个股资金流向（东财分单）与融资融券数据，按交易日 + namespace 缓存，per-symbol 错误隔离，返回历史序列 `fund_flow.history` 与 `margin.history` |
 | `names.py` | 经腾讯行情接口解析中文名 |
 | `store.py` | `TrackerStore`：原子 JSON 文件存储 |
@@ -176,7 +176,7 @@ Vibe-Trading/
 - **入口**：
   - `vibe-trading`（`cli:main`）— 交互式 CLI/TUI；子命令 `serve/run/mcp/sessions/swarm/alpha/hypothesis` 委托 `cli/_legacy.py`。
   - `vibe-trading-mcp`（`mcp_server:main`）— MCP 服务（74 个只读研究工具；`stdio` 默认、`--transport sse`/`http`，http 端点 `/mcp`；不暴露下单工具）。
-- **启动**：`scripts/dev up`（后端 8899 + 前端 5899）；`start-web.bat`（后端静态托管前端于 8899）；`docker-compose.yml`（后端 127.0.0.1:8899）。
+- **启动**：`scripts/dev up`（后端 8899 + 前端 5899）；`start-web.bat`（每次启动先 `npm run build` 再静态托管前端于 8899）；`docker-compose.yml`（后端 127.0.0.1:8899）。
 - **端口**：后端 8899，前端 dev 5899。
 - **测试**：`pytest`（根目录；`pythonpath=["agent"]`、`testpaths=["agent/tests"]`）；`tests/` 下 `api/ factors/ memory/ quantlib/ stock_tracker/ fixtures/`；marker `unit`/`integration`。
 - **lint**：`ruff`（E/F/W，line-length 120；`agent/src/factors/zoo/**` 忽略 F401）。

@@ -1797,6 +1797,9 @@ export interface PeriodMetrics {
   ma10?: number | null;
   ma20?: number | null;
   ma60?: number | null;
+  rps_market?: number | null;
+  rps_sector?: number | null;
+  benchmark_return_pct?: number | null;
 }
 
 export interface MarginHistoryItem {
@@ -1903,6 +1906,8 @@ export interface SymbolSnapshot {
   period_signals: Record<string, PeriodSignals>;
   capital?: CapitalMetrics | null;
   diff?: CrossDayDiff | null;
+  sector_board?: string | null;
+  sector_board_source?: string | null;
   error?: string | null;
 }
 

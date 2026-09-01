@@ -23,6 +23,7 @@ from src.stock_tracker.models import (
 )
 from src.stock_tracker.names import fetch_a_share_names
 from src.stock_tracker.signals import compute_mas, compute_rsi, get_detector, get_detector_meta
+from src.tools.sector_tool import resolve_industry_board
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,11 @@ _BUFFER_DAYS = 90
 # Historical days to fetch for capital data (fund-flow + margin-trading).
 # Must cover the 30-day fund-flow lookback used by the spike detector.
 _CAPITAL_DATA_DAYS = max(10, _FUND_FLOW_LOOKBACK)
+
+# Market benchmark for RPS computation. The index is preferred; the ETF fallback
+# is used when the index itself is unavailable.
+_RPS_MARKET_BENCHMARK = "000300.SH"
+_RPS_MARKET_BENCHMARK_FALLBACK = "510300.SH"
 
 
 class StockTrackerEngine:
@@ -77,6 +83,24 @@ class StockTrackerEngine:
             logger.exception("Name resolution failed")
             names = {}
 
+        # Resolve sector boards once per refresh; tolerate partial failures.
+        sector_boards: Dict[str, Optional[str]] = {}
+        try:
+            for code in self.config.watchlist:
+                sector_boards[code] = resolve_industry_board(code)
+        except Exception:  # noqa: BLE001
+            logger.exception("Sector board resolution failed")
+
+        # Fetch market benchmark for RPS computation; tolerate failure.
+        benchmark_df: Optional[pd.DataFrame] = None
+        try:
+            benchmark_df = self._fetch_benchmark_data(
+                start_date.isoformat(),
+                end_date.isoformat(),
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Benchmark data fetch failed")
+
         # Fetch margin-trading data with daily caching.
         capital_data: Dict[str, CapitalMetrics] = {}
         try:
@@ -108,8 +132,13 @@ class StockTrackerEngine:
                 if df.empty:
                     data_gaps.append({"code": code, "reason": "empty_frame"})
                     continue
+                sector_board = sector_boards.get(code)
                 snapshot = self._analyze_symbol(
-                    code, df, name=names.get(code), capital=capital_data.get(code)
+                    code,
+                    df,
+                    name=names.get(code),
+                    capital=capital_data.get(code),
+                    sector_board=sector_board,
                 )
                 # Use the latest available trading date from actual data.
                 if snapshot.period_signals:
@@ -122,6 +151,9 @@ class StockTrackerEngine:
             except Exception as exc:  # noqa: BLE001 — per-symbol failure must not kill the run
                 logger.exception("Failed to analyze %s", code)
                 data_gaps.append({"code": code, "reason": f"analysis_error: {exc}"})
+
+        # Compute cross-sectional RPS after all symbols have their period metrics.
+        self._compute_and_attach_rps(symbol_snapshots, benchmark_df)
 
         rankings = self._compute_rankings(symbol_snapshots)
         diff_map = self._compute_diff_map(symbol_snapshots, previous)
@@ -230,12 +262,46 @@ class StockTrackerEngine:
             cache=self._capital_cache,
         )
 
+    def _fetch_benchmark_data(
+        self,
+        start_date: str,
+        end_date: str,
+    ) -> Optional[pd.DataFrame]:
+        """Fetch CSI300 index or ETF OHLCV for RPS benchmarking.
+
+        Tries the index first, then falls back to the ETF. Returns ``None``
+        when neither resolves.
+        """
+        for code in (_RPS_MARKET_BENCHMARK, _RPS_MARKET_BENCHMARK_FALLBACK):
+            try:
+                raw = fetch_market_data(
+                    codes=[code],
+                    start_date=start_date,
+                    end_date=end_date,
+                    source="auto",
+                    interval="1D",
+                    max_rows=0,
+                    include_provenance=False,
+                )
+                if code in raw.get("_unresolved", []):
+                    continue
+                records = raw.get(code)
+                if not records:
+                    continue
+                df = self._records_to_dataframe(records)
+                if not df.empty:
+                    return df
+            except Exception:  # noqa: BLE001
+                logger.warning("Benchmark fetch failed for %s", code)
+        return None
+
     def _analyze_symbol(
         self,
         code: str,
         df: pd.DataFrame,
         name: Optional[str] = None,
         capital: Optional[CapitalMetrics] = None,
+        sector_board: Optional[str] = None,
     ) -> SymbolSnapshot:
         """Compute metrics, signals, and summary for one symbol."""
         df = compute_mas(df)
@@ -270,6 +336,8 @@ class StockTrackerEngine:
             avg_volume_20=avg_volume_20,
             capital=capital,
             period_signals=period_signals,
+            sector_board=sector_board,
+            sector_board_source="eastmoney" if sector_board else None,
         )
 
     def _compute_period_metrics(self, df: pd.DataFrame, period: int) -> PeriodMetrics:
@@ -339,6 +407,96 @@ class StockTrackerEngine:
             )
         return results
 
+    def _compute_and_attach_rps(
+        self,
+        snapshots: List[SymbolSnapshot],
+        benchmark_df: Optional[pd.DataFrame],
+    ) -> None:
+        """Compute cross-sectional RPS percentiles and attach them to snapshots.
+
+        Market RPS uses the watchlist plus the CSI300 benchmark. Sector RPS
+        groups symbols by their resolved Eastmoney industry board.
+        """
+        if not snapshots:
+            return
+
+        periods = sorted(int(p) for p in snapshots[0].period_signals.keys())
+
+        # Pre-compute benchmark return for each period once.
+        benchmark_returns: Dict[int, Optional[float]] = {}
+        if benchmark_df is not None and not benchmark_df.empty:
+            for period in periods:
+                window = benchmark_df.tail(period)
+                if len(window) >= 2:
+                    start_price = float(window["close"].iloc[0])
+                    end_price = float(window["close"].iloc[-1])
+                    if start_price:
+                        benchmark_returns[period] = round(end_price / start_price - 1, 6)
+
+        for period in periods:
+            # Collect returns and sector groups.
+            returns: List[float] = []
+            symbol_returns: Dict[str, float] = {}
+            sector_groups: Dict[str, List[str]] = {}
+
+            for snapshot in snapshots:
+                ps = snapshot.period_signals.get(str(period))
+                if ps is None or ps.metrics.return_pct is None:
+                    continue
+                ret = ps.metrics.return_pct
+                returns.append(ret)
+                symbol_returns[snapshot.code] = ret
+                board = snapshot.sector_board
+                if board:
+                    sector_groups.setdefault(board, []).append(snapshot.code)
+
+            # Include benchmark in the market universe if available.
+            benchmark_ret = benchmark_returns.get(period)
+            market_universe = returns.copy()
+            if benchmark_ret is not None:
+                market_universe.append(benchmark_ret)
+
+            # Compute market RPS.
+            market_rps: Dict[str, float] = {}
+            if len(market_universe) >= 2:
+                series = pd.Series(market_universe)
+                ranks = series.rank(method="min")
+                n = len(series)
+                pct_values = ((ranks - 1) / (n - 1) * 100).round(2)
+                # Map ranks back to symbols (the first N entries correspond to symbols).
+                for idx, snapshot in enumerate(snapshots):
+                    if snapshot.code not in symbol_returns:
+                        continue
+                    # Position in the universe equals the symbol's order in `returns`.
+                    symbol_idx = list(symbol_returns.keys()).index(snapshot.code)
+                    market_rps[snapshot.code] = float(pct_values.iloc[symbol_idx])
+
+            # Compute sector RPS.
+            sector_rps: Dict[str, float] = {}
+            for board, codes in sector_groups.items():
+                if len(codes) < 2:
+                    continue
+                group_returns = [symbol_returns[code] for code in codes if code in symbol_returns]
+                if len(group_returns) < 2:
+                    continue
+                series = pd.Series(group_returns)
+                ranks = series.rank(method="min")
+                n = len(series)
+                pct_values = ((ranks - 1) / (n - 1) * 100).round(2)
+                for idx, code in enumerate(codes):
+                    if code not in symbol_returns:
+                        continue
+                    sector_rps[code] = float(pct_values.iloc[idx])
+
+            # Attach computed values back to each snapshot's PeriodMetrics.
+            for snapshot in snapshots:
+                ps = snapshot.period_signals.get(str(period))
+                if ps is None:
+                    continue
+                ps.metrics.rps_market = market_rps.get(snapshot.code)
+                ps.metrics.rps_sector = sector_rps.get(snapshot.code)
+                ps.metrics.benchmark_return_pct = benchmark_ret
+
     @staticmethod
     def _compute_rankings(snapshots: List[SymbolSnapshot]) -> Dict[str, List[str]]:
         """Rank symbols by return, enabled signals, and total triggered count."""
@@ -399,6 +557,30 @@ class StockTrackerEngine:
         rankings["signal_count"] = [
             s.code for s in sorted(snapshots, key=_signal_count, reverse=True)
         ]
+
+        # RPS market/sector rankings per period.
+        for period in periods:
+
+            def _rps_market(snapshot: SymbolSnapshot, period: int = period) -> float:
+                ps = snapshot.period_signals.get(str(period))
+                return ps.metrics.rps_market or 0.0 if ps else 0.0
+
+            rankings[f"rps_market_{period}"] = [
+                s.code for s in sorted(snapshots, key=_rps_market, reverse=True)
+            ]
+
+            def _rps_sector(snapshot: SymbolSnapshot, period: int = period) -> float:
+                ps = snapshot.period_signals.get(str(period))
+                return ps.metrics.rps_sector or 0.0 if ps else 0.0
+
+            rankings[f"rps_sector_{period}"] = [
+                s.code
+                for s in sorted(
+                    [s for s in snapshots if _rps_sector(s) > 0],
+                    key=_rps_sector,
+                    reverse=True,
+                )
+            ]
 
         return rankings
 

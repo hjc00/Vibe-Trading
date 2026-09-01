@@ -385,5 +385,122 @@ def test_compute_rankings_includes_new_capital_signals():
     assert rankings["net_inflow_spike"][0] == "000001.SZ"
 
 
+def _make_df_with_return(rows: int = 80, *, return_pct: float = 0.0) -> pd.DataFrame:
+    """Build a DataFrame whose last 10-bar return equals ``return_pct``."""
+    dates = pd.date_range(end="2026-08-31", periods=rows, freq="B")
+    start_price = 100.0
+    end_price = start_price * (1 + return_pct)
+    # Flat path until the last 10 bars, then linear ramp to the target end price.
+    closes: list[float] = []
+    ramp_start = rows - 10
+    for i in range(rows):
+        if i < ramp_start:
+            closes.append(start_price)
+        else:
+            closes.append(start_price + (end_price - start_price) * (i - ramp_start) / 9)
+    return pd.DataFrame(
+        {
+            "open": [c - 0.1 for c in closes],
+            "high": [c + 0.1 for c in closes],
+            "low": [c - 0.1 for c in closes],
+            "close": closes,
+            "volume": [10000 + (i % 5) * 1000 for i in range(rows)],
+        },
+        index=dates,
+    )
+
+
+def test_rps_market_computed_with_benchmark():
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ", "000003.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    # Symbol returns: -5%, 0%, +5%.
+    snapshots = [
+        engine._analyze_symbol("000001.SZ", _make_df_with_return(return_pct=-0.05)),
+        engine._analyze_symbol("000002.SZ", _make_df_with_return(return_pct=0.0)),
+        engine._analyze_symbol("000003.SZ", _make_df_with_return(return_pct=0.05)),
+    ]
+
+    # Benchmark return 2%.
+    benchmark_df = _make_df_with_return(return_pct=0.02)
+
+    engine._compute_and_attach_rps(snapshots, benchmark_df)
+
+    market_rps = {s.code: s.period_signals["10"].metrics.rps_market for s in snapshots}
+    # Universe: -5%, 0%, +5%, +2%. Sorted: -5% < 0% < +2% < +5%.
+    # rank(min): 1, 2, 3, 4. pct = (rank - 1) / (4 - 1) * 100.
+    assert market_rps["000001.SZ"] == 0.0
+    assert market_rps["000002.SZ"] == pytest.approx(33.33, abs=0.01)
+    assert market_rps["000003.SZ"] == 100.0
+
+    for s in snapshots:
+        assert s.period_signals["10"].metrics.benchmark_return_pct == pytest.approx(0.02, abs=1e-6)
+
+
+def test_rps_sector_groups_by_board():
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ", "000003.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snapshots = [
+        engine._analyze_symbol("000001.SZ", _make_df_with_return(return_pct=-0.05), sector_board="Bank"),
+        engine._analyze_symbol("000002.SZ", _make_df_with_return(return_pct=0.0), sector_board="Bank"),
+        engine._analyze_symbol("000003.SZ", _make_df_with_return(return_pct=0.05), sector_board="Tech"),
+    ]
+
+    engine._compute_and_attach_rps(snapshots, None)
+
+    sector_rps = {s.code: s.period_signals["10"].metrics.rps_sector for s in snapshots}
+    # Bank group: -5%, 0%. rank(min): 1, 2. pct = (rank - 1) / (2 - 1) * 100.
+    assert sector_rps["000001.SZ"] == 0.0
+    assert sector_rps["000002.SZ"] == 100.0
+    # Tech group has only one member.
+    assert sector_rps["000003.SZ"] is None
+
+
+def test_rps_rankings_added():
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snapshots = [
+        engine._analyze_symbol("000001.SZ", _make_df_with_return(return_pct=-0.05)),
+        engine._analyze_symbol("000002.SZ", _make_df_with_return(return_pct=0.05)),
+    ]
+    engine._compute_and_attach_rps(snapshots, None)
+
+    rankings = StockTrackerEngine._compute_rankings(snapshots)
+    assert "rps_market_10" in rankings
+    assert "rps_sector_10" in rankings
+    assert rankings["rps_market_10"][0] == "000002.SZ"
+
+
+def test_rps_fallback_when_benchmark_missing():
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snapshots = [
+        engine._analyze_symbol("000001.SZ", _make_df_with_return(return_pct=-0.05)),
+        engine._analyze_symbol("000002.SZ", _make_df_with_return(return_pct=0.05)),
+    ]
+
+    engine._compute_and_attach_rps(snapshots, None)
+
+    market_rps = {s.code: s.period_signals["10"].metrics.rps_market for s in snapshots}
+    # Watchlist only: -5%, +5%. rank(min): 1, 2. pct = (rank - 1) / (2 - 1) * 100.
+    assert market_rps["000001.SZ"] == 0.0
+    assert market_rps["000002.SZ"] == 100.0
+    for s in snapshots:
+        assert s.period_signals["10"].metrics.benchmark_return_pct is None
+
+
+def test_rps_sector_none_when_single_peer():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snapshot = engine._analyze_symbol("000001.SZ", _make_df_with_return(return_pct=0.05), sector_board="Bank")
+    engine._compute_and_attach_rps([snapshot], None)
+
+    assert snapshot.period_signals["10"].metrics.rps_sector is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

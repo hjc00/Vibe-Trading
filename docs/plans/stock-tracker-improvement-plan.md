@@ -43,9 +43,12 @@
 - **投资人价值**：区分「自身走强」与「随大盘普涨」，避免追涨弱势补涨股。
 - **涉及模块**：`agent/src/stock_tracker/engine.py`、`models.py`、前端表格/图表。
 - **大致方案**：
-  1. 在 `PeriodMetrics` 中新增 `rps_market`（相对沪深 300）、`rps_sector`（相对行业）。
-  2. 用近 20/60/120 日涨幅与全 A 或行业成分股做分位排名。
-  3. 新增 RPS 趋势图或表格列，并用颜色区分 >90 / <10 分位。
+  1. 在 `PeriodMetrics` 中新增 `rps_market`（相对 watchlist + 沪深300 的百分位）、`rps_sector`（相对同行业 watchlist 股票的百分位）、`benchmark_return_pct`。
+  2. 通过 `fetch_market_data` 拉取沪深300指数（`000300.SH`），失败时回退到沪深300 ETF（`510300.SH`）。
+  3. 通过 `src.tools.sector_tool.resolve_industry_board` 解析个股行业板块，失败时留空。
+  4. 在 engine 中先完成所有 symbol 的周期指标计算，再统一做横截面 RPS 排名并回填。
+  5. 在 `rankings` 中新增 `rps_market_{period}` 和 `rps_sector_{period}` 排行榜。
+  6. 前端表格增加 RPS 列、展开行展示 RPS Market/RPS Sector、详情卡展示 RPS 与超额收益，并新增 `RpsChartCard` 趋势图。
 - **验收标准**：
   - 每个 symbol 的 period metrics 包含 RPS 字段。
   - 新增「RPS 排名」榜单。
@@ -189,7 +192,7 @@
 | 序号 | 改进项 | 状态 | 负责人 | 开始时间 | 完成时间 | 备注 |
 |-----|-------|------|-------|---------|---------|------|
 | 2.1 | 主力资金流向信号 | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | 东财 daykline 接口在当前网络下受限，已预留 tushare fallback；见 commit `29663f55` |
-| 2.2 | 个股相对强弱（RPS） | 待开始 | - | - | - | |
+| 2.2 | 个股相对强弱（RPS） | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | watchlist 内横截面排名 + 沪深300；行业 RPS 依赖 `sector_tool`；见当前提交 |
 | 2.3 | 风险指标（ATR/回撤/Beta） | 待开始 | - | - | - | |
 | 2.4 | 多周期共振评分 | 待开始 | - | - | - | |
 | 2.5 | 行业/板块强度看板 | 待开始 | - | - | - | |
@@ -210,5 +213,5 @@
 - 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`models.py`、`analyzer.py`
 - API 路由：`agent/src/api/stock_tracker_routes.py`
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`TrackerConfigPanel.tsx`
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`TrackerConfigPanel.tsx`
 - 项目索引：`docs/PROJECT_INDEX.md`

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type SignalMeta, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
-import { computePriceChange, formatQuoteUpdatedAt, normalizeAShareCode } from "@/lib/stockTracker";
+import { computePriceChange, formatQuoteUpdatedAt, formatRps, getRpsToneClass, normalizeAShareCode } from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
 import { TrackerControlBar } from "@/components/stock-tracker/TrackerControlBar";
@@ -14,6 +14,7 @@ import { TrackerAnalyzePanel } from "@/components/stock-tracker/TrackerAnalyzePa
 import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysisReport";
 import { MarginChartCard } from "@/components/stock-tracker/MarginChartCard";
 import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard";
+import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -331,9 +332,10 @@ export function StockTracker() {
                   quotesUpdatedAt={quotesUpdatedAt}
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <MarginChartCard symbol={selectedSymbol} />
                   <FundFlowChartCard symbol={selectedSymbol} />
+                  <RpsChartCard symbol={selectedSymbol} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
@@ -441,12 +443,26 @@ function SymbolDetail({
     symbol.daily_return,
   );
 
+  const baselinePeriod = String(
+    Object.keys(symbol.period_signals)
+      .map((p) => Number(p))
+      .sort((a, b) => a - b)[0] ?? "10",
+  );
+  const metrics = symbol.period_signals[baselinePeriod]?.metrics;
+  const excessReturn =
+    metrics?.return_pct != null && metrics?.benchmark_return_pct != null
+      ? metrics.return_pct - metrics.benchmark_return_pct
+      : null;
+
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex flex-col">
           <span className="text-sm font-semibold">{symbol.name ?? symbol.code}</span>
           <span className="font-mono text-xs text-muted-foreground">{symbol.code}</span>
+          {symbol.sector_board && (
+            <span className="text-[10px] text-muted-foreground/80">{symbol.sector_board}</span>
+          )}
         </div>
         <div className="flex flex-col items-end">
           <span className="font-mono text-sm font-semibold tabular-nums">{symbol.close?.toFixed(2) ?? "—"}</span>
@@ -486,14 +502,14 @@ function SymbolDetail({
           )}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
         <div className="rounded bg-muted/40 p-2">
           <p className="text-muted-foreground">{t("stockTracker.volumeRatio")}</p>
-          <p className="font-mono font-medium">{symbol.period_signals["10"]?.metrics.volume_ratio?.toFixed(2) ?? "—"}</p>
+          <p className="font-mono font-medium">{metrics?.volume_ratio?.toFixed(2) ?? "—"}</p>
         </div>
         <div className="rounded bg-muted/40 p-2">
           <p className="text-muted-foreground">RSI(14)</p>
-          <p className="font-mono font-medium">{symbol.period_signals["10"]?.metrics.rsi?.toFixed(1) ?? "—"}</p>
+          <p className="font-mono font-medium">{metrics?.rsi?.toFixed(1) ?? "—"}</p>
         </div>
         <div className="rounded bg-muted/40 p-2">
           <p className="text-muted-foreground">{t("stockTracker.volatility")}</p>
@@ -504,8 +520,31 @@ function SymbolDetail({
           </p>
         </div>
         <div className="rounded bg-muted/40 p-2">
-          <p className="text-muted-foreground">MA20</p>
-          <p className="font-mono font-medium">{symbol.period_signals["10"]?.metrics.ma20?.toFixed(2) ?? "—"}</p>
+          <p className="text-muted-foreground">{t("stockTracker.rpsMarket")}</p>
+          <p className={cn("font-mono font-medium tabular-nums", getRpsToneClass(metrics?.rps_market))}>
+            {formatRps(metrics?.rps_market)}
+          </p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.rpsSector")}</p>
+          <p className={cn("font-mono font-medium tabular-nums", getRpsToneClass(metrics?.rps_sector))}>
+            {formatRps(metrics?.rps_sector)}
+          </p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.excessReturn")}</p>
+          <p
+            className={cn(
+              "font-mono font-medium tabular-nums",
+              excessReturn != null && excessReturn > 0 && "text-success",
+              excessReturn != null && excessReturn < 0 && "text-danger",
+              excessReturn != null && excessReturn === 0 && "text-muted-foreground",
+            )}
+          >
+            {excessReturn !== null
+              ? `${excessReturn > 0 ? "+" : ""}${(excessReturn * 100).toFixed(2)}%`
+              : "—"}
+          </p>
         </div>
       </div>
     </div>

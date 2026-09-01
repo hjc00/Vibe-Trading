@@ -1711,16 +1711,26 @@
     "marginTotalBalance": "融券余额",
     "capitalDataUnavailable": "资金数据暂不可用",
     "marginChartTitle": "融资融券余额趋势",
+    "marginExplanation": "展示融资余额（借钱买入）和融券余额（借券卖出）走势。融资余额上升通常反映杠杆资金做多意愿增强。",
     "noMarginData": "暂无融资融券数据",
+    "fundFlowChartTitle": "主力资金流向趋势",
+    "fundFlowExplanation": "按主力/超大单/大单/中单/小单划分的每日净流入。正值代表机构或大单资金流入压力。",
     "expand": "展开",
     "collapse": "收起",
     "price": "价格",
     "change": "涨跌",
     "mainForceNetInflow": "主力净流入",
     "mainForce5dNetInflow": "5日主力累计",
-    "fundFlowChartTitle": "主力资金流向趋势",
     "netInflowSpike": "资金异动",
     "mainForceInflow": "主力连续流入",
-    "fundFlowDataUnavailable": "资金流数据暂不可用"
+    "fundFlowDataUnavailable": "资金流数据暂不可用",
+    "rps": "相对强弱",
+    "rpsMarket": "大盘RPS",
+    "rpsSector": "行业RPS",
+    "rpsChartTitle": "RPS 趋势",
+    "rpsExplanation": "RPS（Relative Strength Percentile，相对强弱百分位）衡量个股在观察列表+沪深300中的相对强弱。数值≥90表示显著强于基准，≤10表示显著弱于基准。",
+    "noRpsData": "暂无 RPS 数据",
+    "excessReturn": "超额收益",
+    "sectorBoard": "行业"
   }
 }
