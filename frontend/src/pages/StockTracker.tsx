@@ -17,6 +17,7 @@ import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard"
 import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
+import { SectorStrengthBoard } from "@/components/stock-tracker/SectorStrengthBoard";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -363,6 +364,11 @@ export function StockTracker() {
                   ))}
                 </div>
 
+                <SectorStrengthBoard
+                  sectors={snapshot.sectors}
+                  tradingDate={snapshot.trading_date}
+                />
+
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
                   <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
                   <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
@@ -486,7 +492,12 @@ function SymbolDetail({
           <span className="text-sm font-semibold">{symbol.name ?? symbol.code}</span>
           <span className="font-mono text-xs text-muted-foreground">{symbol.code}</span>
           {symbol.sector_board && (
-            <span className="text-[10px] text-muted-foreground/80">{symbol.sector_board}</span>
+            <span className="text-[10px] text-muted-foreground/80">
+              {symbol.sector_board}
+              {symbol.sector_strength_rank != null
+                ? ` · ${t("stockTracker.sectorStrengthRank")} #${symbol.sector_strength_rank}`
+                : ""}
+            </span>
           )}
         </div>
         <div className="flex flex-col items-end">

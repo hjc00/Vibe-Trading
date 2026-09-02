@@ -318,6 +318,51 @@ class CrossDayDiff(BaseModel):
     cleared_signals: List[str] = Field(default_factory=list)
 
 
+class SectorPeriodMetric(BaseModel):
+    """Per-period watchlist aggregate for one industry board."""
+
+    period: int
+    avg_return_pct: Optional[float] = None
+    avg_rps_market: Optional[float] = None
+    avg_rps_sector: Optional[float] = None
+
+
+class SectorStrength(BaseModel):
+    """Strength snapshot for one Eastmoney industry board (行业板块).
+
+    Combines the whole-market board ranking (percent change, main-force net
+    inflow, up/down constituent counts, leading stock) with watchlist-internal
+    aggregates (member returns per period, prosperity score). The aggregates
+    and ``prosperity_score`` stay ``None`` when the board has no watchlist
+    members. Populated by :mod:`src.stock_tracker.sector_data`.
+    """
+
+    # Whole-market board ranking (Eastmoney clist, sorted by change_pct desc).
+    board_code: Optional[str] = None
+    board_name: str
+    change_pct: Optional[float] = None
+    fund_flow_net: Optional[float] = None  # main-force net inflow, CNY
+    up_count: Optional[float] = None
+    down_count: Optional[float] = None
+    leader: Optional[str] = None
+    market_rank: Optional[int] = None  # 1-based rank by change_pct
+    # Watchlist-internal aggregates. ``period_metrics`` holds the per-period
+    # return / RPS trend across all configured periods (ascending by period).
+    member_count: int = 0
+    members: List[str] = Field(default_factory=list)
+    period_metrics: List[SectorPeriodMetric] = Field(default_factory=list)
+    total_main_net: Optional[float] = None
+    # Prosperity (fundamental-based scoring).
+    prosperity_score: Optional[float] = None
+    avg_roe: Optional[float] = None
+    avg_gross_margin: Optional[float] = None
+    avg_revenue_yoy: Optional[float] = None
+    # Provenance: "eastmoney" (from ranking), "watchlist" (aggregate-only),
+    # or "unavailable".
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
 class SymbolSnapshot(BaseModel):
     """One symbol's slice of a tracker snapshot."""
 
@@ -337,6 +382,7 @@ class SymbolSnapshot(BaseModel):
     diff: Optional[CrossDayDiff] = None
     sector_board: Optional[str] = None
     sector_board_source: Optional[str] = None
+    sector_strength_rank: Optional[int] = None  # board's market rank (1-based)
     error: Optional[str] = None
 
 
@@ -348,6 +394,7 @@ class TrackerSnapshot(BaseModel):
     config: TrackerConfig
     symbols: List[SymbolSnapshot] = Field(default_factory=list)
     rankings: Dict[str, List[str]] = Field(default_factory=dict)
+    sectors: List[SectorStrength] = Field(default_factory=list)
     unresolved: List[str] = Field(default_factory=list)
     data_gaps: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -439,6 +486,8 @@ __all__ = [
     "RiskMetrics",
     "ValuationHistoryItem",
     "ValuationSnapshot",
+    "SectorPeriodMetric",
+    "SectorStrength",
     "CrossDayDiff",
     "SymbolSnapshot",
     "TrackerSnapshot",

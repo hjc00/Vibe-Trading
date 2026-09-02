@@ -1945,6 +1945,34 @@ export interface ValuationSnapshot {
   history: ValuationHistoryItem[];
 }
 
+export interface SectorPeriodMetric {
+  period: number;
+  avg_return_pct?: number | null;
+  avg_rps_market?: number | null;
+  avg_rps_sector?: number | null;
+}
+
+export interface SectorStrength {
+  board_code?: string | null;
+  board_name: string;
+  change_pct?: number | null;
+  fund_flow_net?: number | null;
+  up_count?: number | null;
+  down_count?: number | null;
+  leader?: string | null;
+  market_rank?: number | null;
+  member_count: number;
+  members: string[];
+  period_metrics: SectorPeriodMetric[];
+  total_main_net?: number | null;
+  prosperity_score?: number | null;
+  avg_roe?: number | null;
+  avg_gross_margin?: number | null;
+  avg_revenue_yoy?: number | null;
+  source: string;
+  error?: string | null;
+}
+
 export interface SymbolSnapshot {
   code: string;
   name?: string | null;
@@ -1962,6 +1990,7 @@ export interface SymbolSnapshot {
   diff?: CrossDayDiff | null;
   sector_board?: string | null;
   sector_board_source?: string | null;
+  sector_strength_rank?: number | null;
   error?: string | null;
 }
 
@@ -1971,6 +2000,7 @@ export interface TrackerSnapshot {
   config: TrackerConfig;
   symbols: SymbolSnapshot[];
   rankings: Record<string, string[]>;
+  sectors: SectorStrength[];
   unresolved: string[];
   data_gaps: Array<Record<string, unknown>>;
 }

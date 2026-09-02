@@ -40,6 +40,18 @@ export function getRpsToneClass(value: number | null | undefined): string {
   return "text-muted-foreground";
 }
 
+/**
+ * Tone for an up/down percentage change. Positive changes render as success
+ * (green), negative as danger (red), matching the inline convention used across
+ * the tracker UI.
+ */
+export function getChangeToneClass(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value > 0) return "text-success";
+  if (value < 0) return "text-danger";
+  return "text-muted-foreground";
+}
+
 export function formatAtr(value: number | null | undefined): string {
   if (value === undefined || value === null) return "—";
   return value.toFixed(2);

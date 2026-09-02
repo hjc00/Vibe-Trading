@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "snapshot": {
-    "generated_at": "2026-09-02T10:40:38.385580+08:00",
+    "generated_at": "2026-09-02T13:08:28.912402+08:00",
     "trading_date": "2026-09-01",
     "config": {
       "watchlist": [
@@ -34,7 +34,8 @@
         "beta_window": 60,
         "stop_loss_atr_multiple": 2.0
       },
-      "refresh_interval_seconds": 600
+      "refresh_interval_seconds": 600,
+      "detail_card_count": 5
     },
     "symbols": [
       {
@@ -65,7 +66,7 @@
               "ma60": 79.38483333333333,
               "rps_market": 33.33,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01863
+              "benchmark_return_pct": -0.018167
             },
             "signals": {
               "volume_spike": {
@@ -136,7 +137,7 @@
               "ma60": 79.38483333333333,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01061
+              "benchmark_return_pct": -0.010144
             },
             "signals": {
               "volume_spike": {
@@ -207,7 +208,7 @@
               "ma60": 79.38483333333333,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.023067
+              "benchmark_return_pct": -0.022607
             },
             "signals": {
               "volume_spike": {
@@ -278,7 +279,7 @@
               "ma60": 79.38483333333333,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.04308
+              "benchmark_return_pct": -0.042629
             },
             "signals": {
               "volume_spike": {
@@ -15680,6 +15681,7 @@
         },
         "sector_board": "元件",
         "sector_board_source": "eastmoney",
+        "sector_strength_rank": null,
         "error": null
       },
       {
@@ -15710,7 +15712,7 @@
               "ma60": 34.31408333333333,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01863
+              "benchmark_return_pct": -0.018167
             },
             "signals": {
               "volume_spike": {
@@ -15781,7 +15783,7 @@
               "ma60": 34.31408333333333,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01061
+              "benchmark_return_pct": -0.010144
             },
             "signals": {
               "volume_spike": {
@@ -15852,7 +15854,7 @@
               "ma60": 34.31408333333333,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.023067
+              "benchmark_return_pct": -0.022607
             },
             "signals": {
               "volume_spike": {
@@ -15923,7 +15925,7 @@
               "ma60": 34.31408333333333,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.04308
+              "benchmark_return_pct": -0.042629
             },
             "signals": {
               "volume_spike": {
@@ -31084,6 +31086,7 @@
         },
         "sector_board": "IT服务Ⅱ",
         "sector_board_source": "eastmoney",
+        "sector_strength_rank": null,
         "error": null
       },
       {
@@ -31114,7 +31117,7 @@
               "ma60": 507.55966666666666,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01863
+              "benchmark_return_pct": -0.018167
             },
             "signals": {
               "volume_spike": {
@@ -31155,16 +31158,16 @@
               "main_force_inflow": {
                 "triggered": false,
                 "state": "none",
-                "value": 0.0,
-                "threshold": 3.0,
-                "description": "Main-force inflow 0 consecutive days, below 3"
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
               },
               "net_inflow_spike": {
                 "triggered": false,
                 "state": "none",
-                "value": 1.094,
-                "threshold": 2.0,
-                "description": "Main-force net 1.09x average, below 2.0x threshold"
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
               }
             }
           },
@@ -31185,7 +31188,7 @@
               "ma60": 507.55966666666666,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01061
+              "benchmark_return_pct": -0.010144
             },
             "signals": {
               "volume_spike": {
@@ -31226,16 +31229,16 @@
               "main_force_inflow": {
                 "triggered": false,
                 "state": "none",
-                "value": 0.0,
-                "threshold": 3.0,
-                "description": "Main-force inflow 0 consecutive days, below 3"
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
               },
               "net_inflow_spike": {
                 "triggered": false,
                 "state": "none",
-                "value": 1.094,
-                "threshold": 2.0,
-                "description": "Main-force net 1.09x average, below 2.0x threshold"
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
               }
             }
           },
@@ -31256,7 +31259,7 @@
               "ma60": 507.55966666666666,
               "rps_market": 33.33,
               "rps_sector": null,
-              "benchmark_return_pct": -0.023067
+              "benchmark_return_pct": -0.022607
             },
             "signals": {
               "volume_spike": {
@@ -31297,16 +31300,16 @@
               "main_force_inflow": {
                 "triggered": false,
                 "state": "none",
-                "value": 0.0,
-                "threshold": 3.0,
-                "description": "Main-force inflow 0 consecutive days, below 3"
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
               },
               "net_inflow_spike": {
                 "triggered": false,
                 "state": "none",
-                "value": 1.094,
-                "threshold": 2.0,
-                "description": "Main-force net 1.09x average, below 2.0x threshold"
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
               }
             }
           },
@@ -31327,7 +31330,7 @@
               "ma60": 507.55966666666666,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.04308
+              "benchmark_return_pct": -0.042629
             },
             "signals": {
               "volume_spike": {
@@ -31368,272 +31371,31 @@
               "main_force_inflow": {
                 "triggered": false,
                 "state": "none",
-                "value": 0.0,
-                "threshold": 3.0,
-                "description": "Main-force inflow 0 consecutive days, below 3"
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
               },
               "net_inflow_spike": {
                 "triggered": false,
                 "state": "none",
-                "value": 1.094,
-                "threshold": 2.0,
-                "description": "Main-force net 1.09x average, below 2.0x threshold"
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
               }
             }
           }
         },
         "capital": {
           "fund_flow": {
-            "trade_date": "2026-09-01",
-            "main_net": -1637575712.0,
+            "trade_date": null,
+            "main_net": null,
             "main_net_ratio": null,
-            "main_5d_net": -1259016736.0,
-            "super_large_net": -1332371280.0,
-            "large_net": -305204432.0,
-            "medium_net": 509125888.0,
-            "small_net": 1128449824.0,
-            "history": [
-              {
-                "trade_date": "2026-07-22",
-                "main_net": -701564160.0,
-                "super_large_net": -402641408.0,
-                "large_net": -298922752.0,
-                "medium_net": 702814464.0,
-                "small_net": -1250426.0
-              },
-              {
-                "trade_date": "2026-07-23",
-                "main_net": -1960063232.0,
-                "super_large_net": -1682393600.0,
-                "large_net": -277669632.0,
-                "medium_net": 1961070848.0,
-                "small_net": -1007641.0
-              },
-              {
-                "trade_date": "2026-07-24",
-                "main_net": 279552512.0,
-                "super_large_net": -46992896.0,
-                "large_net": 326545408.0,
-                "medium_net": -278591744.0,
-                "small_net": -960662.0
-              },
-              {
-                "trade_date": "2026-07-27",
-                "main_net": -2722046720.0,
-                "super_large_net": -1591976960.0,
-                "large_net": -1130069760.0,
-                "medium_net": 2724231424.0,
-                "small_net": -2184728.0
-              },
-              {
-                "trade_date": "2026-07-28",
-                "main_net": -4371787120.0,
-                "super_large_net": -4078927216.0,
-                "large_net": -292859904.0,
-                "medium_net": 2259327056.0,
-                "small_net": 2112459888.0
-              },
-              {
-                "trade_date": "2026-07-29",
-                "main_net": -33526528.0,
-                "super_large_net": 992726784.0,
-                "large_net": -1026253312.0,
-                "medium_net": -656518912.0,
-                "small_net": 690045440.0
-              },
-              {
-                "trade_date": "2026-07-30",
-                "main_net": 242618112.0,
-                "super_large_net": -386178304.0,
-                "large_net": 628796416.0,
-                "medium_net": -456053504.0,
-                "small_net": 213435136.0
-              },
-              {
-                "trade_date": "2026-07-31",
-                "main_net": 379653888.0,
-                "super_large_net": 1423108096.0,
-                "large_net": -1043454208.0,
-                "medium_net": -1728080640.0,
-                "small_net": 1348426896.0
-              },
-              {
-                "trade_date": "2026-08-03",
-                "main_net": -4808171008.0,
-                "super_large_net": -4616991744.0,
-                "large_net": -191179264.0,
-                "medium_net": 1324260656.0,
-                "small_net": 3483910400.0
-              },
-              {
-                "trade_date": "2026-08-04",
-                "main_net": 1562810880.0,
-                "super_large_net": 1318066176.0,
-                "large_net": 244744704.0,
-                "medium_net": -743692800.0,
-                "small_net": -819118112.0
-              },
-              {
-                "trade_date": "2026-08-05",
-                "main_net": 1731261184.0,
-                "super_large_net": 1655879936.0,
-                "large_net": 75381248.0,
-                "medium_net": -1107891456.0,
-                "small_net": -623369728.0
-              },
-              {
-                "trade_date": "2026-08-06",
-                "main_net": -969140480.0,
-                "super_large_net": -508199680.0,
-                "large_net": -460940800.0,
-                "medium_net": 158964480.0,
-                "small_net": 810176256.0
-              },
-              {
-                "trade_date": "2026-08-07",
-                "main_net": 1999803392.0,
-                "super_large_net": 1524314112.0,
-                "large_net": 475489280.0,
-                "medium_net": -1735143680.0,
-                "small_net": -264659808.0
-              },
-              {
-                "trade_date": "2026-08-10",
-                "main_net": -3056963072.0,
-                "super_large_net": -2494645248.0,
-                "large_net": -562317824.0,
-                "medium_net": 1715456768.0,
-                "small_net": 1341506384.0
-              },
-              {
-                "trade_date": "2026-08-11",
-                "main_net": -467057376.0,
-                "super_large_net": -364574944.0,
-                "large_net": -102482432.0,
-                "medium_net": 429510912.0,
-                "small_net": 37546611.0
-              },
-              {
-                "trade_date": "2026-08-12",
-                "main_net": 881488640.0,
-                "super_large_net": 792662528.0,
-                "large_net": 88826112.0,
-                "medium_net": -880421376.0,
-                "small_net": -1067306.0
-              },
-              {
-                "trade_date": "2026-08-13",
-                "main_net": -1023848448.0,
-                "super_large_net": -845020416.0,
-                "large_net": -178828032.0,
-                "medium_net": 1025105152.0,
-                "small_net": -1256994.0
-              },
-              {
-                "trade_date": "2026-08-14",
-                "main_net": -309889280.0,
-                "super_large_net": -193694464.0,
-                "large_net": -116194816.0,
-                "medium_net": 310930688.0,
-                "small_net": -1041220.0
-              },
-              {
-                "trade_date": "2026-08-17",
-                "main_net": 1517734144.0,
-                "super_large_net": 1518631168.0,
-                "large_net": -897024.0,
-                "medium_net": -1515308032.0,
-                "small_net": -2426052.0
-              },
-              {
-                "trade_date": "2026-08-18",
-                "main_net": -1615095296.0,
-                "super_large_net": -1261064960.0,
-                "large_net": -354030336.0,
-                "medium_net": 1615996416.0,
-                "small_net": -901279.0
-              },
-              {
-                "trade_date": "2026-08-19",
-                "main_net": -4795646464.0,
-                "super_large_net": -4027298048.0,
-                "large_net": -768348416.0,
-                "medium_net": 4050693888.0,
-                "small_net": 744952512.0
-              },
-              {
-                "trade_date": "2026-08-20",
-                "main_net": -191590944.0,
-                "super_large_net": -183096224.0,
-                "large_net": -8494720.0,
-                "medium_net": 135124480.0,
-                "small_net": 56466492.0
-              },
-              {
-                "trade_date": "2026-08-21",
-                "main_net": 576527008.0,
-                "super_large_net": 420364416.0,
-                "large_net": 156162592.0,
-                "medium_net": -575190272.0,
-                "small_net": -1336531.0
-              },
-              {
-                "trade_date": "2026-08-24",
-                "main_net": -3352652608.0,
-                "super_large_net": -2925699648.0,
-                "large_net": -426952960.0,
-                "medium_net": 1041800032.0,
-                "small_net": 2310852528.0
-              },
-              {
-                "trade_date": "2026-08-25",
-                "main_net": 1326362592.0,
-                "super_large_net": 1287207264.0,
-                "large_net": 39155328.0,
-                "medium_net": -672783328.0,
-                "small_net": -653579296.0
-              },
-              {
-                "trade_date": "2026-08-26",
-                "main_net": -388222544.0,
-                "super_large_net": -236826896.0,
-                "large_net": -151395648.0,
-                "medium_net": -148859136.0,
-                "small_net": 537081696.0
-              },
-              {
-                "trade_date": "2026-08-27",
-                "main_net": 1624000752.0,
-                "super_large_net": 1429452528.0,
-                "large_net": 194548224.0,
-                "medium_net": -1532428800.0,
-                "small_net": -91571920.0
-              },
-              {
-                "trade_date": "2026-08-28",
-                "main_net": -1633264000.0,
-                "super_large_net": -1714167840.0,
-                "large_net": 80903840.0,
-                "medium_net": 1235849728.0,
-                "small_net": 397414160.0
-              },
-              {
-                "trade_date": "2026-08-31",
-                "main_net": 776044768.0,
-                "super_large_net": 960451296.0,
-                "large_net": -184406528.0,
-                "medium_net": -1009002112.0,
-                "small_net": 232957216.0
-              },
-              {
-                "trade_date": "2026-09-01",
-                "main_net": -1637575712.0,
-                "super_large_net": -1332371280.0,
-                "large_net": -305204432.0,
-                "medium_net": 509125888.0,
-                "small_net": 1128449824.0
-              }
-            ]
+            "main_5d_net": null,
+            "super_large_net": null,
+            "large_net": null,
+            "medium_net": null,
+            "small_net": null,
+            "history": []
           },
           "margin": {
             "trade_date": "2026-09-01",
@@ -31949,9 +31711,9 @@
               }
             ]
           },
-          "fund_flow_source": "eastmoney",
+          "fund_flow_source": "unavailable",
           "margin_source": "eastmoney",
-          "fund_flow_error": null,
+          "fund_flow_error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
           "margin_error": null
         },
         "risk": {
@@ -46729,6 +46491,7 @@
         },
         "sector_board": "半导体",
         "sector_board_source": "eastmoney",
+        "sector_strength_rank": null,
         "error": null
       }
     ],
@@ -46753,7 +46516,27 @@
         "603228.SH",
         "603986.SH"
       ],
+      "main_force_inflow": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "rsi": [
+        "603228.SH",
+        "603986.SH",
+        "000938.SZ"
+      ],
       "volume_spike": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "margin_expansion": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "net_inflow_spike": [
         "603228.SH",
         "000938.SZ",
         "603986.SH"
@@ -46761,26 +46544,6 @@
       "breakout": [
         "000938.SZ",
         "603228.SH",
-        "603986.SH"
-      ],
-      "net_inflow_spike": [
-        "603228.SH",
-        "603986.SH",
-        "000938.SZ"
-      ],
-      "rsi": [
-        "603228.SH",
-        "603986.SH",
-        "000938.SZ"
-      ],
-      "margin_expansion": [
-        "603228.SH",
-        "000938.SZ",
-        "603986.SH"
-      ],
-      "main_force_inflow": [
-        "603228.SH",
-        "000938.SZ",
         "603986.SH"
       ],
       "signal_count": [
@@ -46813,6 +46576,1149 @@
       ],
       "rps_sector_60": []
     },
+    "sectors": [
+      {
+        "board_code": "BK1382",
+        "board_name": "地面兵装Ⅲ",
+        "change_pct": 6.93,
+        "fund_flow_net": 1197470480.0,
+        "up_count": 12.0,
+        "down_count": 0.0,
+        "leader": "600967",
+        "market_rank": 1,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1229",
+        "board_name": "地面兵装Ⅱ",
+        "change_pct": 6.93,
+        "fund_flow_net": 1197470480.0,
+        "up_count": 12.0,
+        "down_count": 0.0,
+        "leader": "600967",
+        "market_rank": 2,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1497",
+        "board_name": "化妆品制造及其他",
+        "change_pct": 5.87,
+        "fund_flow_net": 102216381.0,
+        "up_count": 5.0,
+        "down_count": 3.0,
+        "leader": "920176",
+        "market_rank": 3,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1441",
+        "board_name": "其他橡胶制品",
+        "change_pct": 4.39,
+        "fund_flow_net": 63656040.0,
+        "up_count": 7.0,
+        "down_count": 8.0,
+        "leader": "920098",
+        "market_rank": 4,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1296",
+        "board_name": "视频媒体",
+        "change_pct": 4.27,
+        "fund_flow_net": -418212176.0,
+        "up_count": 1.0,
+        "down_count": 0.0,
+        "leader": "300413",
+        "market_rank": 5,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1252",
+        "board_name": "化妆品",
+        "change_pct": 3.43,
+        "fund_flow_net": 177276878.0,
+        "up_count": 9.0,
+        "down_count": 7.0,
+        "leader": "920176",
+        "market_rank": 6,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1507",
+        "board_name": "宠物食品",
+        "change_pct": 2.79,
+        "fund_flow_net": 9262711.0,
+        "up_count": 4.0,
+        "down_count": 0.0,
+        "leader": "300673",
+        "market_rank": 7,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1462",
+        "board_name": "玻纤制造",
+        "change_pct": 2.69,
+        "fund_flow_net": 1115537504.0,
+        "up_count": 4.0,
+        "down_count": 4.0,
+        "leader": "605006",
+        "market_rank": 8,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1018",
+        "board_name": "橡胶",
+        "change_pct": 2.67,
+        "fund_flow_net": 37825520.0,
+        "up_count": 9.0,
+        "down_count": 14.0,
+        "leader": "920098",
+        "market_rank": 9,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1337",
+        "board_name": "品牌消费电子",
+        "change_pct": 2.3,
+        "fund_flow_net": -19509332.0,
+        "up_count": 7.0,
+        "down_count": 4.0,
+        "leader": "301189",
+        "market_rank": 10,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1348",
+        "board_name": "辅料",
+        "change_pct": 2.13,
+        "fund_flow_net": 15068255.0,
+        "up_count": 2.0,
+        "down_count": 2.0,
+        "leader": "920527",
+        "market_rank": 11,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1506",
+        "board_name": "农业综合Ⅲ",
+        "change_pct": 2.02,
+        "fund_flow_net": -8026147.0,
+        "up_count": 1.0,
+        "down_count": 2.0,
+        "leader": "920964",
+        "market_rank": 12,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1257",
+        "board_name": "农业综合Ⅱ",
+        "change_pct": 2.02,
+        "fund_flow_net": -8026147.0,
+        "up_count": 1.0,
+        "down_count": 2.0,
+        "leader": "920964",
+        "market_rank": 13,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1562",
+        "board_name": "人工景区",
+        "change_pct": 2.0,
+        "fund_flow_net": 113039822.0,
+        "up_count": 4.0,
+        "down_count": 1.0,
+        "leader": "002059",
+        "market_rank": 14,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1384",
+        "board_name": "航空装备Ⅲ",
+        "change_pct": 1.96,
+        "fund_flow_net": 1313260976.0,
+        "up_count": 36.0,
+        "down_count": 11.0,
+        "leader": "002297",
+        "market_rank": 15,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1231",
+        "board_name": "航空装备Ⅱ",
+        "change_pct": 1.96,
+        "fund_flow_net": 1313260976.0,
+        "up_count": 36.0,
+        "down_count": 11.0,
+        "leader": "002297",
+        "market_rank": 16,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1533",
+        "board_name": "塑料包装",
+        "change_pct": 1.8,
+        "fund_flow_net": 77251036.0,
+        "up_count": 6.0,
+        "down_count": 3.0,
+        "leader": "920218",
+        "market_rank": 17,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1312",
+        "board_name": "线缆部件及其他",
+        "change_pct": 1.7,
+        "fund_flow_net": 1855213088.0,
+        "up_count": 24.0,
+        "down_count": 14.0,
+        "leader": "600869",
+        "market_rank": 18,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1204",
+        "board_name": "国防军工",
+        "change_pct": 1.66,
+        "fund_flow_net": 2778056208.0,
+        "up_count": 91.0,
+        "down_count": 47.0,
+        "leader": "600967",
+        "market_rank": 19,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1035",
+        "board_name": "美容护理",
+        "change_pct": 1.61,
+        "fund_flow_net": 163338428.0,
+        "up_count": 16.0,
+        "down_count": 17.0,
+        "leader": "920176",
+        "market_rank": 20,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1452",
+        "board_name": "卫浴电器",
+        "change_pct": 1.54,
+        "fund_flow_net": 2939692.0,
+        "up_count": 2.0,
+        "down_count": 1.0,
+        "leader": "002543",
+        "market_rank": 21,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1467",
+        "board_name": "耐火材料",
+        "change_pct": 1.49,
+        "fund_flow_net": -3975962.0,
+        "up_count": 6.0,
+        "down_count": 3.0,
+        "leader": "920191",
+        "market_rank": 22,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1556",
+        "board_name": "教育运营及其他",
+        "change_pct": 1.44,
+        "fund_flow_net": -27674462.0,
+        "up_count": 1.0,
+        "down_count": 1.0,
+        "leader": "300010",
+        "market_rank": 23,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1592",
+        "board_name": "通信线缆及配套",
+        "change_pct": 1.34,
+        "fund_flow_net": 271510624.0,
+        "up_count": 8.0,
+        "down_count": 5.0,
+        "leader": "920640",
+        "market_rank": 24,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1411",
+        "board_name": "非金属材料Ⅲ",
+        "change_pct": 1.19,
+        "fund_flow_net": 242300912.0,
+        "up_count": 9.0,
+        "down_count": 5.0,
+        "leader": "920675",
+        "market_rank": 25,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1020",
+        "board_name": "非金属材料Ⅱ",
+        "change_pct": 1.19,
+        "fund_flow_net": 242300912.0,
+        "up_count": 9.0,
+        "down_count": 5.0,
+        "leader": "920675",
+        "market_rank": 26,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1392",
+        "board_name": "工程机械器件",
+        "change_pct": 1.16,
+        "fund_flow_net": 417378.0,
+        "up_count": 7.0,
+        "down_count": 6.0,
+        "leader": "920839",
+        "market_rank": 27,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1563",
+        "board_name": "自然景区",
+        "change_pct": 1.13,
+        "fund_flow_net": 110192436.0,
+        "up_count": 11.0,
+        "down_count": 2.0,
+        "leader": "300859",
+        "market_rank": 28,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1567",
+        "board_name": "其他专业服务",
+        "change_pct": 1.08,
+        "fund_flow_net": 2092931.0,
+        "up_count": 1.0,
+        "down_count": 3.0,
+        "leader": "920039",
+        "market_rank": 29,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1354",
+        "board_name": "鞋帽及其他",
+        "change_pct": 1.07,
+        "fund_flow_net": 70684857.0,
+        "up_count": 5.0,
+        "down_count": 5.0,
+        "leader": "603958",
+        "market_rank": 30,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1272",
+        "board_name": "旅游及景区",
+        "change_pct": 1.04,
+        "fund_flow_net": 210023259.0,
+        "up_count": 19.0,
+        "down_count": 8.0,
+        "leader": "002059",
+        "market_rank": 31,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1498",
+        "board_name": "品牌化妆品",
+        "change_pct": 1.0,
+        "fund_flow_net": 75060490.0,
+        "up_count": 4.0,
+        "down_count": 4.0,
+        "leader": "603983",
+        "market_rank": 32,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1534",
+        "board_name": "印刷",
+        "change_pct": 0.97,
+        "fund_flow_net": -2438583.0,
+        "up_count": 2.0,
+        "down_count": 1.0,
+        "leader": "920121",
+        "market_rank": 33,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1496",
+        "board_name": "洗护用品",
+        "change_pct": 0.96,
+        "fund_flow_net": -3459868.0,
+        "up_count": 3.0,
+        "down_count": 1.0,
+        "leader": "001328",
+        "market_rank": 34,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1383",
+        "board_name": "航海装备Ⅲ",
+        "change_pct": 0.96,
+        "fund_flow_net": -56273520.0,
+        "up_count": 8.0,
+        "down_count": 2.0,
+        "leader": "300589",
+        "market_rank": 35,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1230",
+        "board_name": "航海装备Ⅱ",
+        "change_pct": 0.96,
+        "fund_flow_net": -56273520.0,
+        "up_count": 8.0,
+        "down_count": 2.0,
+        "leader": "300589",
+        "market_rank": 36,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1311",
+        "board_name": "输变电设备",
+        "change_pct": 0.94,
+        "fund_flow_net": -55545888.0,
+        "up_count": 12.0,
+        "down_count": 17.0,
+        "leader": "920222",
+        "market_rank": 37,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1388",
+        "board_name": "大气治理",
+        "change_pct": 0.93,
+        "fund_flow_net": -1550284.0,
+        "up_count": 4.0,
+        "down_count": 3.0,
+        "leader": "920802",
+        "market_rank": 38,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1406",
+        "board_name": "印刷包装机械",
+        "change_pct": 0.82,
+        "fund_flow_net": 11126201.0,
+        "up_count": 8.0,
+        "down_count": 4.0,
+        "leader": "603901",
+        "market_rank": 39,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1619",
+        "board_name": "其他金属新材料",
+        "change_pct": 0.82,
+        "fund_flow_net": 49132784.0,
+        "up_count": 9.0,
+        "down_count": 12.0,
+        "leader": "603978",
+        "market_rank": 40,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK0546",
+        "board_name": "玻璃玻纤",
+        "change_pct": 0.82,
+        "fund_flow_net": 1102689904.0,
+        "up_count": 5.0,
+        "down_count": 9.0,
+        "leader": "605006",
+        "market_rank": 41,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1611",
+        "board_name": "国有大型银行Ⅲ",
+        "change_pct": 0.76,
+        "fund_flow_net": -257008512.0,
+        "up_count": 6.0,
+        "down_count": 0.0,
+        "leader": "601658",
+        "market_rank": 42,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1398",
+        "board_name": "其他通用设备",
+        "change_pct": 0.74,
+        "fund_flow_net": 562522272.0,
+        "up_count": 27.0,
+        "down_count": 30.0,
+        "leader": "603269",
+        "market_rank": 43,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1385",
+        "board_name": "航天装备Ⅲ",
+        "change_pct": 0.71,
+        "fund_flow_net": 44289563.0,
+        "up_count": 4.0,
+        "down_count": 5.0,
+        "leader": "688282",
+        "market_rank": 44,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1232",
+        "board_name": "航天装备Ⅱ",
+        "change_pct": 0.71,
+        "fund_flow_net": 44289563.0,
+        "up_count": 4.0,
+        "down_count": 5.0,
+        "leader": "688282",
+        "market_rank": 45,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1500",
+        "board_name": "医美耗材",
+        "change_pct": 0.68,
+        "fund_flow_net": -3299179.0,
+        "up_count": 1.0,
+        "down_count": 2.0,
+        "leader": "920982",
+        "market_rank": 46,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1350",
+        "board_name": "其他纺织",
+        "change_pct": 0.68,
+        "fund_flow_net": 9567863.0,
+        "up_count": 8.0,
+        "down_count": 7.0,
+        "leader": "300877",
+        "market_rank": 47,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1526",
+        "board_name": "底盘与发动机系统",
+        "change_pct": 0.66,
+        "fund_flow_net": 582073760.0,
+        "up_count": 46.0,
+        "down_count": 65.0,
+        "leader": "002265",
+        "market_rank": 48,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1240",
+        "board_name": "厨卫电器",
+        "change_pct": 0.63,
+        "fund_flow_net": -56354368.0,
+        "up_count": 4.0,
+        "down_count": 5.0,
+        "leader": "002543",
+        "market_rank": 49,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": "BK1386",
+        "board_name": "军工电子Ⅲ",
+        "change_pct": 0.63,
+        "fund_flow_net": 279308912.0,
+        "up_count": 31.0,
+        "down_count": 29.0,
+        "leader": "920008",
+        "market_rank": 50,
+        "member_count": 0,
+        "members": [],
+        "period_metrics": [],
+        "total_main_net": null,
+        "prosperity_score": null,
+        "avg_roe": null,
+        "avg_gross_margin": null,
+        "avg_revenue_yoy": null,
+        "source": "eastmoney",
+        "error": null
+      },
+      {
+        "board_code": null,
+        "board_name": "元件",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "market_rank": null,
+        "member_count": 1,
+        "members": [
+          "603228.SH"
+        ],
+        "period_metrics": [
+          {
+            "period": 5,
+            "avg_return_pct": -0.0094,
+            "avg_rps_market": 33.33,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 10,
+            "avg_return_pct": 0.0135,
+            "avg_rps_market": 66.67,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 20,
+            "avg_return_pct": 0.138,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 60,
+            "avg_return_pct": 0.2367,
+            "avg_rps_market": 66.67,
+            "avg_rps_sector": null
+          }
+        ],
+        "total_main_net": -411693136.0,
+        "prosperity_score": 35.24,
+        "avg_roe": 4.55,
+        "avg_gross_margin": 20.223,
+        "avg_revenue_yoy": 21.3707,
+        "source": "watchlist",
+        "error": null
+      },
+      {
+        "board_code": null,
+        "board_name": "IT服务Ⅱ",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "market_rank": null,
+        "member_count": 1,
+        "members": [
+          "000938.SZ"
+        ],
+        "period_metrics": [
+          {
+            "period": 5,
+            "avg_return_pct": 0.098,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 10,
+            "avg_return_pct": 0.0846,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 20,
+            "avg_return_pct": 0.0374,
+            "avg_rps_market": 66.67,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 60,
+            "avg_return_pct": 0.4562,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          }
+        ],
+        "total_main_net": null,
+        "prosperity_score": 51.63,
+        "avg_roe": 13.32,
+        "avg_gross_margin": 13.4057,
+        "avg_revenue_yoy": 33.9296,
+        "source": "watchlist",
+        "error": null
+      },
+      {
+        "board_code": null,
+        "board_name": "半导体",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "market_rank": null,
+        "member_count": 1,
+        "members": [
+          "603986.SH"
+        ],
+        "period_metrics": [
+          {
+            "period": 5,
+            "avg_return_pct": 0.0013,
+            "avg_rps_market": 66.67,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 10,
+            "avg_return_pct": -0.0265,
+            "avg_rps_market": 0.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 20,
+            "avg_return_pct": 0.0196,
+            "avg_rps_market": 33.33,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 60,
+            "avg_return_pct": -0.2148,
+            "avg_rps_market": 0.0,
+            "avg_rps_sector": null
+          }
+        ],
+        "total_main_net": null,
+        "prosperity_score": 90.84,
+        "avg_roe": 23.13,
+        "avg_gross_margin": 63.1305,
+        "avg_revenue_yoy": 178.6723,
+        "source": "watchlist",
+        "error": null
+      }
+    ],
     "unresolved": [],
     "data_gaps": []
   }

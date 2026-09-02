@@ -2,7 +2,7 @@
 
 > 本文档用于跟踪 A 股多周期股票追踪器（`stock_tracker`）的后续优化方向。
 > 创建时间：2026-09-01
-> 最后更新：2026-09-02（已落地 2.6 估值与质量指标）（已落地 2.3 风险指标）
+> 最后更新：2026-09-02（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量指标）
 
 ## 一、现状概述
 
@@ -197,7 +197,7 @@
 | 2.2 | 个股相对强弱（RPS） | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | watchlist 内横截面排名 + 沪深300；行业 RPS 依赖 `sector_tool`；见当前提交 |
 | 2.3 | 风险指标（ATR/回撤/Beta） | 已完成 | jinchu | 2026-09-01 | 2026-09-01 | 新增 `risk.py` + `RiskMetricsCard`；Beta 复用 RPS benchmark |
 | 2.4 | 多周期共振评分 | 待开始 | - | - | - | |
-| 2.5 | 行业/板块强度看板 | 待开始 | - | - | - | |
+| 2.5 | 行业/板块强度看板 | 已完成 | jinchu | 2026-09-02 | 2026-09-02 | 东财行业板块口径（约 86 个，非申万）；新增 `sector_data.py` + `SectorStrengthBoard`；全市场板块涨跌/资金流排行 + watchlist 聚合 + 简版景气度评分（营收增速/ROE/毛利率 40/40/20）；卡片可折叠（localStorage 记忆），周期趋势列对比各配置周期平均收益 |
 | 2.6 | 估值与质量指标 | 已完成 | jinchu | 2026-09-02 | 2026-09-02 | 东财 datacenter `RPT_VALUEANALYSIS_DET`（PE_TTM/PB/PS/PCF/PEG/总市值+3/5/10年分位）+ `RPT_F10_FINANCE_MAINFINADATA`（ROE/毛利率/增速/现金流质量/杠杆→质量评分 0–100）；股息率当前无稳定来源留空，研发投入强度未纳入评分（见 2.6 方案备注） |
 | 2.7 | 信号历史绩效追踪 | 待开始 | - | - | - | |
 | 2.8 | 组合风险检查 | 待开始 | - | - | - | |
@@ -212,8 +212,8 @@
 
 ## 五、相关文件
 
-- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`
+- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`
 - API 路由：`agent/src/api/stock_tracker_routes.py`
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`TrackerConfigPanel.tsx`
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`
 - 项目索引：`docs/PROJECT_INDEX.md`

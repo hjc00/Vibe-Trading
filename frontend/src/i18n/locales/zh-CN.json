@@ -1758,6 +1758,17 @@
     "qualityScore": "质量评分",
     "valuationCheap": "偏低",
     "valuationReasonable": "合理",
-    "valuationExpensive": "偏高"
+    "valuationExpensive": "偏高",
+    "sectorStrengthTitle": "行业强度看板",
+    "sectorStrengthExplanation": "全市场东财行业板块按当日涨跌幅排行，叠加自选股所在行业的聚合指标。自选股所在板块置顶展示，列表上限 20 行。趋势列展示各板块成员在每一配置周期（如 10/20/60 日）的平均收益，对比短中期动量；悬停周期标签可查看该周期大盘 RPS。景气度评分（0–100）综合各板块平均营收增速、ROE 与毛利率（权重 40/40/20）。带成员角标的行表示自选股所在板块。",
+    "sectorRank": "排名",
+    "sectorChangePct": "涨跌幅",
+    "sectorTrend": "周期趋势",
+    "sectorFundFlow": "主力净流入",
+    "sectorUpDown": "涨/跌",
+    "sectorProsperity": "景气度",
+    "sectorLeader": "领涨股",
+    "sectorNoData": "暂无行业强度数据",
+    "sectorStrengthRank": "行业强度"
   }
 }

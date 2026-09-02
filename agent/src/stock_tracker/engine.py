@@ -16,6 +16,7 @@ from src.stock_tracker.models import (
     PeriodMetrics,
     PeriodSignals,
     RiskMetrics,
+    SectorStrength,
     SignalType,
     SignalValue,
     SymbolSnapshot,
@@ -25,6 +26,7 @@ from src.stock_tracker.models import (
 )
 from src.stock_tracker.names import fetch_a_share_names
 from src.stock_tracker.risk import compute_atr, compute_beta, compute_max_drawdown
+from src.stock_tracker.sector_data import load_sector_strength
 from src.stock_tracker.signals import compute_mas, compute_rsi, get_detector, get_detector_meta
 from src.stock_tracker.valuation_data import ValuationDataCache, load_valuation_data
 from src.tools.sector_tool import resolve_industry_board
@@ -180,6 +182,8 @@ class StockTrackerEngine:
         # Compute cross-sectional RPS after all symbols have their period metrics.
         self._compute_and_attach_rps(symbol_snapshots, benchmark_df)
 
+        sectors = self._compute_sector_strength(symbol_snapshots)
+
         rankings = self._compute_rankings(symbol_snapshots)
         diff_map = self._compute_diff_map(symbol_snapshots, previous)
 
@@ -193,6 +197,7 @@ class StockTrackerEngine:
             config=self.config,
             symbols=symbol_snapshots,
             rankings=rankings,
+            sectors=sectors,
             unresolved=unresolved,
             data_gaps=data_gaps,
         )
@@ -591,6 +596,34 @@ class StockTrackerEngine:
                 ps.metrics.rps_market = market_rps.get(snapshot.code)
                 ps.metrics.rps_sector = sector_rps.get(snapshot.code)
                 ps.metrics.benchmark_return_pct = benchmark_ret
+
+    def _compute_sector_strength(
+        self,
+        snapshots: List[SymbolSnapshot],
+    ) -> List[SectorStrength]:
+        """Compute the sector-strength board and attach each board's rank.
+
+        Aggregates watchlist metrics per Eastmoney industry board across every
+        configured period and merges the whole-market board ranking. Tolerates
+        failure via ``load_sector_strength`` returning ``[]``.
+        """
+        periods = sorted(self.config.periods)
+
+        try:
+            sectors = load_sector_strength(snapshots, periods=periods)
+        except Exception:  # noqa: BLE001 - sector view must not break refresh
+            logger.exception("Sector strength computation failed")
+            sectors = []
+
+        if sectors:
+            rank_by_board = {
+                s.board_name: s.market_rank for s in sectors if s.market_rank is not None
+            }
+            for snapshot in snapshots:
+                board = snapshot.sector_board
+                if board:
+                    snapshot.sector_strength_rank = rank_by_board.get(board)
+        return sectors
 
     @staticmethod
     def _compute_rankings(snapshots: List[SymbolSnapshot]) -> Dict[str, List[str]]:

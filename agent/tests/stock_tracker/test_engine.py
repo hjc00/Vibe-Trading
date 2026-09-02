@@ -654,5 +654,61 @@ def test_seed_skips_capital_with_errors():
     assert engine._capital_cache.get("margin", "000001.SZ", trading_date) is None
 
 
+def test_compute_sector_strength_attaches_rank(monkeypatch):
+    from src.stock_tracker.models import SectorStrength
+
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snap_a = engine._analyze_symbol("000001.SZ", _make_df(rows=80), sector_board="Bank")
+    snap_b = engine._analyze_symbol("000002.SZ", _make_df(rows=80), sector_board="Bank")
+
+    sectors = [
+        SectorStrength(board_name="Bank", change_pct=1.5, market_rank=1, member_count=2),
+        SectorStrength(board_name="Tech", change_pct=-0.5, market_rank=2),
+    ]
+    monkeypatch.setattr("src.stock_tracker.engine.load_sector_strength", lambda *a, **k: sectors)
+
+    result = engine._compute_sector_strength([snap_a, snap_b])
+
+    assert result == sectors
+    assert snap_a.sector_strength_rank == 1
+    assert snap_b.sector_strength_rank == 1
+
+
+def test_compute_sector_strength_none_when_board_unranked(monkeypatch):
+    from src.stock_tracker.models import SectorStrength
+
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snap = engine._analyze_symbol("000001.SZ", _make_df(rows=80), sector_board="Bank")
+    # Bank appears only in the watchlist aggregation, not in the ranking.
+    sectors = [SectorStrength(board_name="Tech", change_pct=2.0, market_rank=1)]
+    monkeypatch.setattr("src.stock_tracker.engine.load_sector_strength", lambda *a, **k: sectors)
+
+    result = engine._compute_sector_strength([snap])
+
+    assert len(result) == 1
+    assert snap.sector_strength_rank is None
+
+
+def test_compute_sector_strength_degrades_on_failure(monkeypatch):
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    snap = engine._analyze_symbol("000001.SZ", _make_df(rows=80), sector_board="Bank")
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("sector data unavailable")
+
+    monkeypatch.setattr("src.stock_tracker.engine.load_sector_strength", _boom)
+
+    result = engine._compute_sector_strength([snap])
+
+    assert result == []
+    assert snap.sector_strength_rank is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

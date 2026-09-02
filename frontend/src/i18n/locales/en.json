@@ -1758,6 +1758,17 @@
     "qualityScore": "Quality score",
     "valuationCheap": "Cheap",
     "valuationReasonable": "Fair",
-    "valuationExpensive": "Expensive"
+    "valuationExpensive": "Expensive",
+    "sectorStrengthTitle": "Sector strength",
+    "sectorStrengthExplanation": "Whole-market Eastmoney industry boards ranked by today's percent change, merged with watchlist-internal aggregates. Boards your watchlist holds are pinned to the top; the list caps at the top 20. The trend column shows each board's average member return over each configured period (e.g. 10D/20D/60D) to compare short vs. long-term momentum; hover a chip for its market RPS. The prosperity score (0-100) blends each board's average revenue growth, ROE, and gross margin (weights 40/40/20). Rows with a member badge are boards your watchlist holds.",
+    "sectorRank": "Rank",
+    "sectorChangePct": "Change %",
+    "sectorTrend": "Trend",
+    "sectorFundFlow": "Main inflow",
+    "sectorUpDown": "Up/Down",
+    "sectorProsperity": "Prosperity",
+    "sectorLeader": "Leader",
+    "sectorNoData": "No sector strength data",
+    "sectorStrengthRank": "Industry rank"
   }
 }

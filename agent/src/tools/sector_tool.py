@@ -35,9 +35,10 @@ _MEMBERSHIP_URL = "https://push2.eastmoney.com/api/qt/slist/get"
 _RANKING_URL = "https://push2.eastmoney.com/api/qt/clist/get"
 
 # Field selectors. f12 = board/security code, f14 = name, f3 = change percent,
-# f2 = latest price, f104/f105 = up/down constituent counts (ranking only).
+# f2 = latest price, f104/f105 = up/down constituent counts (ranking only),
+# f62 = main-force net inflow (ranking only).
 _MEMBERSHIP_FIELDS = "f12,f13,f14,f3,f2"
-_RANKING_FIELDS = "f12,f14,f3,f2,f104,f105,f128,f140"
+_RANKING_FIELDS = "f12,f14,f3,f2,f104,f105,f128,f140,f62"
 
 # Industry-only selector (f13 = market marker distinguishing the stock row
 # from its board row in the spt=1 single-industry response).
@@ -116,7 +117,8 @@ def _parse_ranking_row(row: Any) -> dict[str, Any] | None:
 
     Returns:
         A dict ``{board_code, board_name, change_pct, index, leader, up_count,
-        down_count}``, or ``None`` when the row lacks a board code/name.
+        down_count, fund_flow_net}``, or ``None`` when the row lacks a board
+        code/name.
     """
     if not isinstance(row, dict):
         return None
@@ -133,6 +135,7 @@ def _parse_ranking_row(row: Any) -> dict[str, Any] | None:
         "up_count": _as_float(row.get("f104")),
         "down_count": _as_float(row.get("f105")),
         "leader": str(leader) if leader and leader != "-" else None,
+        "fund_flow_net": _as_float(row.get("f62")),
     }
 
 
@@ -254,15 +257,20 @@ def resolve_industry_board(code: str) -> str | None:
     return None
 
 
-def _fetch_ranking(limit: int) -> str:
-    """Fetch the industry-board ranking by intraday percent change.
+def fetch_industry_board_ranking(limit: int) -> list[dict[str, Any]]:
+    """Fetch the top ``limit`` industry boards ranked by percent change.
+
+    Unlike the JSON-envelope ``_fetch_ranking`` (which targets the LLM tool),
+    this returns a plain list of parsed board dicts for programmatic consumers
+    (e.g. the stock-tracker sector-strength board). Fields: ``board_code``,
+    ``board_name``, ``change_pct``, ``index``, ``up_count``, ``down_count``,
+    ``leader``, ``fund_flow_net``. Returns ``[]`` (never raises) on failure.
 
     Args:
-        limit: Number of top boards to keep (already validated and capped).
+        limit: Number of top boards to keep.
 
     Returns:
-        A JSON envelope string with the ranked boards, or an error envelope when
-        the request fails.
+        The ranked board dicts, most positive first, or ``[]`` on failure.
     """
     try:
         payload = get_json(
@@ -277,9 +285,9 @@ def _fetch_ranking(limit: int) -> str:
                 "fltt": "2",
             },
         )
-    except Exception as exc:  # noqa: BLE001 - surface a clean error envelope
+    except Exception as exc:  # noqa: BLE001 - degraded to empty list
         logger.warning("sector ranking fetch failed: %s", exc)
-        return _error(f"ranking request failed: {exc}")
+        return []
 
     boards = [
         parsed
@@ -288,6 +296,20 @@ def _fetch_ranking(limit: int) -> str:
     ]
     if len(boards) > limit:
         boards = boards[:limit]
+    return boards
+
+
+def _fetch_ranking(limit: int) -> str:
+    """Fetch the industry-board ranking by intraday percent change.
+
+    Args:
+        limit: Number of top boards to keep (already validated and capped).
+
+    Returns:
+        A JSON envelope string with the ranked boards, or an error envelope when
+        the request fails.
+    """
+    boards = fetch_industry_board_ranking(limit)
     envelope = {
         "ok": True,
         "market": "stock",
