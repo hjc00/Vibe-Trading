@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "snapshot": {
-    "generated_at": "2026-09-02T19:41:54.394161+08:00",
+    "generated_at": "2026-09-02T20:39:00.409373+08:00",
     "trading_date": "2026-09-02",
     "config": {
       "watchlist": [
@@ -35,7 +35,7 @@
         "stop_loss_atr_multiple": 2.0
       },
       "refresh_interval_seconds": 600,
-      "detail_card_count": 5
+      "detail_card_count": 6
     },
     "symbols": [
       {
@@ -970,16 +970,14 @@
         },
         "diff": {
           "signal_count": {
-            "prev": 3,
+            "prev": 1,
             "curr": 1
           },
-          "return_pct": 0.069028,
+          "return_pct": 0.0,
           "rank_return_10": null,
           "rank_change_10": null,
           "new_signals": [],
-          "cleared_signals": [
-            "volume_spike"
-          ]
+          "cleared_signals": []
         },
         "sector_board": "元件",
         "sector_board_source": "eastmoney",
@@ -1660,16 +1658,14 @@
         },
         "diff": {
           "signal_count": {
-            "prev": 4,
+            "prev": 2,
             "curr": 2
           },
-          "return_pct": 0.007563,
+          "return_pct": 0.0,
           "rank_return_10": null,
           "rank_change_10": null,
           "new_signals": [],
-          "cleared_signals": [
-            "volume_spike"
-          ]
+          "cleared_signals": []
         },
         "sector_board": "IT服务Ⅱ",
         "sector_board_source": "eastmoney",
@@ -2353,7 +2349,7 @@
             "prev": 0,
             "curr": 0
           },
-          "return_pct": 0.021486,
+          "return_pct": 0.0,
           "rank_return_10": null,
           "rank_change_10": null,
           "new_signals": [],
@@ -2386,14 +2382,19 @@
         "603228.SH",
         "603986.SH"
       ],
-      "volume_spike": [
+      "breakout": [
         "000938.SZ",
         "603228.SH",
         "603986.SH"
       ],
-      "breakout": [
-        "000938.SZ",
+      "margin_expansion": [
         "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "net_inflow_spike": [
+        "603228.SH",
+        "000938.SZ",
         "603986.SH"
       ],
       "main_force_inflow": [
@@ -2401,20 +2402,15 @@
         "000938.SZ",
         "603986.SH"
       ],
+      "volume_spike": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
       "rsi": [
         "603228.SH",
         "603986.SH",
         "000938.SZ"
-      ],
-      "net_inflow_spike": [
-        "603228.SH",
-        "000938.SZ",
-        "603986.SH"
-      ],
-      "margin_expansion": [
-        "603228.SH",
-        "000938.SZ",
-        "603986.SH"
       ],
       "signal_count": [
         "000938.SZ",
