@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "snapshot": {
-    "generated_at": "2026-09-02T20:39:00.409373+08:00",
+    "generated_at": "2026-09-02T20:59:48.235246+08:00",
     "trading_date": "2026-09-02",
     "config": {
       "watchlist": [
@@ -2382,17 +2382,27 @@
         "603228.SH",
         "603986.SH"
       ],
+      "rsi": [
+        "603228.SH",
+        "603986.SH",
+        "000938.SZ"
+      ],
       "breakout": [
         "000938.SZ",
         "603228.SH",
         "603986.SH"
       ],
-      "margin_expansion": [
+      "volume_spike": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "net_inflow_spike": [
         "603228.SH",
         "000938.SZ",
         "603986.SH"
       ],
-      "net_inflow_spike": [
+      "margin_expansion": [
         "603228.SH",
         "000938.SZ",
         "603986.SH"
@@ -2401,16 +2411,6 @@
         "603228.SH",
         "000938.SZ",
         "603986.SH"
-      ],
-      "volume_spike": [
-        "000938.SZ",
-        "603228.SH",
-        "603986.SH"
-      ],
-      "rsi": [
-        "603228.SH",
-        "603986.SH",
-        "000938.SZ"
       ],
       "signal_count": [
         "000938.SZ",
