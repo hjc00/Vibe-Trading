@@ -64,6 +64,11 @@ class TrackerSettingsRequest(BaseModel):
         ge=5,
         description="Auto quote refresh interval in seconds.",
     )
+    detail_card_count: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Number of detail cards to show (max three per row; extras wrap).",
+    )
 
 
 class TrackerConfigResponse(BaseModel):
@@ -74,6 +79,7 @@ class TrackerConfigResponse(BaseModel):
     signals: List[str]
     thresholds: Dict[str, float]
     refresh_interval_seconds: int
+    detail_card_count: int
 
 
 class TrackerSettingsResponse(BaseModel):
@@ -136,6 +142,8 @@ def _config_from_request(request: TrackerSettingsRequest) -> TrackerConfig:
         kwargs["thresholds"] = current.thresholds.model_copy(update=request.thresholds)
     if request.refresh_interval_seconds is not None:
         kwargs["refresh_interval_seconds"] = request.refresh_interval_seconds
+    if request.detail_card_count is not None:
+        kwargs["detail_card_count"] = request.detail_card_count
 
     # Merge with current config so omitted fields keep their defaults, then
     # reconstruct to re-run Pydantic validators (model_copy skips them).

@@ -20,6 +20,16 @@ import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
 
 const POLL_INTERVAL_MS = 2000;
 
+// Fixed render order for the middle detail cards; the first
+// `detail_card_count` are shown, at most three per row.
+const DETAIL_CARD_COMPONENTS = [
+  MarginChartCard,
+  FundFlowChartCard,
+  RpsChartCard,
+  RiskMetricsCard,
+  ValuationCard,
+] as const;
+
 export function StockTracker() {
   const { t } = useTranslation();
   const [snapshot, setSnapshot] = useState<TrackerSnapshot | null>(null);
@@ -266,9 +276,18 @@ export function StockTracker() {
         signals: [],
         thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 },
         refresh_interval_seconds: 10,
+        detail_card_count: 5,
       },
     [config],
   );
+
+  const detailCards = useMemo(() => {
+    const count = Math.max(
+      1,
+      Math.min(config?.detail_card_count ?? DETAIL_CARD_COMPONENTS.length, DETAIL_CARD_COMPONENTS.length),
+    );
+    return DETAIL_CARD_COMPONENTS.slice(0, count);
+  }, [config?.detail_card_count]);
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
@@ -338,12 +357,10 @@ export function StockTracker() {
                   quotesUpdatedAt={quotesUpdatedAt}
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                  <MarginChartCard symbol={selectedSymbol} />
-                  <FundFlowChartCard symbol={selectedSymbol} />
-                  <RpsChartCard symbol={selectedSymbol} />
-                  <RiskMetricsCard symbol={selectedSymbol} />
-                  <ValuationCard symbol={selectedSymbol} />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {detailCards.map((Card) => (
+                    <Card key={Card.name} symbol={selectedSymbol} />
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">

@@ -1635,6 +1635,8 @@
     "lastUpdated": "最后更新",
     "refreshInterval": "刷新间隔（秒）",
     "refreshIntervalHint": "最小 5 秒。系统将按此间隔拉取实时行情。",
+    "detailCardCount": "详情卡片数量",
+    "detailCardCountHint": "显示详情卡片的数量。每行最多 3 个，超出自动换行到下一行。",
     "updatedAt": "{{when}} 更新",
     "dataDate": "数据日期 {{date}}",
     "updatedJustNow": "刚刚",

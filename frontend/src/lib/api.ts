@@ -1758,6 +1758,8 @@ export interface TrackerConfig {
   signals: SignalType[];
   thresholds: TrackerThresholds;
   refresh_interval_seconds: number;
+  /** Number of detail cards to render (max three per row; extras wrap). */
+  detail_card_count: number;
 }
 
 export interface StockTrackerQuote {

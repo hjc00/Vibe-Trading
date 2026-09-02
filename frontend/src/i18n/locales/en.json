@@ -1635,6 +1635,8 @@
     "lastUpdated": "Last updated",
     "refreshInterval": "Refresh interval (seconds)",
     "refreshIntervalHint": "Minimum 5 seconds. Real-time quotes are fetched on this interval.",
+    "detailCardCount": "Detail cards",
+    "detailCardCountHint": "Number of detail cards to show. At most three per row; extras wrap to the next row.",
     "updatedAt": "Updated {{when}}",
     "dataDate": "Data date {{date}}",
     "updatedJustNow": "just now",

@@ -52,6 +52,7 @@ def test_get_settings_default(client):
     assert data["config"]["watchlist"] == TrackerConfig().watchlist
     assert data["config"]["periods"] == [10, 20, 60]
     assert data["config"]["refresh_interval_seconds"] == 10
+    assert data["config"]["detail_card_count"] == 5
 
 
 def test_update_settings_validation(client):
@@ -105,6 +106,24 @@ def test_update_settings_refresh_interval_validation(client):
     response = client.put(
         "/api/stock-tracker/settings",
         json={"refresh_interval_seconds": 3},
+    )
+    assert response.status_code == 422
+
+
+def test_update_settings_detail_card_count(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"detail_card_count": 5},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["config"]["detail_card_count"] == 5
+
+
+def test_update_settings_detail_card_count_validation(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"detail_card_count": 0},
     )
     assert response.status_code == 422
 

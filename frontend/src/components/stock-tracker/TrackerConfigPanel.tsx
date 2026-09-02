@@ -165,6 +165,12 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
     setDraft((prev) => ({ ...prev, refresh_interval_seconds: Math.max(5, num) }));
   };
 
+  const updateDetailCardCount = (value: string) => {
+    const num = parseInt(value, 10);
+    if (Number.isNaN(num)) return;
+    setDraft((prev) => ({ ...prev, detail_card_count: Math.max(1, num) }));
+  };
+
   const saveDisabled =
     watchlistInput.trim().length === 0 ||
     draft.signals.length === 0 ||
@@ -269,6 +275,25 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
                 )}
               />
               <p className="text-[10px] text-muted-foreground">{t("stockTracker.refreshIntervalHint")}</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="detail-card-count">
+                {t("stockTracker.detailCardCount")}
+              </label>
+              <input
+                id="detail-card-count"
+                type="number"
+                min={1}
+                step={1}
+                value={draft.detail_card_count}
+                onChange={(e) => updateDetailCardCount(e.target.value)}
+                className={cn(
+                  "w-full rounded-md border bg-background px-3 py-2 text-xs outline-none",
+                  "focus:border-primary focus:ring-2 focus:ring-primary/20",
+                )}
+              />
+              <p className="text-[10px] text-muted-foreground">{t("stockTracker.detailCardCountHint")}</p>
             </div>
 
             {allParams.length > 0 && (

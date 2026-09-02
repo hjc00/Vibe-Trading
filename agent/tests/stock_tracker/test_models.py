@@ -36,6 +36,16 @@ def test_tracker_config_accepts_rsi() -> None:
     assert "volume_spike" in config.signals
 
 
+def test_tracker_config_detail_card_count_default() -> None:
+    config = TrackerConfig()
+    assert config.detail_card_count == 5
+
+
+def test_tracker_config_rejects_nonpositive_detail_card_count() -> None:
+    with pytest.raises(ValueError, match="greater than or equal to 1"):
+        TrackerConfig(detail_card_count=0)
+
+
 @pytest.mark.parametrize(
     ("input_code", "expected"),
     [

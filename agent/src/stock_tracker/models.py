@@ -73,6 +73,14 @@ class TrackerConfig(BaseModel):
         ge=5,
         description="Auto quote refresh interval in seconds.",
     )
+    # Number of detail cards to render in the middle row. At most three fit per
+    # row; the rest wrap onto the next row. Defaults to the full card set so no
+    # card is hidden unless the user lowers the count.
+    detail_card_count: int = Field(
+        default=5,
+        ge=1,
+        description="Number of detail cards to show (max three per row; extras wrap).",
+    )
 
     @field_validator("watchlist")
     @classmethod
