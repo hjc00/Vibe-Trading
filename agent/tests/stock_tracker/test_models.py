@@ -130,23 +130,25 @@ def test_valuation_snapshot_serializes_percentiles() -> None:
     assert dumped["pe_percentile_3y"] == 80.0
     assert dumped["pb_percentile_3y"] == 12.0
     assert dumped["fundamental_quality_score"] == 88.0
-    assert dumped["pe_percentile_5y"] is None
+    assert dumped["pe_percentile_1y"] is None
+    assert "history" not in dumped
 
 
 def test_symbol_snapshot_serializes_valuation() -> None:
     from datetime import date
 
-    from src.stock_tracker.models import SymbolSnapshot, ValuationHistoryItem, ValuationSnapshot
+    from src.stock_tracker.models import SymbolSnapshot, ValuationSnapshot
 
     snapshot = SymbolSnapshot(
         code="600519.SH",
         valuation=ValuationSnapshot(
             trade_date=date(2026, 8, 31),
             pe_ttm=19.9,
-            history=[ValuationHistoryItem(trade_date=date(2026, 8, 31), pe_ttm=19.9)],
+            pe_percentile_3y=80.0,
         ),
     )
     dumped = snapshot.model_dump(mode="json")
     assert dumped["valuation"]["pe_ttm"] == 19.9
+    assert dumped["valuation"]["pe_percentile_3y"] == 80.0
     assert dumped["valuation"]["trade_date"] == "2026-08-31"
-    assert dumped["valuation"]["history"][0]["trade_date"] == "2026-08-31"
+    assert "history" not in dumped["valuation"]

@@ -1913,14 +1913,6 @@ export interface CrossDayDiff {
   cleared_signals: string[];
 }
 
-export interface ValuationHistoryItem {
-  trade_date?: string | null;
-  close?: number | null;
-  pe_ttm?: number | null;
-  pb?: number | null;
-  ps_ttm?: number | null;
-}
-
 export interface ValuationSnapshot {
   trade_date?: string | null;
   pe_ttm?: number | null;
@@ -1931,11 +1923,9 @@ export interface ValuationSnapshot {
   dividend_yield?: number | null;
   total_market_cap?: number | null;
   pe_percentile_3y?: number | null;
-  pe_percentile_5y?: number | null;
-  pe_percentile_10y?: number | null;
+  pe_percentile_1y?: number | null;
   pb_percentile_3y?: number | null;
-  pb_percentile_5y?: number | null;
-  pb_percentile_10y?: number | null;
+  pb_percentile_1y?: number | null;
   roe?: number | null;
   roe_mean_5y?: number | null;
   roe_std_5y?: number | null;
@@ -1949,7 +1939,6 @@ export interface ValuationSnapshot {
   fundamental_quality_score?: number | null;
   source?: string;
   error?: string | null;
-  history: ValuationHistoryItem[];
 }
 
 export interface SectorPeriodMetric {

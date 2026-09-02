@@ -252,16 +252,6 @@ class RiskMetrics(BaseModel):
     stop_loss_atr_multiple: Optional[float] = None  # the k actually used
 
 
-class ValuationHistoryItem(BaseModel):
-    """One daily valuation observation for charting and percentile computation."""
-
-    trade_date: Optional[date] = None
-    close: Optional[float] = None
-    pe_ttm: Optional[float] = None
-    pb: Optional[float] = None
-    ps_ttm: Optional[float] = None
-
-
 class ValuationSnapshot(BaseModel):
     """Valuation multiples, historical percentiles, and quality fundamentals.
 
@@ -281,13 +271,13 @@ class ValuationSnapshot(BaseModel):
     dividend_yield: Optional[float] = None
     total_market_cap: Optional[float] = None
     # Percentile of the current multiple within its own history (0-100; a
-    # lower percentile means cheaper relative to the stock's own past).
+    # lower percentile means cheaper relative to the stock's own past). Computed
+    # over a trailing 3y (primary) and 1y (secondary) window at fetch time from
+    # the raw daily valuation series, which is not persisted.
     pe_percentile_3y: Optional[float] = None
-    pe_percentile_5y: Optional[float] = None
-    pe_percentile_10y: Optional[float] = None
+    pe_percentile_1y: Optional[float] = None
     pb_percentile_3y: Optional[float] = None
-    pb_percentile_5y: Optional[float] = None
-    pb_percentile_10y: Optional[float] = None
+    pb_percentile_1y: Optional[float] = None
     # Fundamental quality inputs (from the F10 indicator report).
     roe: Optional[float] = None
     roe_mean_5y: Optional[float] = None
@@ -304,7 +294,6 @@ class ValuationSnapshot(BaseModel):
     # Provenance and per-symbol error isolation.
     source: str = "unavailable"
     error: Optional[str] = None
-    history: List[ValuationHistoryItem] = Field(default_factory=list)
 
 
 class CrossDayDiff(BaseModel):
@@ -554,7 +543,6 @@ __all__ = [
     "FundFlowSnapshot",
     "CapitalMetrics",
     "RiskMetrics",
-    "ValuationHistoryItem",
     "ValuationSnapshot",
     "SectorPeriodMetric",
     "SectorStrength",

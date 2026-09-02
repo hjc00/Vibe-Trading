@@ -18,7 +18,6 @@ from src.stock_tracker.models import (
     TrackerSettings,
     TrackerSnapshot,
     TrackerThresholds,
-    ValuationHistoryItem,
     ValuationSnapshot,
 )
 from src.stock_tracker.risk import compute_atr, compute_beta, compute_max_drawdown
@@ -57,7 +56,6 @@ __all__ = [
     "TrackerSnapshot",
     "TrackerStore",
     "TrackerThresholds",
-    "ValuationHistoryItem",
     "ValuationSnapshot",
     "VolumeSpikeDetector",
     "compute_atr",

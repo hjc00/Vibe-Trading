@@ -5,7 +5,8 @@
 
 数据源（均走 :func:`backtest.loaders.eastmoney_client.get_json` 的东财节流）：
 - ``RPT_VALUEANALYSIS_DET`` —— 每日估值序列（PE_TTM / PB / PS_TTM / PCF /
-  PEG / 总市值）。一次请求返回约 8 年历史，既给当前值也用于 3/5/10 年分位。
+  PEG / 总市值）。抓取量只覆盖最大分位窗口（3 年 ≈750 交易日）加余量，当前值
+  取最新行、3/1 年分位取序列尾部窗口计算；原始逐日序列不持久化。
 - ``RPT_F10_FINANCE_MAINFINADATA`` —— 分报告期财务指标（ROE / 毛利率 /
   净利率 / 增速 / 每股经营现金流 / 资产负债率），用于质量评分。
 - 可选 Tushare 兜底（``daily_basic`` / ``fina_indicator``），需要配置
@@ -16,7 +17,7 @@
 - ROE / 毛利率 / 净利率 / 增速 / 资产负债率均为百分数（如 16.75 表示 16.75%）。
 - ``operating_cashflow_to_net_profit`` = 每股经营现金流 / 每股收益（F10 口径）；
   Tushare 兜底用 ``ocf_to_profit``（经营现金流/营业利润）作为近似。
-- 分位窗口：3y≈750 交易日、5y≈1250、10y≈2500；序列不足
+- 分位窗口：3y≈750 交易日、1y≈250；序列不足
   :data:`_MIN_PERCENTILE_SESSIONS` 个交易日时返回 ``None``。
 """
 
@@ -33,14 +34,15 @@ import pandas as pd
 
 from backtest.loaders.eastmoney_client import get_json
 from src.stock_tracker._convert import dashed_date, to_float
-from src.stock_tracker.models import ValuationHistoryItem, ValuationSnapshot
+from src.stock_tracker.models import ValuationSnapshot
 from src.tools import tushare_fallbacks
 
 logger = logging.getLogger(__name__)
 
-# Trading-day history requested from the valuation report. Covers the full 10y
-# window (plus slack); the Eastmoney report returns what it has (~8.5y).
-_DEFAULT_DAYS = 2500
+# Trading sessions requested from the valuation report. Covers the largest
+# percentile window (3y=750) plus slack; the trailing window is all the current
+# multiple is ever ranked against, so there is no need to fetch farther back.
+_DEFAULT_DAYS = 800
 _CACHE_TTL_SECONDS = 30 * 60
 # Delay between per-symbol HTTP requests in batch loaders. Mirrors the capital
 # data loader to keep bursty short-lived HTTPS requests under the proxy limit.
@@ -64,8 +66,10 @@ _FUNDAMENTAL_PERIODS = 40
 # Number of trailing report periods used for 5-year stability aggregates.
 _STABILITY_PERIODS = 20
 
-# Percentile windows by label, in trading days.
-_PERCENTILE_WINDOWS = {"3y": 750, "5y": 1250, "10y": 2500}
+# Percentile windows by label, in trading days. 3y is the primary anchor the UI
+# shows; 1y is a secondary "recent-regime" view. The largest window drives how
+# much history is fetched (see ``_DEFAULT_DAYS``).
+_PERCENTILE_WINDOWS = {"3y": 750, "1y": 250}
 
 # Fundamental quality score weights. Centralized here so the scoring rule is
 # explainable and tunable in one place; sub-scores are each 0-100.
@@ -143,24 +147,26 @@ def _fetch_report(report_name: str, secucode: str, *, page_size: int) -> List[Di
     return [row for row in data if isinstance(row, dict)]
 
 
-def _parse_valuation_history(rows: List[Dict[str, Any]]) -> List[ValuationHistoryItem]:
-    """Build an ascending daily valuation history from newest-first report rows."""
-    parsed: List[ValuationHistoryItem] = []
+def _valuation_series(rows: List[Dict[str, Any]]) -> tuple[List[float], List[float]]:
+    """Ascending PE/PB series from newest-first valuation report rows.
+
+    Percentiles rank the latest multiple against this trailing series, so rows
+    must be re-sorted oldest-first here. The raw series is transient: only the
+    percentile scalars derived from it are kept on the snapshot.
+    """
+    points: List[tuple[date, Optional[float], Optional[float]]] = []
     for row in rows:
         trade_date = dashed_date(row.get("TRADE_DATE"))
         if trade_date is None:
             continue
-        parsed.append(
-            ValuationHistoryItem(
-                trade_date=trade_date,
-                close=to_float(row.get("CLOSE_PRICE")),
-                pe_ttm=to_float(row.get("PE_TTM")),
-                pb=to_float(row.get("PB_MRQ")),
-                ps_ttm=to_float(row.get("PS_TTM")),
-            )
+        points.append(
+            (trade_date, to_float(row.get("PE_TTM")), to_float(row.get("PB_MRQ")))
         )
-    parsed.sort(key=lambda item: item.trade_date)
-    return parsed
+    points.sort(key=lambda item: item[0])
+    return (
+        [pe for _, pe, _ in points if pe is not None],
+        [pb for _, _, pb in points if pb is not None],
+    )
 
 
 def _window_percentile(values: List[float], window_days: int) -> Optional[float]:
@@ -174,14 +180,23 @@ def _window_percentile(values: List[float], window_days: int) -> Optional[float]
     return round(float(series.rank(pct=True).iloc[-1] * 100), 2)
 
 
+def _attach_percentiles(
+    snapshot: ValuationSnapshot,
+    pe_series: List[float],
+    pb_series: List[float],
+) -> None:
+    """Set PE/PB percentile scalars (per ``_PERCENTILE_WINDOWS``) on snapshot."""
+    for label, window_days in _PERCENTILE_WINDOWS.items():
+        setattr(snapshot, f"pe_percentile_{label}", _window_percentile(pe_series, window_days))
+        setattr(snapshot, f"pb_percentile_{label}", _window_percentile(pb_series, window_days))
+
+
 def _build_valuation_snapshot(rows: List[Dict[str, Any]]) -> ValuationSnapshot:
     """Build a ``ValuationSnapshot`` from ``RPT_VALUEANALYSIS_DET`` rows."""
     if not rows:
         return ValuationSnapshot(error="no valuation data")
     latest = rows[0]
-    history = _parse_valuation_history(rows)
-    pe_series = [item.pe_ttm for item in history if item.pe_ttm is not None]
-    pb_series = [item.pb for item in history if item.pb is not None]
+    pe_series, pb_series = _valuation_series(rows)
 
     peg = to_float(latest.get("PEG_CAR"))
     snapshot = ValuationSnapshot(
@@ -195,11 +210,8 @@ def _build_valuation_snapshot(rows: List[Dict[str, Any]]) -> ValuationSnapshot:
         peg=peg if peg is not None and peg > 0 else None,
         total_market_cap=to_float(latest.get("TOTAL_MARKET_CAP")),
         source="eastmoney",
-        history=history,
     )
-    for label, window_days in _PERCENTILE_WINDOWS.items():
-        setattr(snapshot, f"pe_percentile_{label}", _window_percentile(pe_series, window_days))
-        setattr(snapshot, f"pb_percentile_{label}", _window_percentile(pb_series, window_days))
+    _attach_percentiles(snapshot, pe_series, pb_series)
     return snapshot
 
 
@@ -214,16 +226,8 @@ def _tushare_valuation_snapshot(code: str) -> ValuationSnapshot:
         return ValuationSnapshot(error="no valuation data", source="unavailable")
 
     latest = rows[-1]
-    history = [
-        ValuationHistoryItem(
-            trade_date=dashed_date(item.get("trade_date")),
-            close=to_float(item.get("close")),
-            pe_ttm=to_float(item.get("pe_ttm")),
-            pb=to_float(item.get("pb")),
-            ps_ttm=to_float(item.get("ps_ttm")),
-        )
-        for item in rows
-    ]
+    pe_series = [pe for pe in (to_float(item.get("pe_ttm")) for item in rows) if pe is not None]
+    pb_series = [pb for pb in (to_float(item.get("pb")) for item in rows) if pb is not None]
     snapshot = ValuationSnapshot(
         trade_date=dashed_date(latest.get("trade_date")),
         pe_ttm=to_float(latest.get("pe_ttm")),
@@ -232,13 +236,8 @@ def _tushare_valuation_snapshot(code: str) -> ValuationSnapshot:
         dividend_yield=to_float(latest.get("dividend_yield")),
         total_market_cap=to_float(latest.get("total_market_cap")),
         source="tushare",
-        history=history,
     )
-    pe_series = [item.pe_ttm for item in history if item.pe_ttm is not None]
-    pb_series = [item.pb for item in history if item.pb is not None]
-    for label, window_days in _PERCENTILE_WINDOWS.items():
-        setattr(snapshot, f"pe_percentile_{label}", _window_percentile(pe_series, window_days))
-        setattr(snapshot, f"pb_percentile_{label}", _window_percentile(pb_series, window_days))
+    _attach_percentiles(snapshot, pe_series, pb_series)
     return snapshot
 
 

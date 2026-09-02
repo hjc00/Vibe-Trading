@@ -16,6 +16,7 @@ from src.stock_tracker.valuation_data import (
     _fetch_one_valuation,
     _parse_fundamental_rows,
     _tushare_valuation_snapshot,
+    _valuation_series,
     _window_percentile,
     compute_quality_score,
     load_valuation_data,
@@ -103,14 +104,17 @@ class TestBuildValuationSnapshot:
         assert snapshot.total_market_cap == 1.6e12
         assert snapshot.source == "eastmoney"
         assert snapshot.error is None
-        assert len(snapshot.history) == 200
+        assert snapshot.pe_percentile_3y == pytest.approx(100.0, abs=1.0)
+        assert snapshot.pe_percentile_1y == pytest.approx(100.0, abs=1.0)
 
-    def test_history_is_ascending(self):
-        snapshot = _build_valuation_snapshot(_make_valuation_rows(days=50))
-        dates = [item.trade_date for item in snapshot.history]
-        assert dates == sorted(dates)
-        # Newest row from the report is the last history item.
-        assert dates[-1] == date(2026, 9, 1)
+    def test_valuation_series_reorders_newest_first_rows_ascending(self):
+        pe_series, pb_series = _valuation_series(_make_valuation_rows(days=50))
+        assert pe_series == sorted(pe_series)
+        # PB falls with newer dates in this fixture, so it is descending in time.
+        assert pb_series == sorted(pb_series, reverse=True)
+        # Newest report row (highest idx) lands at the end of the series.
+        assert pe_series[-1] == pytest.approx(10.0 + 50 * 0.01)
+        assert pb_series[-1] == pytest.approx(5.0 - 50 * 0.005)
 
     def test_percentiles_use_latest_value_position(self):
         snapshot = _build_valuation_snapshot(_make_valuation_rows(days=200))
@@ -250,7 +254,7 @@ class TestTushareFallback:
         assert snapshot.pb == 5.1
         assert snapshot.dividend_yield == 1.2
         assert snapshot.pe_percentile_3y is None  # too few points
-        assert snapshot.history[0].trade_date == date(2026, 8, 28)
+        assert snapshot.pe_percentile_1y is None
 
     def test_tushare_fallback_unavailable(self):
         with patch(
