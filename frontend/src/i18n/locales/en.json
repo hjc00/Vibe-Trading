@@ -1743,7 +1743,7 @@
     "stopLoss": "Stop loss",
     "valuation": "Valuation",
     "valuationTitle": "Valuation & Quality",
-    "valuationExplanation": "Valuation percentile is where today's PE/PB sits within the stock's own 3-year history: <30% relatively cheap, 30-70% fair, >70% relatively expensive. The quality score (0-100) blends ROE stability, earnings quality (operating cash flow / net profit), growth, gross-margin stability, and leverage health.",
+    "valuationExplanation": "Valuation percentile is where today's PE/PB sits within the stock's own 3-year history: <30% relatively cheap, 30-70% fair, >70% relatively expensive. PEG = PE / profit growth: <1 cheap relative to growth, >1 pricey, hidden when growth is negative. The quality score (0-100) blends ROE stability, earnings quality (operating cash flow / net profit), growth, gross-margin stability, and leverage health.",
     "noValuationData": "No valuation data",
     "peTtm": "PE(TTM)",
     "pb": "PB",
