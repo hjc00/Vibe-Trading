@@ -263,6 +263,7 @@ def load_sector_strength(
     *,
     periods: List[int],
     limit: int = 50,
+    ranking: Optional[List[Dict[str, Any]]] = None,
 ) -> List[SectorStrength]:
     """Load the combined sector-strength list for the tracker dashboard.
 
@@ -274,17 +275,23 @@ def load_sector_strength(
     Args:
         snapshots: Current symbol snapshots to aggregate per board.
         periods: Trading-day windows for the per-period trend comparison.
-        limit: Max whole-market boards to fetch.
+        limit: Max whole-market boards to fetch. Only used when ``ranking`` is
+            not supplied.
+        ranking: Optional pre-fetched whole-market board ranking rows (same shape
+            as :func:`src.tools.sector_tool.fetch_industry_board_ranking`). When
+            supplied the Eastmoney ranking fetch is skipped; pass ``None`` to
+            fetch fresh.
 
     Returns:
         Boards sorted by ``change_pct`` descending (``market_rank`` 1-based);
         watchlist boards missing from the ranking append at the end.
     """
-    ranking: List[Dict[str, Any]] = []
-    try:
-        ranking = fetch_industry_board_ranking(limit)
-    except Exception as exc:  # noqa: BLE001 - degraded to watchlist-only view
-        logger.warning("Sector board ranking fetch failed: %s", exc)
+    if ranking is None:
+        try:
+            ranking = fetch_industry_board_ranking(limit)
+        except Exception as exc:  # noqa: BLE001 - degraded to watchlist-only view
+            logger.warning("Sector board ranking fetch failed: %s", exc)
+            ranking = []
 
     watchlist_agg: Dict[str, Dict[str, Any]] = {}
     try:

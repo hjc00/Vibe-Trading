@@ -263,6 +263,87 @@ def test_refresh_status_endpoint(client):
     assert "running" in data["refresh"]
 
 
+def _wait_refresh_done(client, timeout: float = 10.0) -> dict:
+    """Poll refresh-status until the background refresh completes."""
+    import time as _time
+
+    deadline = _time.monotonic() + timeout
+    while _time.monotonic() < deadline:
+        state = client.get("/api/stock-tracker/refresh-status").json()["refresh"]
+        if not state["running"]:
+            return state
+        _time.sleep(0.02)
+    raise AssertionError("background refresh did not finish")
+
+
+def test_refresh_post_starts_background_and_persists(client, isolated_tracker_store):
+    from datetime import datetime, timezone as tz
+
+    def _fake_sync():
+        isolated_tracker_store.save_snapshot(
+            TrackerSnapshot(
+                generated_at=datetime.now(tz.utc),
+                trading_date=date(2026, 8, 31),
+                config=TrackerConfig(),
+                symbols=[SymbolSnapshot(code="600519.SH", name="贵州茅台", close=1500.0)],
+            )
+        )
+        return {"status": "ok"}
+
+    with patch("src.api.stock_tracker_routes._refresh_snapshot_sync", side_effect=_fake_sync):
+        response = client.post("/api/stock-tracker/refresh")
+        assert response.status_code == 200
+        # The POST answers immediately; the refresh finishes on a worker thread.
+        assert response.json()["status"] == "started"
+        state = _wait_refresh_done(client)
+    assert state["running"] is False
+    assert state["error"] is None
+
+    snapshot = client.get("/api/stock-tracker").json()
+    assert snapshot["status"] == "ok"
+    assert snapshot["snapshot"]["symbols"][0]["code"] == "600519.SH"
+
+
+def test_refresh_background_error_surfaced_in_status(client, isolated_tracker_store):
+    def _boom():
+        raise RuntimeError("provider down")
+
+    with patch("src.api.stock_tracker_routes._refresh_snapshot_sync", side_effect=_boom):
+        response = client.post("/api/stock-tracker/refresh")
+        assert response.json()["status"] == "started"
+        state = _wait_refresh_done(client)
+    assert state["running"] is False
+    assert state["error"] is not None
+    assert "provider down" in state["error"]
+
+
+def test_refresh_post_singleflight_returns_refreshing(client, isolated_tracker_store):
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    def _slow_sync():
+        started.set()
+        if not release.wait(5.0):
+            raise RuntimeError("timed out")
+        return {"status": "ok"}
+
+    with patch("src.api.stock_tracker_routes._refresh_snapshot_sync", side_effect=_slow_sync):
+        first = client.post("/api/stock-tracker/refresh")
+        assert first.json()["status"] == "started"
+        assert started.wait(5.0)
+
+        # A second (non-force) request while one is running answers "refreshing"
+        # instead of spawning a duplicate refresh.
+        second = client.post("/api/stock-tracker/refresh")
+        assert second.json()["status"] == "refreshing"
+
+        release.set()
+        state = _wait_refresh_done(client)
+    assert state["running"] is False
+
+
 def _saved_snapshot(store: TrackerStore) -> None:
     store.save_snapshot(
         TrackerSnapshot(

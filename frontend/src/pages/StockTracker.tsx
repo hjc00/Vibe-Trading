@@ -162,6 +162,7 @@ export function StockTracker() {
           pollTimerRef.current = null;
           setRefreshing(false);
           await loadSnapshot();
+          if (status.refresh.error) setError(status.refresh.error);
           startQuotePolling();
         }
       } catch {

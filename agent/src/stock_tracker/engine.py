@@ -98,13 +98,10 @@ class StockTrackerEngine:
             logger.exception("Name resolution failed")
             names = {}
 
-        # Resolve sector boards once per refresh; tolerate partial failures.
-        sector_boards: Dict[str, Optional[str]] = {}
-        try:
-            for code in self.config.watchlist:
-                sector_boards[code] = resolve_industry_board(code)
-        except Exception:  # noqa: BLE001
-            logger.exception("Sector board resolution failed")
+        # Resolve sector boards, reusing the prior same-trading-day mapping so a
+        # repeat refresh skips the throttled Eastmoney membership calls; only
+        # symbols missing from it are resolved fresh. Tolerate partial failures.
+        sector_boards = self._resolve_sector_boards(previous, trading_date)
 
         # Fetch market benchmark for RPS computation; tolerate failure.
         benchmark_df: Optional[pd.DataFrame] = None
@@ -198,7 +195,9 @@ class StockTrackerEngine:
         # Compute cross-sectional RPS after all symbols have their period metrics.
         self._compute_and_attach_rps(symbol_snapshots, benchmark_df)
 
-        sectors = self._compute_sector_strength(symbol_snapshots)
+        sectors = self._compute_sector_strength(
+            symbol_snapshots, previous=previous, trading_date=trading_date
+        )
 
         rankings = self._compute_rankings(symbol_snapshots)
         diff_map = self._compute_diff_map(symbol_snapshots, previous)
@@ -322,6 +321,34 @@ class StockTrackerEngine:
             events = symbol.events
             if events is not None and events.error is None:
                 self._events_cache.set(code, trading_date, events)
+
+    def _resolve_sector_boards(
+        self,
+        previous: TrackerSnapshot | None,
+        trading_date: date,
+    ) -> Dict[str, Optional[str]]:
+        """Resolve each watchlist symbol's Eastmoney industry board.
+
+        Reuses the prior snapshot's ``sector_board`` when it was captured on the
+        same trading date (board membership does not change intraday), so a
+        repeat refresh skips the throttled per-symbol Eastmoney membership
+        requests. Only symbols absent from the prior mapping are resolved fresh;
+        failures degrade to ``None`` and are retried on the next refresh.
+        """
+        boards: Dict[str, Optional[str]] = {}
+        if previous is not None and previous.trading_date == trading_date:
+            for symbol in previous.symbols:
+                if symbol.sector_board:
+                    boards[symbol.code] = symbol.sector_board
+        for code in self.config.watchlist:
+            if code in boards:
+                continue
+            try:
+                boards[code] = resolve_industry_board(code)
+            except Exception:  # noqa: BLE001 — per-symbol failure degrades to None
+                logger.exception("Sector board resolution failed for %s", code)
+                boards[code] = None
+        return boards
 
     def _fetch_capital_data(
         self,
@@ -618,20 +645,63 @@ class StockTrackerEngine:
                 ps.metrics.rps_sector = sector_rps.get(snapshot.code)
                 ps.metrics.benchmark_return_pct = benchmark_ret
 
+    def _cached_sector_ranking(
+        self,
+        previous: TrackerSnapshot | None,
+        trading_date: date | None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Reconstruct the whole-market board ranking from the prior snapshot.
+
+        Only the network-fetched part (the Eastmoney ``clist`` ranking) is
+        frozen; watchlist aggregates are always recomputed fresh from the current
+        symbols. Returns ``None`` when there is nothing reusable so the caller
+        refetches the ranking.
+        """
+        if previous is None or previous.trading_date != trading_date:
+            return None
+        ranked = [
+            sector
+            for sector in previous.sectors
+            if sector.source == "eastmoney" and sector.market_rank is not None
+        ]
+        if not ranked:
+            return None
+        return [
+            {
+                "board_code": sector.board_code,
+                "board_name": sector.board_name,
+                "change_pct": sector.change_pct,
+                "fund_flow_net": sector.fund_flow_net,
+                "up_count": sector.up_count,
+                "down_count": sector.down_count,
+                "leader": sector.leader,
+            }
+            for sector in sorted(ranked, key=lambda s: s.market_rank)
+        ]
+
     def _compute_sector_strength(
         self,
         snapshots: List[SymbolSnapshot],
+        previous: TrackerSnapshot | None = None,
+        trading_date: date | None = None,
     ) -> List[SectorStrength]:
         """Compute the sector-strength board and attach each board's rank.
 
         Aggregates watchlist metrics per Eastmoney industry board across every
-        configured period and merges the whole-market board ranking. Tolerates
-        failure via ``load_sector_strength`` returning ``[]``.
+        configured period and merges the whole-market board ranking. When a prior
+        same-trading-day snapshot is supplied, its ranking is reused (frozen) so
+        the throttled Eastmoney ranking fetch is skipped; aggregates are always
+        recomputed from the current snapshots. Tolerates failure via
+        ``load_sector_strength`` returning ``[]``.
         """
         periods = sorted(self.config.periods)
 
         try:
-            sectors = load_sector_strength(snapshots, periods=periods)
+            sectors = load_sector_strength(
+                snapshots,
+                periods=periods,
+                ranking=self._cached_sector_ranking(previous, trading_date),
+            )
         except Exception:  # noqa: BLE001 - sector view must not break refresh
             logger.exception("Sector strength computation failed")
             sectors = []

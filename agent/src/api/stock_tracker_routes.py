@@ -40,6 +40,10 @@ _QUOTE_PREV_LOOKBACK_DAYS = 15
 
 _REFRESH_LOCK = threading.Lock()
 _REFRESH_OPERATION_LOCK = threading.Lock()
+# Set when a ``force`` refresh arrives while another run is in flight; the active
+# background worker performs one extra run to honour it rather than a second
+# concurrent worker doing double network work.
+_REFRESH_RERUN = False
 _REFRESH_STATE: Dict[str, Any] = {
     "running": False,
     "current": None,
@@ -527,39 +531,48 @@ def register_stock_tracker_routes(
         request: RefreshRequest | None = None,
         principal=Depends(require_auth),  # noqa: ARG001
     ) -> Dict[str, Any]:
+        """Kick off a snapshot refresh in the background and return immediately.
+
+        The actual refresh runs on a daemon worker thread; clients poll
+        ``/api/stock-tracker/refresh-status`` until ``running`` flips back to
+        false. A second request while one is in flight answers ``refreshing``
+        (or, with ``force``, queues a single re-run once the current one ends)
+        instead of starting a duplicate refresh.
+        """
+        global _REFRESH_RERUN
         request = request or RefreshRequest()
 
+        start_worker = False
         with _REFRESH_OPERATION_LOCK:
-            if _REFRESH_STATE["running"] and not request.force:
-                return {
-                    "status": "refreshing",
-                    "message": "A refresh is already in progress.",
-                    "refresh": _refresh_snapshot(),
-                }
-
-            with _REFRESH_LOCK:
-                _REFRESH_STATE.update(
-                    {
-                        "running": True,
-                        "current": None,
-                        "symbols": {},
-                        "error": None,
+            if _REFRESH_STATE["running"]:
+                if not request.force:
+                    return {
+                        "status": "refreshing",
+                        "message": "A refresh is already in progress.",
+                        "refresh": _refresh_snapshot(),
                     }
-                )
-
-            try:
-                result = await asyncio.to_thread(_refresh_snapshot_sync)
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("Tracker refresh failed")
+                # force: run again once the in-flight refresh finishes.
+                _REFRESH_RERUN = True
+            else:
                 with _REFRESH_LOCK:
-                    _REFRESH_STATE["error"] = f"{type(exc).__name__}: {exc}"
-                raise HTTPException(status_code=500, detail=str(exc)) from exc
-            finally:
-                with _REFRESH_LOCK:
-                    _REFRESH_STATE["running"] = False
-                    _REFRESH_STATE["current"] = None
+                    _REFRESH_STATE.update(
+                        {
+                            "running": True,
+                            "current": None,
+                            "symbols": {},
+                            "error": None,
+                        }
+                    )
+                start_worker = True
 
-        return result
+        if start_worker:
+            threading.Thread(
+                target=_run_refresh_background,
+                name="stock-tracker-refresh",
+                daemon=True,
+            ).start()
+
+        return {"status": "started", "refresh": _refresh_snapshot()}
 
     @app.get("/api/stock-tracker/refresh-status")
     async def refresh_status(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
@@ -679,6 +692,34 @@ def register_stock_tracker_routes(
             "trading_date": analysis.get("trading_date"),
             "generated_at": analysis.get("generated_at"),
         }
+
+
+def _run_refresh_background() -> None:
+    """Run the snapshot refresh, honouring a queued forced re-run.
+
+    Executes in a daemon worker thread so the HTTP handler never blocks the
+    event loop on the multi-second Eastmoney fetches. The refresh is
+    single-flight: a ``force`` request arriving mid-run is consumed here as one
+    additional run rather than spawning a concurrent worker (which would double
+    the network load). Failures are recorded into ``_REFRESH_STATE["error"]``
+    and surfaced by ``refresh-status``.
+    """
+    global _REFRESH_RERUN
+    while True:
+        try:
+            _refresh_snapshot_sync()
+        except Exception as exc:  # noqa: BLE001 - surfaced via refresh-status
+            logger.exception("Tracker refresh failed")
+            with _REFRESH_LOCK:
+                _REFRESH_STATE["error"] = f"{type(exc).__name__}: {exc}"
+        with _REFRESH_OPERATION_LOCK:
+            if not _REFRESH_RERUN:
+                with _REFRESH_LOCK:
+                    _REFRESH_STATE["running"] = False
+                    _REFRESH_STATE["current"] = None
+                return
+            _REFRESH_RERUN = False
+            # Keep ``running`` True and loop once more for the forced re-run.
 
 
 def _refresh_snapshot() -> Dict[str, Any]:

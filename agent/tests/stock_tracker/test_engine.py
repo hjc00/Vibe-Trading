@@ -785,5 +785,200 @@ def test_compute_sector_strength_degrades_on_failure(monkeypatch):
     assert snap.sector_strength_rank is None
 
 
+# ---------------------------------------------------------------------------
+# Same-trading-day sector reuse (改动1: skip throttled Eastmoney board calls)
+# ---------------------------------------------------------------------------
+
+
+def _snapshot_with_boards_and_sectors(
+    trading_date: date,
+    board_map: dict,
+    sectors: list,
+) -> "TrackerSnapshot":
+    """Build a prior snapshot carrying per-symbol sector boards plus a sector list."""
+    from datetime import datetime, timezone
+
+    symbols = [SymbolSnapshot(code=code, sector_board=board) for code, board in board_map.items()]
+    return TrackerSnapshot(
+        generated_at=datetime.now(timezone.utc),
+        trading_date=trading_date,
+        config=TrackerConfig(),
+        symbols=symbols,
+        sectors=sectors,
+    )
+
+
+def test_resolve_sector_boards_reuses_previous_same_day(monkeypatch):
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    previous = _snapshot_with_boards_and_sectors(
+        trading_date, {"000001.SZ": "Bank", "000002.SZ": "Tech"}, []
+    )
+
+    calls = {"n": 0}
+
+    def _fake_resolve(code):
+        calls["n"] += 1
+        return "FakeBoard"
+
+    monkeypatch.setattr("src.stock_tracker.engine.resolve_industry_board", _fake_resolve)
+
+    boards = engine._resolve_sector_boards(previous, trading_date)
+
+    assert boards == {"000001.SZ": "Bank", "000002.SZ": "Tech"}
+    assert calls["n"] == 0
+
+
+def test_resolve_sector_boards_fills_only_missing(monkeypatch):
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ", "000003.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    # Previous snapshot only resolved the first symbol.
+    previous = _snapshot_with_boards_and_sectors(trading_date, {"000001.SZ": "Bank"}, [])
+
+    resolved: list[str] = []
+
+    def _fake_resolve(code):
+        resolved.append(code)
+        return {"000002.SZ": "Tech", "000003.SZ": "Bank"}[code]
+
+    monkeypatch.setattr("src.stock_tracker.engine.resolve_industry_board", _fake_resolve)
+
+    boards = engine._resolve_sector_boards(previous, trading_date)
+
+    assert boards["000001.SZ"] == "Bank"
+    assert sorted(resolved) == ["000002.SZ", "000003.SZ"]
+    assert boards["000002.SZ"] == "Tech"
+    assert boards["000003.SZ"] == "Bank"
+
+
+def test_resolve_sector_boards_retries_unresolved_previous_board(monkeypatch):
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    # First symbol had no board last time (resolution failed) -> must be retried.
+    previous = _snapshot_with_boards_and_sectors(trading_date, {"000001.SZ": None, "000002.SZ": "Tech"}, [])
+
+    resolved: list[str] = []
+
+    def _fake_resolve(code):
+        resolved.append(code)
+        return "Bank"
+
+    monkeypatch.setattr("src.stock_tracker.engine.resolve_industry_board", _fake_resolve)
+
+    boards = engine._resolve_sector_boards(previous, trading_date)
+
+    assert resolved == ["000001.SZ"]
+    assert boards["000001.SZ"] == "Bank"
+    assert boards["000002.SZ"] == "Tech"
+
+
+def test_resolve_sector_boards_refetches_on_new_trading_day(monkeypatch):
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    previous = _snapshot_with_boards_and_sectors(date(2026, 8, 31), {"000001.SZ": "Bank"}, [])
+
+    resolved: list[str] = []
+
+    def _fake_resolve(code):
+        resolved.append(code)
+        return "NewBoard"
+
+    monkeypatch.setattr("src.stock_tracker.engine.resolve_industry_board", _fake_resolve)
+
+    boards = engine._resolve_sector_boards(previous, date(2026, 9, 1))
+
+    assert resolved == ["000001.SZ"]
+    assert boards["000001.SZ"] == "NewBoard"
+
+
+def test_cached_sector_ranking_reconstructs_same_day_sorted():
+    from src.stock_tracker.models import SectorStrength
+
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    sectors = [
+        SectorStrength(board_name="Bank", board_code="BK01", change_pct=2.0, market_rank=2, source="eastmoney"),
+        SectorStrength(board_name="Tech", board_code="BK02", change_pct=3.0, market_rank=1, source="eastmoney"),
+        # Watchlist-only board (no whole-market rank) is not part of the ranking.
+        SectorStrength(board_name="Standalone", source="watchlist"),
+    ]
+    previous = _snapshot_with_boards_and_sectors(trading_date, {}, sectors)
+
+    ranking = engine._cached_sector_ranking(previous, trading_date)
+
+    assert ranking is not None
+    assert [r["board_name"] for r in ranking] == ["Tech", "Bank"]
+    assert ranking[0]["board_code"] == "BK02"
+    assert ranking[0]["change_pct"] == 3.0
+    assert ranking[1]["leader"] is None
+
+
+def test_cached_sector_ranking_none_for_new_day_or_empty():
+    from src.stock_tracker.models import SectorStrength
+
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    sectors = [SectorStrength(board_name="Bank", change_pct=2.0, market_rank=2, source="eastmoney")]
+
+    previous = _snapshot_with_boards_and_sectors(trading_date, {}, sectors)
+    assert engine._cached_sector_ranking(previous, date(2026, 9, 1)) is None
+
+    empty_previous = _snapshot_with_boards_and_sectors(trading_date, {}, [])
+    assert engine._cached_sector_ranking(empty_previous, trading_date) is None
+
+
+def test_compute_sector_strength_reuses_previous_ranking(monkeypatch):
+    from src.stock_tracker.models import SectorStrength
+
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    snap = engine._analyze_symbol("000001.SZ", _make_df(rows=80), sector_board="Bank")
+
+    sectors = [SectorStrength(board_name="Bank", change_pct=1.0, market_rank=1, source="eastmoney")]
+    previous = _snapshot_with_boards_and_sectors(trading_date, {"000001.SZ": "Bank"}, sectors)
+
+    captured: dict = {}
+
+    def _fake_load(snapshots, **kwargs):
+        captured.update(kwargs)
+        return sectors
+
+    monkeypatch.setattr("src.stock_tracker.engine.load_sector_strength", _fake_load)
+
+    result = engine._compute_sector_strength([snap], previous=previous, trading_date=trading_date)
+
+    assert captured["ranking"] is not None
+    assert captured["ranking"][0]["board_name"] == "Bank"
+    assert result == sectors
+    assert snap.sector_strength_rank == 1
+
+
+def test_compute_sector_strength_fetches_without_previous(monkeypatch):
+    from src.stock_tracker.models import SectorStrength
+
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    snap = engine._analyze_symbol("000001.SZ", _make_df(rows=80), sector_board="Bank")
+
+    captured: dict = {}
+    sectors = [SectorStrength(board_name="Bank", change_pct=1.0, market_rank=1, source="eastmoney")]
+
+    def _fake_load(snapshots, **kwargs):
+        captured.update(kwargs)
+        return sectors
+
+    monkeypatch.setattr("src.stock_tracker.engine.load_sector_strength", _fake_load)
+
+    engine._compute_sector_strength([snap])
+
+    assert captured["ranking"] is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
