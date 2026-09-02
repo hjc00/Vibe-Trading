@@ -139,7 +139,11 @@ def _config_from_request(request: TrackerSettingsRequest) -> TrackerConfig:
     if request.signals is not None:
         kwargs["signals"] = request.signals
     if request.thresholds is not None:
-        kwargs["thresholds"] = current.thresholds.model_copy(update=request.thresholds)
+        # Merge as plain dicts so the reconstruct below re-runs Pydantic
+        # coercion. ``model_copy(update=...)`` would skip validators and let
+        # integral floats (e.g. atr_period=14.0 from the JSON request) leak
+        # into int fields, producing serialization warnings later.
+        kwargs["thresholds"] = {**current.thresholds.model_dump(), **request.thresholds}
     if request.refresh_interval_seconds is not None:
         kwargs["refresh_interval_seconds"] = request.refresh_interval_seconds
     if request.detail_card_count is not None:

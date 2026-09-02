@@ -319,5 +319,35 @@ def test_get_analysis_by_id_404(client):
     assert response.status_code == 404
 
 
+def test_config_from_request_coerces_int_threshold_fields(client, isolated_tracker_store):
+    from src.api.stock_tracker_routes import TrackerSettingsRequest, _config_from_request
+
+    config = _config_from_request(
+        TrackerSettingsRequest(thresholds={"atr_period": 14, "beta_window": 60, "volume_spike": 2.5})
+    )
+    # Integral floats from the JSON request must be coerced back to int so the
+    # model serializes cleanly (regression: model_copy bypassed validation).
+    assert isinstance(config.thresholds.atr_period, int)
+    assert config.thresholds.atr_period == 14
+    assert isinstance(config.thresholds.beta_window, int)
+    assert config.thresholds.beta_window == 60
+    # Non-integral thresholds keep their float type.
+    assert config.thresholds.volume_spike == 2.5
+
+
+def test_update_settings_serializes_without_int_float_warning(client, isolated_tracker_store):
+    import warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        response = client.put(
+            "/api/stock-tracker/settings",
+            json={"thresholds": {"atr_period": 14, "max_drawdown_window": 60}},
+        )
+    assert response.status_code == 200
+    pydantic_warnings = [w for w in caught if "PydanticSerializationUnexpectedValue" in str(w.message)]
+    assert pydantic_warnings == []
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
