@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type SignalMeta, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
-import { computePriceChange, formatQuoteUpdatedAt, formatRps, getRpsToneClass, normalizeAShareCode } from "@/lib/stockTracker";
+import { computePriceChange, formatQuoteUpdatedAt, formatRps, getQualityToneClass, getRpsToneClass, normalizeAShareCode } from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
 import { TrackerControlBar } from "@/components/stock-tracker/TrackerControlBar";
@@ -16,6 +16,7 @@ import { MarginChartCard } from "@/components/stock-tracker/MarginChartCard";
 import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard";
 import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
+import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -337,11 +338,12 @@ export function StockTracker() {
                   quotesUpdatedAt={quotesUpdatedAt}
                 />
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                   <MarginChartCard symbol={selectedSymbol} />
                   <FundFlowChartCard symbol={selectedSymbol} />
                   <RpsChartCard symbol={selectedSymbol} />
                   <RiskMetricsCard symbol={selectedSymbol} />
+                  <ValuationCard symbol={selectedSymbol} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
@@ -550,6 +552,30 @@ function SymbolDetail({
             {excessReturn !== null
               ? `${excessReturn > 0 ? "+" : ""}${(excessReturn * 100).toFixed(2)}%`
               : "—"}
+          </p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.peTtm")}</p>
+          <p className="font-mono font-medium tabular-nums">
+            {symbol.valuation?.pe_ttm?.toFixed(1) ?? "—"}
+          </p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.pb")}</p>
+          <p className="font-mono font-medium tabular-nums">
+            {symbol.valuation?.pb?.toFixed(2) ?? "—"}
+          </p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.peg")}</p>
+          <p className="font-mono font-medium tabular-nums">
+            {symbol.valuation?.peg?.toFixed(2) ?? "—"}
+          </p>
+        </div>
+        <div className="rounded bg-muted/40 p-2">
+          <p className="text-muted-foreground">{t("stockTracker.qualityScore")}</p>
+          <p className={cn("font-mono font-medium tabular-nums", getQualityToneClass(symbol.valuation?.fundamental_quality_score))}>
+            {symbol.valuation?.fundamental_quality_score?.toFixed(0) ?? "—"}
           </p>
         </div>
       </div>

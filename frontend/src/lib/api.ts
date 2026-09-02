@@ -1904,6 +1904,45 @@ export interface CrossDayDiff {
   cleared_signals: string[];
 }
 
+export interface ValuationHistoryItem {
+  trade_date?: string | null;
+  close?: number | null;
+  pe_ttm?: number | null;
+  pb?: number | null;
+  ps_ttm?: number | null;
+}
+
+export interface ValuationSnapshot {
+  trade_date?: string | null;
+  pe_ttm?: number | null;
+  pb?: number | null;
+  ps_ttm?: number | null;
+  pcf_ocf_ttm?: number | null;
+  peg?: number | null;
+  dividend_yield?: number | null;
+  total_market_cap?: number | null;
+  pe_percentile_3y?: number | null;
+  pe_percentile_5y?: number | null;
+  pe_percentile_10y?: number | null;
+  pb_percentile_3y?: number | null;
+  pb_percentile_5y?: number | null;
+  pb_percentile_10y?: number | null;
+  roe?: number | null;
+  roe_mean_5y?: number | null;
+  roe_std_5y?: number | null;
+  gross_margin?: number | null;
+  gross_margin_std_5y?: number | null;
+  net_margin?: number | null;
+  net_profit_yoy?: number | null;
+  revenue_yoy?: number | null;
+  operating_cashflow_to_net_profit?: number | null;
+  debt_to_assets?: number | null;
+  fundamental_quality_score?: number | null;
+  source?: string;
+  error?: string | null;
+  history: ValuationHistoryItem[];
+}
+
 export interface SymbolSnapshot {
   code: string;
   name?: string | null;
@@ -1917,6 +1956,7 @@ export interface SymbolSnapshot {
   period_signals: Record<string, PeriodSignals>;
   capital?: CapitalMetrics | null;
   risk?: RiskMetrics | null;
+  valuation?: ValuationSnapshot | null;
   diff?: CrossDayDiff | null;
   sector_board?: string | null;
   sector_board_source?: string | null;

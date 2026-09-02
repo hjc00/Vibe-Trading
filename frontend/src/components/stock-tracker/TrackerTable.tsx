@@ -87,6 +87,7 @@ export function TrackerTable({
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.price")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.change")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.rps")}</th>
+              <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.valuation")}</th>
               <th className="py-2 pr-4 text-right font-medium">{t("stockTracker.delete")}</th>
             </tr>
           </thead>
@@ -159,6 +160,9 @@ export function TrackerTable({
                       <RpsPill symbol={symbol} />
                     </td>
                     <td className="py-3 pr-4 text-right">
+                      <ValuationPill symbol={symbol} />
+                    </td>
+                    <td className="py-3 pr-4 text-right">
                       {onRemoveSymbol && (
                         <button
                           type="button"
@@ -179,7 +183,7 @@ export function TrackerTable({
                       key={`${symbol.code}-expanded`}
                       className={cn("border-b last:border-0", isSelected ? "bg-primary/10" : "bg-muted/5")}
                     >
-                      <td colSpan={5} className="p-0">
+                      <td colSpan={6} className="p-0">
                         <div className="grid grid-cols-1 gap-4 px-4 py-3 sm:grid-cols-[1fr_auto]">
                           <div className="flex flex-col gap-2">
                             {quotesUpdatedAt && (
@@ -396,6 +400,23 @@ function RpsPill({ symbol }: { symbol: SymbolSnapshot }) {
         {formatRps(value)}
       </span>
       <span className="text-[10px] text-muted-foreground">{t("stockTracker.rpsMarket")}</span>
+    </div>
+  );
+}
+
+function ValuationPill({ symbol }: { symbol: SymbolSnapshot }) {
+  const valuation = symbol.valuation;
+  if (!valuation || (valuation.pe_ttm == null && valuation.pb == null)) {
+    return <span className="text-[10px] text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="font-mono text-xs tabular-nums">
+        {valuation.pe_ttm != null ? `PE ${valuation.pe_ttm.toFixed(1)}` : "PE —"}
+      </span>
+      <span className="font-mono text-[10px] text-muted-foreground tabular-nums">
+        {valuation.pb != null ? `PB ${valuation.pb.toFixed(2)}` : "PB —"}
+      </span>
     </div>
   );
 }

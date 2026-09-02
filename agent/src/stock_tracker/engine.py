@@ -21,10 +21,12 @@ from src.stock_tracker.models import (
     SymbolSnapshot,
     TrackerConfig,
     TrackerSnapshot,
+    ValuationSnapshot,
 )
 from src.stock_tracker.names import fetch_a_share_names
 from src.stock_tracker.risk import compute_atr, compute_beta, compute_max_drawdown
 from src.stock_tracker.signals import compute_mas, compute_rsi, get_detector, get_detector_meta
+from src.stock_tracker.valuation_data import ValuationDataCache, load_valuation_data
 from src.tools.sector_tool import resolve_industry_board
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ class StockTrackerEngine:
     def __init__(self, config: TrackerConfig) -> None:
         self.config = config
         self._capital_cache = CapitalDataCache()
+        self._valuation_cache = ValuationDataCache()
 
     def refresh(
         self,
@@ -118,6 +121,17 @@ class StockTrackerEngine:
         except Exception:  # noqa: BLE001
             logger.exception("Capital data fetch failed")
 
+        # Fetch valuation + quality data with daily caching; tolerate failure.
+        valuation_data: Dict[str, ValuationSnapshot] = {}
+        try:
+            valuation_data = load_valuation_data(
+                self.config.watchlist,
+                end_date=trading_date,
+                cache=self._valuation_cache,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Valuation data fetch failed")
+
         symbol_snapshots: List[SymbolSnapshot] = []
         unresolved: List[str] = []
         data_gaps: List[Dict[str, Any]] = []
@@ -146,6 +160,7 @@ class StockTrackerEngine:
                     capital=capital_data.get(code),
                     sector_board=sector_board,
                     benchmark_df=benchmark_df,
+                    valuation=valuation_data.get(code),
                 )
                 # Use the latest available trading date from actual data.
                 if snapshot.period_signals:
@@ -310,6 +325,7 @@ class StockTrackerEngine:
         capital: Optional[CapitalMetrics] = None,
         sector_board: Optional[str] = None,
         benchmark_df: Optional[pd.DataFrame] = None,
+        valuation: Optional[ValuationSnapshot] = None,
     ) -> SymbolSnapshot:
         """Compute metrics, signals, risk measures, and summary for one symbol."""
         df = compute_mas(df)
@@ -346,6 +362,7 @@ class StockTrackerEngine:
             avg_volume_20=avg_volume_20,
             capital=capital,
             risk=risk,
+            valuation=valuation,
             period_signals=period_signals,
             sector_board=sector_board,
             sector_board_source="eastmoney" if sector_board else None,

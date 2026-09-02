@@ -12,6 +12,11 @@ import time
 from datetime import date
 from typing import Any, Dict, List, Optional
 
+from src.stock_tracker._convert import (
+    dashed_date as _dashed_date,
+    to_float as _to_float,
+    to_float_div as _to_float_div,
+)
 from src.stock_tracker.models import (
     CapitalMetrics,
     FundFlowHistoryItem,
@@ -86,32 +91,6 @@ class CapitalDataCache:
         """Clear all cached entries."""
         with self._lock:
             self._cache.clear()
-
-
-def _dashed_date(value: Any) -> Optional[date]:
-    if value is None:
-        return None
-    try:
-        return date.fromisoformat(str(value)[:10])
-    except ValueError:
-        return None
-
-
-def _to_float(value: Any) -> Optional[float]:
-    if value is None or value == "":
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _to_float_div(value: Any) -> Optional[float]:
-    """Convert to float and treat zero as None for use as a divisor."""
-    v = _to_float(value)
-    if v is None or v == 0:
-        return None
-    return v
 
 
 def _parse_fund_flow_rows(rows: List[Dict[str, Any]]) -> FundFlowSnapshot:

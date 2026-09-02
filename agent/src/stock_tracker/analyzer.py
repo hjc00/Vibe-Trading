@@ -82,6 +82,7 @@ def _serialize_symbol(symbol: SymbolSnapshot) -> Dict[str, Any]:
             period: ps.model_dump(mode="json")
             for period, ps in symbol.period_signals.items()
         },
+        "valuation": symbol.valuation.model_dump(mode="json") if symbol.valuation else None,
         "diff": symbol.diff.model_dump(mode="json") if symbol.diff else None,
     }
 

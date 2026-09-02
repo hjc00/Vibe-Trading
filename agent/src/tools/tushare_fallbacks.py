@@ -229,3 +229,67 @@ def fetch_margin_trading(code: str, *, days: int) -> dict[str, Any]:
     ]
     normalized.sort(key=lambda item: item.get("trade_date") or "", reverse=True)
     return {"code": ts_code.split(".", 1)[0], "ts_code": ts_code, "rows": normalized[:days]}
+
+
+def fetch_daily_basic(code: str, *, days: int) -> dict[str, Any]:
+    """Fetch per-day valuation multiples (``daily_basic``) for one symbol.
+
+    Tushare ``daily_basic`` returns the authoritative PE_TTM / PB / PS_TTM /
+    dividend-yield fields that the Eastmoney valuation report lacks. Amounts
+    are normalized to the repo's CNY unit (``total_mv`` is 10k CNY -> CNY).
+    """
+    ts_code = _ts_code(code)
+    start_date, end_date = _date_window(days)
+    rows = _records(
+        _pro_api().daily_basic(
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields="ts_code,trade_date,close,pe_ttm,pb,ps_ttm,dv_ratio,total_mv",
+        )
+    )
+    parsed = [
+        {
+            "trade_date": _dashed_date(row.get("trade_date")),
+            "close": _to_float(row.get("close")),
+            "pe_ttm": _to_float(row.get("pe_ttm")),
+            "pb": _to_float(row.get("pb")),
+            "ps_ttm": _to_float(row.get("ps_ttm")),
+            "dividend_yield": _to_float(row.get("dv_ratio")),
+            "total_market_cap": (_to_float(row.get("total_mv")) or 0.0) * 10_000,
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("trade_date") or "")
+    parsed = parsed[-days:]
+    return {"code": ts_code.split(".", 1)[0], "ts_code": ts_code, "source": "tushare", "rows": parsed}
+
+
+def fetch_fina_indicator(code: str, *, periods: int = 40) -> dict[str, Any]:
+    """Fetch per-report-period quality indicators (``fina_indicator``).
+
+    Covers ROE, margins, growth rates, leverage, and cash-flow quality. The
+    cash-flow-to-net-profit proxy uses ``ocf_to_profit`` (经营现金流/营业利润),
+    matching the Eastmoney F10 ratio computed in the valuation loader.
+    """
+    ts_code = _ts_code(code)
+    rows = _records(_pro_api().fina_indicator(ts_code=ts_code, limit=max(periods, 2)))
+    parsed = [
+        {
+            "end_date": _dashed_date(row.get("end_date")),
+            "roe": _to_float(row.get("roe")),
+            "gross_margin": _to_float(row.get("grossprofit_margin")),
+            "net_margin": _to_float(row.get("netprofit_margin")),
+            "net_profit_yoy": _to_float(row.get("yoynet_profit")),
+            "revenue_yoy": _to_float(row.get("yoy_or")),
+            "debt_to_assets": _to_float(row.get("debt_to_assets")),
+            "operating_cashflow_to_net_profit": _to_float(row.get("ocf_to_profit")),
+            "eps": _to_float(row.get("eps")),
+            "bps": _to_float(row.get("bps")),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("end_date") or "")
+    return {"code": ts_code.split(".", 1)[0], "ts_code": ts_code, "source": "tushare", "rows": parsed}

@@ -244,6 +244,61 @@ class RiskMetrics(BaseModel):
     stop_loss_atr_multiple: Optional[float] = None  # the k actually used
 
 
+class ValuationHistoryItem(BaseModel):
+    """One daily valuation observation for charting and percentile computation."""
+
+    trade_date: Optional[date] = None
+    close: Optional[float] = None
+    pe_ttm: Optional[float] = None
+    pb: Optional[float] = None
+    ps_ttm: Optional[float] = None
+
+
+class ValuationSnapshot(BaseModel):
+    """Valuation multiples, historical percentiles, and quality fundamentals.
+
+    Populated by :mod:`src.stock_tracker.valuation_data` from the Eastmoney
+    datacenter ``RPT_VALUEANALYSIS_DET`` (daily valuation series) and
+    ``RPT_F10_FINANCE_MAINFINADATA`` (per-period fundamentals). Fields degrade
+    to ``None`` when a source is unavailable; ``error`` carries the reason.
+    """
+
+    trade_date: Optional[date] = None
+    # Valuation multiples (from the daily valuation series).
+    pe_ttm: Optional[float] = None
+    pb: Optional[float] = None
+    ps_ttm: Optional[float] = None
+    pcf_ocf_ttm: Optional[float] = None
+    peg: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    total_market_cap: Optional[float] = None
+    # Percentile of the current multiple within its own history (0-100; a
+    # lower percentile means cheaper relative to the stock's own past).
+    pe_percentile_3y: Optional[float] = None
+    pe_percentile_5y: Optional[float] = None
+    pe_percentile_10y: Optional[float] = None
+    pb_percentile_3y: Optional[float] = None
+    pb_percentile_5y: Optional[float] = None
+    pb_percentile_10y: Optional[float] = None
+    # Fundamental quality inputs (from the F10 indicator report).
+    roe: Optional[float] = None
+    roe_mean_5y: Optional[float] = None
+    roe_std_5y: Optional[float] = None
+    gross_margin: Optional[float] = None
+    gross_margin_std_5y: Optional[float] = None
+    net_margin: Optional[float] = None
+    net_profit_yoy: Optional[float] = None
+    revenue_yoy: Optional[float] = None
+    operating_cashflow_to_net_profit: Optional[float] = None
+    debt_to_assets: Optional[float] = None
+    # Composite fundamental quality score (0-100; None when no inputs).
+    fundamental_quality_score: Optional[float] = None
+    # Provenance and per-symbol error isolation.
+    source: str = "unavailable"
+    error: Optional[str] = None
+    history: List[ValuationHistoryItem] = Field(default_factory=list)
+
+
 class CrossDayDiff(BaseModel):
     """Change between today and the previous trading day for one symbol."""
 
@@ -270,6 +325,7 @@ class SymbolSnapshot(BaseModel):
     period_signals: Dict[str, PeriodSignals] = Field(default_factory=dict)
     capital: Optional[CapitalMetrics] = None
     risk: Optional[RiskMetrics] = None
+    valuation: Optional[ValuationSnapshot] = None
     diff: Optional[CrossDayDiff] = None
     sector_board: Optional[str] = None
     sector_board_source: Optional[str] = None
@@ -373,6 +429,8 @@ __all__ = [
     "FundFlowSnapshot",
     "CapitalMetrics",
     "RiskMetrics",
+    "ValuationHistoryItem",
+    "ValuationSnapshot",
     "CrossDayDiff",
     "SymbolSnapshot",
     "TrackerSnapshot",

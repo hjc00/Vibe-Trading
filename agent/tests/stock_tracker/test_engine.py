@@ -15,6 +15,7 @@ from src.stock_tracker.models import (
     MarginSnapshot,
     TrackerConfig,
     TrackerThresholds,
+    ValuationSnapshot,
 )
 
 
@@ -535,6 +536,32 @@ def test_risk_beta_none_when_benchmark_missing():
     assert snapshot.risk.atr_14 is not None
     assert snapshot.risk.max_drawdown_60d is not None
     assert snapshot.risk.stop_loss_price is not None
+
+
+def test_valuation_metrics_attached():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    df = _make_df(rows=80)
+
+    valuation = ValuationSnapshot(
+        pe_ttm=19.9,
+        pb=6.4,
+        fundamental_quality_score=88.0,
+        source="eastmoney",
+    )
+    snapshot = engine._analyze_symbol("000001.SZ", df, valuation=valuation)
+
+    assert snapshot.valuation is not None
+    assert snapshot.valuation.pe_ttm == 19.9
+    assert snapshot.valuation.pb == 6.4
+    assert snapshot.valuation.fundamental_quality_score == 88.0
+
+
+def test_valuation_none_when_not_provided():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    snapshot = engine._analyze_symbol("000001.SZ", _make_df(rows=80))
+    assert snapshot.valuation is None
 
 
 def test_risk_stop_loss_multiple_override():

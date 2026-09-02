@@ -55,6 +55,42 @@ export function formatBeta(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
+export function formatMarketCap(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  if (value >= 1e12) return `${(value / 1e12).toFixed(2)}万亿`;
+  if (value >= 1e8) return `${(value / 1e8).toFixed(1)}亿`;
+  if (value >= 1e4) return `${(value / 1e4).toFixed(1)}万`;
+  return value.toFixed(0);
+}
+
+/**
+ * Tone for a valuation percentile. A low percentile means the stock is cheap
+ * relative to its own history (good), a high percentile means expensive (bad) —
+ * the opposite of the RPS tone mapping.
+ */
+export function getValuationPercentileTone(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value <= 30) return "text-success";
+  if (value >= 70) return "text-danger";
+  return "text-foreground";
+}
+
+/** i18n key for the valuation band a percentile falls into, or null when absent. */
+export function getValuationBandLabelKey(value: number | null | undefined): string | null {
+  if (value === undefined || value === null) return null;
+  if (value <= 30) return "stockTracker.valuationCheap";
+  if (value >= 70) return "stockTracker.valuationExpensive";
+  return "stockTracker.valuationReasonable";
+}
+
+export function getQualityToneClass(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value >= 80) return "text-success";
+  if (value >= 60) return "text-info";
+  if (value >= 40) return "text-warning";
+  return "text-danger";
+}
+
 export function getBetaToneClass(value: number | null | undefined): string {
   if (value === undefined || value === null) return "text-muted-foreground";
   if (value >= 1.3) return "text-warning";

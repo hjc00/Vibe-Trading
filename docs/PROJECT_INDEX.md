@@ -135,19 +135,21 @@ Vibe-Trading/
 
 | 文件 | 职责 |
 |------|------|
-| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段；`refresh_interval_seconds` 控制实时行情轮询间隔）+ 快照类型 + 代码归一；`PeriodMetrics` 已含 RPS 分位（`rps_market`/`rps_sector`/`benchmark_return_pct`），`SymbolSnapshot` 已含行业板块（`sector_board`）与风险度量（`risk: RiskMetrics`）；资金相关模型 `CapitalMetrics`（含 `FundFlowSnapshot`/`MarginSnapshot` 双维度）/`FundFlowHistoryItem`/`MarginHistoryItem` |
+| `models.py` | 配置（`TrackerConfig`/`TrackerThresholds`，阈值支持动态字段；`refresh_interval_seconds` 控制实时行情轮询间隔）+ 快照类型 + 代码归一；`PeriodMetrics` 已含 RPS 分位（`rps_market`/`rps_sector`/`benchmark_return_pct`），`SymbolSnapshot` 已含行业板块（`sector_board`）、风险度量（`risk: RiskMetrics`）与估值质量（`valuation: ValuationSnapshot`）；资金相关模型 `CapitalMetrics`（含 `FundFlowSnapshot`/`MarginSnapshot` 双维度）/`FundFlowHistoryItem`/`MarginHistoryItem` |
 | `signals.py` | 信号注册表 + 自描述 `SignalMeta`；内置放量/突破/均线排列/RSI，`margin_expansion` 与 `net_inflow_spike`/`main_force_inflow` 资金信号检测器 |
 | `risk.py` | 纯风险度量函数：`compute_atr`（Wilder 平滑）、`compute_max_drawdown`（滚动峰值回撤）、`compute_beta`（相对基准 OLS 斜率，重叠样本 ≥30 才输出），确定性、可单测 |
-| `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，拉取资金流向+融资融券数据，解析沪深300基准与行业板块，计算周期指标与 RPS 分位，挂载 `RiskMetrics`（ATR/回撤/Beta/止损参考价，Beta 复用 RPS 基准帧），跑检测器，按元数据生成排名（含 `rps_market_{period}`/`rps_sector_{period}`）与跨日 diff |
+| `valuation_data.py` | 批量抓取估值与质量数据：东财 datacenter `RPT_VALUEANALYSIS_DET`（PE_TTM/PB/PS_TTM/PCF/PEG/总市值 + 约 8 年每日序列 → 3/5/10 年分位）与 `RPT_F10_FINANCE_MAINFINADATA`（ROE/毛利率/增速/现金流质量/杠杆 → `fundamental_quality_score` 0–100）；可选 tushare 兜底；按交易日缓存 + per-symbol 错误隔离 |
+| `_convert.py` | 共享标量转换助手（`to_float`/`to_float_div`/`dashed_date`），被 `capital_data` 与 `valuation_data` 复用 |
+| `engine.py` | `StockTrackerEngine.refresh`：取 OHLCV，拉取资金流向+融资融券+估值质量数据，解析沪深300基准与行业板块，计算周期指标与 RPS 分位，挂载 `RiskMetrics`（ATR/回撤/Beta/止损参考价，Beta 复用 RPS 基准帧）与 `ValuationSnapshot`，跑检测器，按元数据生成排名（含 `rps_market_{period}`/`rps_sector_{period}`）与跨日 diff |
 | `capital_data.py` | 批量抓取个股资金流向（东财分单）与融资融券数据，按交易日 + namespace 缓存，per-symbol 错误隔离，返回历史序列 `fund_flow.history` 与 `margin.history` |
 | `names.py` | 经腾讯行情接口解析中文名 |
 | `store.py` | `TrackerStore`：原子 JSON 文件存储 |
-| `analyzer.py` | `run_analysis` 包装 `ChatLLM` 产出结构化报告 |
+| `analyzer.py` | `run_analysis` 包装 `ChatLLM` 产出结构化报告；symbol 序列化已注入 `valuation` 估值与质量数据 |
 
 - **路由**（挂载于 `/api/stock-tracker/`）：`settings` GET/PUT（含 `refresh_interval_seconds`）、`signals` GET（信号元数据）、`GET /`、`history`、`quotes` GET（轻量实时行情）、`refresh` POST、`refresh-status`、`analyze` POST/GET、`analyze/history`、`analyze/{id}`。
 - **扩展方式**：新增信号只需在 `signals.py` 写一个 `SignalDetector` 子类并 `register_detector`；若信号依赖资金数据，在 `capital_data.py` 中返回对应字段，engine 会自动写入 `SymbolSnapshot.capital`，无需改路由。
 - **改进计划**：详见 [`docs/plans/stock-tracker-improvement-plan.md`](plans/stock-tracker-improvement-plan.md)。
-- **测试**：`tests/stock_tracker/test_{models,signals,engine,risk,store,names,analyzer,capital_data}.py` + `tests/api/test_stock_tracker_routes.py`。
+- **测试**：`tests/stock_tracker/test_{models,signals,engine,risk,store,names,analyzer,capital_data,valuation_data}.py` + `tests/api/test_stock_tracker_routes.py`。
 
 ## 六、前端 frontend/
 
