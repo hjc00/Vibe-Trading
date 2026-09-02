@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
 import { useChartLifecycle } from "@/hooks/useChartLifecycle";
 import { getChartTheme } from "@/lib/chart-theme";
-import { formatRps } from "@/lib/stockTracker";
+import { formatDataDate, formatRps, latestPeriodEndDate } from "@/lib/stockTracker";
 import { ChartCardHeader } from "./ChartCardHeader";
 import type { SymbolSnapshot } from "@/lib/api";
 
@@ -163,6 +163,9 @@ export function RpsChartCard({ symbol }: RpsChartCardProps) {
       <ChartCardHeader
         title={t("stockTracker.rpsChartTitle")}
         helpText={t("stockTracker.rpsExplanation")}
+        meta={t("stockTracker.dataDate", {
+          date: formatDataDate(latestPeriodEndDate(symbol)),
+        })}
       />
       <div className="relative h-[240px] w-full">
         <div ref={ref} className="absolute inset-0" />

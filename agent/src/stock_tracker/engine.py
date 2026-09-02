@@ -75,6 +75,9 @@ class StockTrackerEngine:
             end_date = date.fromisoformat(end_date)
 
         trading_date = end_date
+        # Reuse same-trading-day capital/valuation from the previous snapshot so
+        # a refresh does not re-request throttled/blocked Eastmoney sources.
+        self._seed_caches_from_previous(previous, trading_date)
         start_date = end_date - timedelta(days=max(self.config.periods) + _BUFFER_DAYS)
 
         raw_data = self._fetch_data(
@@ -269,6 +272,32 @@ class StockTrackerEngine:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
         df["close"] = pd.to_numeric(df["close"], errors="coerce")
         return df.dropna()
+
+    def _seed_caches_from_previous(
+        self,
+        previous: TrackerSnapshot | None,
+        trading_date: date,
+    ) -> None:
+        """Seed capital/valuation caches from the prior snapshot.
+
+        Reuses only data from the *same* trading date; a new trading date still
+        refetches. Seeding lets ``load_capital_data`` / ``load_valuation_data``
+        hit their TTL cache and skip re-requesting the throttled/blocked
+        Eastmoney capital endpoints on every refresh within one trading day.
+        """
+        if previous is None or previous.trading_date != trading_date:
+            return
+        for symbol in previous.symbols:
+            code = symbol.code
+            capital = symbol.capital
+            if capital is not None:
+                if capital.fund_flow_error is None:
+                    self._capital_cache.set("fund_flow", code, trading_date, capital)
+                if capital.margin_error is None:
+                    self._capital_cache.set("margin", code, trading_date, capital)
+            valuation = symbol.valuation
+            if valuation is not None and valuation.error is None:
+                self._valuation_cache.set(code, trading_date, valuation)
 
     def _fetch_capital_data(
         self,

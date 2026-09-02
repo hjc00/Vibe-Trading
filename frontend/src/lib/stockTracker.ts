@@ -1,4 +1,4 @@
-import type { SignalMeta, SignalType } from "@/lib/api";
+import type { SignalMeta, SignalType, SymbolSnapshot } from "@/lib/api";
 import type { TFunction } from "i18next";
 
 export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
@@ -173,6 +173,23 @@ export function formatQuoteUpdatedAt(iso: string, t: TFunction): string {
   if (minutes < 60) return t("stockTracker.updatedMinutesAgo", { count: minutes });
   const hours = Math.floor(minutes / 60);
   return t("stockTracker.updatedHoursAgo", { count: hours });
+}
+
+export function formatDataDate(value: string | null | undefined): string {
+  if (!value) return "—";
+  return value.slice(0, 10);
+}
+
+export function latestPeriodEndDate(
+  symbol: SymbolSnapshot | null | undefined,
+): string | null {
+  if (!symbol) return null;
+  let latest: string | null = null;
+  for (const ps of Object.values(symbol.period_signals)) {
+    const end = ps.metrics.end_date;
+    if (end && (latest === null || end > latest)) latest = end;
+  }
+  return latest;
 }
 
 export function normalizeAShareCode(code: string): string | null {

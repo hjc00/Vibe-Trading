@@ -13,7 +13,9 @@ from src.stock_tracker.models import (
     FundFlowHistoryItem,
     FundFlowSnapshot,
     MarginSnapshot,
+    SymbolSnapshot,
     TrackerConfig,
+    TrackerSnapshot,
     TrackerThresholds,
     ValuationSnapshot,
 )
@@ -577,6 +579,79 @@ def test_risk_stop_loss_multiple_override():
     assert snapshot.risk is not None
     assert snapshot.risk.stop_loss_atr_multiple == 3.0
     assert snapshot.risk.stop_loss_price == pytest.approx(107.9 - 3 * 1.0, abs=1e-6)
+
+
+def _make_previous_snapshot(
+    config: TrackerConfig,
+    trading_date: date,
+    *,
+    capital: CapitalMetrics | None,
+    valuation: ValuationSnapshot | None,
+) -> TrackerSnapshot:
+    """Build a minimal previous snapshot carrying capital/valuation."""
+    from datetime import datetime, timezone
+
+    symbol = SymbolSnapshot(
+        code="000001.SZ",
+        name="Test",
+        close=10.0,
+        capital=capital,
+        valuation=valuation,
+    )
+    return TrackerSnapshot(
+        generated_at=datetime.now(timezone.utc),
+        trading_date=trading_date,
+        config=config,
+        symbols=[symbol],
+    )
+
+
+def test_seed_caches_from_previous_same_day():
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    capital = CapitalMetrics(
+        fund_flow=FundFlowSnapshot(trade_date=trading_date, main_net=100_000.0),
+        margin=MarginSnapshot(trade_date=trading_date, financing_balance=1_000_000.0),
+        fund_flow_source="eastmoney",
+        margin_source="eastmoney",
+    )
+    valuation = ValuationSnapshot(trade_date=trading_date, pe_ttm=19.9, source="eastmoney")
+
+    previous = _make_previous_snapshot(config, trading_date, capital=capital, valuation=valuation)
+    engine._seed_caches_from_previous(previous, trading_date)
+
+    assert engine._capital_cache.get("fund_flow", "000001.SZ", trading_date) is capital
+    assert engine._capital_cache.get("margin", "000001.SZ", trading_date) is capital
+    assert engine._valuation_cache.get("000001.SZ", trading_date) is valuation
+
+
+def test_seed_caches_skipped_for_different_day():
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    capital = CapitalMetrics(fund_flow=FundFlowSnapshot(trade_date=trading_date, main_net=100_000.0))
+    previous = _make_previous_snapshot(config, trading_date, capital=capital, valuation=None)
+
+    # A new trading day must not reuse the previous day's data.
+    engine._seed_caches_from_previous(previous, date(2026, 9, 1))
+    assert engine._capital_cache.get("fund_flow", "000001.SZ", date(2026, 9, 1)) is None
+    assert engine._valuation_cache.get("000001.SZ", date(2026, 9, 1)) is None
+
+
+def test_seed_skips_capital_with_errors():
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    capital = CapitalMetrics(fund_flow_error="eastmoney blocked", margin_error="eastmoney blocked")
+    previous = _make_previous_snapshot(config, trading_date, capital=capital, valuation=None)
+    engine._seed_caches_from_previous(previous, trading_date)
+
+    assert engine._capital_cache.get("fund_flow", "000001.SZ", trading_date) is None
+    assert engine._capital_cache.get("margin", "000001.SZ", trading_date) is None
 
 
 if __name__ == "__main__":

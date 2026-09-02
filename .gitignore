@@ -66,9 +66,6 @@ data/.duckdb_tmp/
 data/parquet/
 data/backup/
 
-# Stock tracker runtime state (watchlist, snapshots, analyses)
-data/stock_tracker/
-
 # Internal docs (plans, specs)
 docs/
 # AI context index (kept in the fork; re-include the dir then the file)

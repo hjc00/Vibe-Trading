@@ -1636,6 +1636,7 @@
     "refreshInterval": "刷新间隔（秒）",
     "refreshIntervalHint": "最小 5 秒。系统将按此间隔拉取实时行情。",
     "updatedAt": "{{when}} 更新",
+    "dataDate": "数据日期 {{date}}",
     "updatedJustNow": "刚刚",
     "updatedSecondsAgo": "{{count}} 秒前",
     "updatedMinutesAgo": "{{count}} 分钟前",

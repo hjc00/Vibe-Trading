@@ -1636,6 +1636,7 @@
     "refreshInterval": "Refresh interval (seconds)",
     "refreshIntervalHint": "Minimum 5 seconds. Real-time quotes are fetched on this interval.",
     "updatedAt": "Updated {{when}}",
+    "dataDate": "Data date {{date}}",
     "updatedJustNow": "just now",
     "updatedSecondsAgo": "{{count}}s ago",
     "updatedMinutesAgo": "{{count}}m ago",

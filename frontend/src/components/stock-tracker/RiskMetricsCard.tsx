@@ -4,9 +4,11 @@ import { cn } from "@/lib/utils";
 import {
   formatAtr,
   formatBeta,
+  formatDataDate,
   formatPct,
   getBetaToneClass,
   getDrawdownToneClass,
+  latestPeriodEndDate,
 } from "@/lib/stockTracker";
 import { ChartCardHeader } from "./ChartCardHeader";
 import type { SymbolSnapshot } from "@/lib/api";
@@ -30,6 +32,9 @@ export function RiskMetricsCard({ symbol }: RiskMetricsCardProps) {
       <ChartCardHeader
         title={t("stockTracker.riskTitle")}
         helpText={t("stockTracker.riskExplanation")}
+        meta={t("stockTracker.dataDate", {
+          date: formatDataDate(latestPeriodEndDate(symbol)),
+        })}
       />
       {!hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-muted-foreground">

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { cn } from "@/lib/utils";
 import {
+  formatDataDate,
   formatMarketCap,
   getQualityToneClass,
   getValuationBandLabelKey,
@@ -31,6 +32,9 @@ export function ValuationCard({ symbol }: ValuationCardProps) {
       <ChartCardHeader
         title={t("stockTracker.valuationTitle")}
         helpText={t("stockTracker.valuationExplanation")}
+        meta={t("stockTracker.dataDate", {
+          date: formatDataDate(symbol?.valuation?.trade_date),
+        })}
       />
       {!hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-muted-foreground">

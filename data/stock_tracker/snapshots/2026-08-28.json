@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "generated_at": "2026-08-31T20:10:29.352289+08:00",
+    "trading_date": "2026-08-28",
+    "config": {
+      "watchlist": [
+        "603228.SH"
+      ],
+      "periods": [
+        10,
+        20,
+        60
+      ],
+      "signals": [
+        "volume_spike",
+        "breakout",
+        "ma_alignment"
+      ],
+      "thresholds": {
+        "volume_spike": 2.0,
+        "rsi_overbought": 70.0,
+        "rsi_oversold": 30.0,
+        "breakout_window": 20
+      }
+    },
+    "symbols": [
+      {
+        "code": "603228.SH",
+        "name": "景旺电子",
+        "market": "a_share",
+        "close": 93.9,
+        "prev_close": 96.74,
+        "daily_return": -0.029357,
+        "volume": 326400.0,
+        "avg_volume_20": 494366.95,
+        "currency": "CNY",
+        "period_signals": {
+          "10": {
+            "metrics": {
+              "period": 10,
+              "start_date": "2026-08-17",
+              "end_date": "2026-08-28",
+              "sessions": 10,
+              "return_pct": -0.03126,
+              "annualized_volatility": 0.82602,
+              "volume_ratio": 0.653,
+              "rsi": 37.76,
+              "price_vs_ma20": 0.0298,
+              "ma5": 92.69200000000001,
+              "ma10": 93.046,
+              "ma20": 91.18249999999999,
+              "ma60": 78.62650000000001
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.821,
+                "threshold": 2.0,
+                "description": "Volume 0.82x average, below 2.0x threshold"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.655,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.17889,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              }
+            }
+          },
+          "20": {
+            "metrics": {
+              "period": 20,
+              "start_date": "2026-08-03",
+              "end_date": "2026-08-28",
+              "sessions": 20,
+              "return_pct": 0.256187,
+              "annualized_volatility": 0.907428,
+              "volume_ratio": 1.035,
+              "rsi": 37.76,
+              "price_vs_ma20": 0.0298,
+              "ma5": 92.69200000000001,
+              "ma10": 93.046,
+              "ma20": 91.18249999999999,
+              "ma60": 78.62650000000001
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.649,
+                "threshold": 2.0,
+                "description": "Volume 0.65x average, below 2.0x threshold"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.655,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.17889,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              }
+            }
+          },
+          "60": {
+            "metrics": {
+              "period": 60,
+              "start_date": "2026-06-05",
+              "end_date": "2026-08-28",
+              "sessions": 60,
+              "return_pct": 0.316417,
+              "annualized_volatility": 0.880933,
+              "volume_ratio": null,
+              "rsi": 37.76,
+              "price_vs_ma20": 0.0298,
+              "ma5": 92.69200000000001,
+              "ma10": 93.046,
+              "ma20": 91.18249999999999,
+              "ma60": 78.62650000000001
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.705,
+                "threshold": 2.0,
+                "description": "Volume 0.71x average, below 2.0x threshold"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.655,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.17889,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              }
+            }
+          }
+        },
+        "diff": {
+          "signal_count": {
+            "prev": 0,
+            "curr": 0
+          },
+          "return_pct": 0.0,
+          "rank_return_10": null,
+          "rank_change_10": null,
+          "new_signals": [],
+          "cleared_signals": []
+        },
+        "error": null
+      }
+    ],
+    "rankings": {
+      "return_10": [
+        "603228.SH"
+      ],
+      "return_20": [
+        "603228.SH"
+      ],
+      "return_60": [
+        "603228.SH"
+      ],
+      "volume_spike": [
+        "603228.SH"
+      ],
+      "signal_count": [
+        "603228.SH"
+      ]
+    },
+    "unresolved": [],
+    "data_gaps": []
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "config": {
+    "watchlist": [
+      "603228.SH",
+      "000938.SZ",
+      "603986.SH"
+    ],
+    "periods": [
+      5,
+      10,
+      20,
+      60
+    ],
+    "signals": [
+      "volume_spike",
+      "ma_alignment",
+      "rsi",
+      "margin_expansion",
+      "breakout",
+      "main_force_inflow",
+      "net_inflow_spike"
+    ],
+    "thresholds": {
+      "volume_spike": 1.0,
+      "rsi_overbought": 70.0,
+      "rsi_oversold": 30.0,
+      "breakout_window": 20.0
+    },
+    "refresh_interval_seconds": 600
+  },
+  "created_at": "2026-08-31T17:09:35.817597+08:00",
+  "updated_at": "2026-09-01T20:59:09.052427+08:00"
+}

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
 import { useChartLifecycle } from "@/hooks/useChartLifecycle";
 import { getChartTheme } from "@/lib/chart-theme";
-import { formatCapitalAmount } from "@/lib/stockTracker";
+import { formatCapitalAmount, formatDataDate } from "@/lib/stockTracker";
 import { ChartCardHeader } from "./ChartCardHeader";
 import type { SymbolSnapshot } from "@/lib/api";
 
@@ -125,6 +125,9 @@ export function FundFlowChartCard({ symbol }: FundFlowChartCardProps) {
       <ChartCardHeader
         title={t("stockTracker.fundFlowChartTitle")}
         helpText={t("stockTracker.fundFlowExplanation")}
+        meta={t("stockTracker.dataDate", {
+          date: formatDataDate(symbol?.capital?.fund_flow?.trade_date),
+        })}
       />
       <div className="relative h-[240px] w-full">
         <div ref={ref} className="absolute inset-0" />
