@@ -1,7 +1,8 @@
 """Tests for fund_flow_tool: envelope shape, parsing, per-symbol isolation.
 
 All HTTP is mocked at the Eastmoney client functions the tool imports
-(:func:`get_json` / :func:`resolve_secid`), so no test touches a live endpoint.
+(:func:`get_fund_flow_json` / :func:`resolve_secid`), so no test touches a live
+endpoint.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ class TestSuccessEnvelope:
         with patch(
             "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
         ), patch(
-            "src.tools.fund_flow_tool.get_json", return_value=_DAILY_PAYLOAD
+            "src.tools.fund_flow_tool.get_fund_flow_json", return_value=_DAILY_PAYLOAD
         ):
             text = FundFlowTool().execute(codes=["600519.SH"], period="daily", days=30)
 
@@ -55,7 +56,7 @@ class TestSuccessEnvelope:
         with patch(
             "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
         ), patch(
-            "src.tools.fund_flow_tool.get_json", return_value=_DAILY_PAYLOAD
+            "src.tools.fund_flow_tool.get_fund_flow_json", return_value=_DAILY_PAYLOAD
         ):
             text = FundFlowTool().execute(codes=["600519.SH"], period="daily", days=1)
 
@@ -68,7 +69,7 @@ class TestSuccessEnvelope:
         with patch(
             "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
         ), patch(
-            "src.tools.fund_flow_tool.get_json", return_value=minute_payload
+            "src.tools.fund_flow_tool.get_fund_flow_json", return_value=minute_payload
         ) as mock_get:
             text = FundFlowTool().execute(codes=["600519.SH"], period="min")
 
@@ -89,7 +90,7 @@ class TestPerSymbolIsolation:
         with patch(
             "src.tools.fund_flow_tool.resolve_secid", side_effect=fake_resolve
         ), patch(
-            "src.tools.fund_flow_tool.get_json", return_value=_DAILY_PAYLOAD
+            "src.tools.fund_flow_tool.get_fund_flow_json", return_value=_DAILY_PAYLOAD
         ):
             text = FundFlowTool().execute(codes=["BAD", "600519.SH"])
 
@@ -102,7 +103,7 @@ class TestPerSymbolIsolation:
         with patch(
             "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
         ), patch(
-            "src.tools.fund_flow_tool.get_json", side_effect=RuntimeError("HTTP 429")
+            "src.tools.fund_flow_tool.get_fund_flow_json", side_effect=RuntimeError("HTTP 429")
         ), patch(
             "src.tools.fund_flow_tool.tushare_fallbacks.fetch_fund_flow",
             side_effect=RuntimeError("no fallback"),
@@ -123,7 +124,7 @@ class TestPerSymbolIsolation:
         with patch(
             "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
         ), patch(
-            "src.tools.fund_flow_tool.get_json", side_effect=RuntimeError("HTTP 429")
+            "src.tools.fund_flow_tool.get_fund_flow_json", side_effect=RuntimeError("HTTP 429")
         ), patch(
             "src.tools.fund_flow_tool.tushare_fallbacks.fetch_fund_flow",
             return_value=fallback,
@@ -141,7 +142,7 @@ class TestPerSymbolIsolation:
         bad = {"data": {"klines": ["garbage", "2024-01-03,-50.0,20.0,-5.0,-30.0,-20.0"]}}
         with patch(
             "src.tools.fund_flow_tool.resolve_secid", return_value="1.600519"
-        ), patch("src.tools.fund_flow_tool.get_json", return_value=bad):
+        ), patch("src.tools.fund_flow_tool.get_fund_flow_json", return_value=bad):
             text = FundFlowTool().execute(codes=["600519.SH"])
 
         rows = json.loads(text)["data"]["600519.SH"]["rows"]

@@ -6,8 +6,8 @@ net inflow into main / large / medium / small-order buckets (the
 a daily history line and an intraday (minute) line. Both are addressed by the
 same ``secid`` scheme used for klines, so symbol resolution and HTTP throttling
 are delegated to :mod:`backtest.loaders.eastmoney_client` (every request routes
-through the shared per-host throttle — Eastmoney rate-limits by IP and bans
-bursting clients).
+through its dedicated ``eastmoney_fund_flow`` throttle bucket — Eastmoney
+rate-limits by IP and bans bursting clients).
 
 Markets: A-share (``.SH`` / ``.SZ`` / ``.BJ``), Hong Kong (``.HK``) and US
 (``.US``). One unresolvable or failing symbol never aborts the batch.
@@ -20,7 +20,7 @@ import logging
 import time
 from typing import Any
 
-from backtest.loaders.eastmoney_client import get_json, resolve_secid
+from backtest.loaders.eastmoney_client import get_fund_flow_json, resolve_secid
 from src.agent.tools import BaseTool
 from src.tools import tushare_fallbacks
 
@@ -122,18 +122,17 @@ def fetch_symbol_fund_flow(symbol: str, *, period: str, days: int) -> dict[str, 
         "klt": "101" if is_daily else "1",
         "lmt": "0" if is_daily else "0",
     }
-    # Bypass system-level proxies for Eastmoney fund-flow endpoints; corporate
-    # proxies often reject or throttle push2his.eastmoney.com while direct
-    # internet access works fine.
+    # Eastmoney quote endpoints drop/slow down faster when routed through a
+    # system proxy, so requests go direct (the eastmoney client defaults to
+    # bypassing proxies). Referer keeps the public endpoint happy.
     headers = {"Referer": "https://quote.eastmoney.com/"}
     last_error: Exception | None = None
     for attempt in range(3):
         try:
-            payload = get_json(
+            payload = get_fund_flow_json(
                 url,
                 params=params,
                 headers=headers,
-                proxies={"http": None, "https": None},
             )
             break
         except Exception as exc:  # noqa: BLE001

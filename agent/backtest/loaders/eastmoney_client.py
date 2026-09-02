@@ -39,6 +39,21 @@ _HOST_KEY = "eastmoney"
 _MIN_INTERVAL_ENV = "VIBE_TRADING_EASTMONEY_MIN_INTERVAL"
 _DEFAULT_MIN_INTERVAL = 1.0
 
+# Capital-flow endpoints live on push2his, which drops idle keep-alive sockets
+# and burst-limits by IP more aggressively than the kline/datacenter services.
+# They get their own throttle/session bucket so fund-flow reads neither reuse a
+# server-closed connection from the shared pool nor queue behind kline traffic;
+# their spacing is tunable independently via a dedicated env var.
+_FUND_FLOW_HOST_KEY = "eastmoney_fund_flow"
+_FUND_FLOW_MIN_INTERVAL_ENV = "VIBE_TRADING_EASTMONEY_FUND_FLOW_MIN_INTERVAL"
+_FUND_FLOW_DEFAULT_MIN_INTERVAL = 1.0
+
+# Requests sends to Eastmoney *direct*, bypassing any system/corporate proxy:
+# local proxies commonly misroute or drop Eastmoney's push/push2his quote hosts
+# (verified ProxyError on push2 while direct succeeds), whereas direct access to
+# these public endpoints works. ``proxies`` may still be passed to override.
+_NO_PROXY = {"http": None, "https": None}
+
 # Eastmoney kline period codes (``klt``) keyed by our interval labels.
 KLT_BY_INTERVAL: dict[str, int] = {
     "1D": 101,
@@ -78,21 +93,29 @@ def _min_interval() -> float:
     return resolve_min_interval(_MIN_INTERVAL_ENV, _DEFAULT_MIN_INTERVAL)
 
 
-def get_json(
+def _fund_flow_min_interval() -> float:
+    """Resolve the per-call minimum fund-flow request spacing in seconds."""
+    return resolve_min_interval(_FUND_FLOW_MIN_INTERVAL_ENV, _FUND_FLOW_DEFAULT_MIN_INTERVAL)
+
+
+def _get_json(
     url: str,
     *,
+    host_key: str,
+    min_interval: float,
     params: dict[str, Any],
     headers: dict[str, str] | None = None,
     proxies: dict[str, str | None] | None = None,
 ) -> Any:
-    """Issue a throttled Eastmoney GET and decode the body as JSON.
+    """Throttled Eastmoney GET that decodes the body as JSON.
 
     Args:
         url: Fully-qualified Eastmoney endpoint URL.
         params: Query parameters for the request.
         headers: Optional headers merged over the default browser UA.
-        proxies: Optional proxies mapping forwarded to ``requests``. Pass
-            ``{"http": None, "https": None}`` to bypass system-level proxies.
+        proxies: Optional proxies mapping forwarded to ``requests``. When
+            ``None`` (default) the request goes direct, bypassing system proxies
+            (see :data:`_NO_PROXY`).
 
     Returns:
         The decoded JSON payload (typically a ``dict``).
@@ -103,10 +126,52 @@ def get_json(
         requests.HTTPError: Non-2xx response status.
         ValueError: Body is not valid JSON.
     """
+    if proxies is None:
+        proxies = _NO_PROXY
     return throttled_get_json(
+        url,
+        host_key=host_key,
+        min_interval=min_interval,
+        params=params,
+        headers=headers,
+        proxies=proxies,
+    )
+
+
+def get_json(
+    url: str,
+    *,
+    params: dict[str, Any],
+    headers: dict[str, str] | None = None,
+    proxies: dict[str, str | None] | None = None,
+) -> Any:
+    """Issue a throttled Eastmoney GET (shared bucket/session) and decode JSON."""
+    return _get_json(
         url,
         host_key=_HOST_KEY,
         min_interval=_min_interval(),
+        params=params,
+        headers=headers,
+        proxies=proxies,
+    )
+
+
+def get_fund_flow_json(
+    url: str,
+    *,
+    params: dict[str, Any],
+    headers: dict[str, str] | None = None,
+    proxies: dict[str, str | None] | None = None,
+) -> Any:
+    """Throttled Eastmoney GET+JSON for capital-flow (fflow) endpoints.
+
+    Routed through the dedicated ``eastmoney_fund_flow`` bucket/session so its
+    traffic is paced and pooled separately from general Eastmoney calls.
+    """
+    return _get_json(
+        url,
+        host_key=_FUND_FLOW_HOST_KEY,
+        min_interval=_fund_flow_min_interval(),
         params=params,
         headers=headers,
         proxies=proxies,
