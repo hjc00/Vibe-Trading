@@ -366,3 +366,182 @@ def fetch_holder_trade(code: str, *, days: int = 120) -> dict[str, Any]:
         "source": "tushare",
         "rows": parsed,
     }
+
+
+def fetch_limit_list(trade_date: str | None = None, *, lookback_days: int = 5) -> dict[str, Any]:
+    """Fetch A-share daily limit-up/limit-down/broken-board pool (``limit_list_d``).
+
+    ``limit_list_d`` returns one row per limit-up (U) / limit-down (D) / broken
+    board (Z) stock with its consecutive-board count (``limit_times``) and
+    open-times (``open_times``). Requires 5000+ Tushare points.
+
+    Raises:
+        TushareFallbackUnavailable: No usable token / Tushare not importable.
+    """
+    pro = _pro_api()
+    if trade_date is not None:
+        rows = _records(pro.limit_list_d(trade_date=_compact_date(trade_date)))
+    else:
+        start_date, end_date = _date_window(lookback_days)
+        rows = _records(
+            pro.limit_list_d(start_date=start_date, end_date=end_date)
+        )
+    parsed = [
+        {
+            "trade_date": _dashed_date(row.get("trade_date")),
+            "ts_code": row.get("ts_code"),
+            "name": row.get("name"),
+            "industry": row.get("industry"),
+            "close": _to_float(row.get("close")),
+            "pct_chg": _to_float(row.get("pct_chg")),
+            "limit_type": row.get("limit"),  # U/D/Z
+            "open_times": _to_float(row.get("open_times")),
+            "limit_times": _to_float(row.get("limit_times")),
+            "up_stat": row.get("up_stat"),
+            "fd_amount": _to_float(row.get("fd_amount")),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("trade_date") or "")
+    return {"source": "tushare", "rows": parsed}
+
+
+def fetch_limit_step(trade_date: str | None = None, *, lookback_days: int = 5) -> dict[str, Any]:
+    """Fetch the daily consecutive-board ladder (``limit_step``, 连板天梯).
+
+    One row per stock reaching ``nums`` consecutive limit-ups. Requires 8000+
+    Tushare points.
+
+    Raises:
+        TushareFallbackUnavailable: No usable token / Tushare not importable.
+    """
+    pro = _pro_api()
+    if trade_date is not None:
+        rows = _records(pro.limit_step(trade_date=_compact_date(trade_date)))
+    else:
+        start_date, end_date = _date_window(lookback_days)
+        rows = _records(pro.limit_step(start_date=start_date, end_date=end_date))
+    parsed = [
+        {
+            "trade_date": _dashed_date(row.get("trade_date")),
+            "ts_code": row.get("ts_code"),
+            "name": row.get("name"),
+            "nums": _to_float(row.get("nums")),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("trade_date") or "")
+    return {"source": "tushare", "rows": parsed}
+
+
+def fetch_report_rc(code: str, *, lookback_days: int = 400) -> dict[str, Any]:
+    """Fetch sell-side earnings forecasts (``report_rc``) for one symbol.
+
+    ``report_rc`` carries per-broker EPS/PE forecasts, a rating label, and
+    target-price bounds (``max_price``/``min_price``). 120 points trial (10
+    calls/day); 8000+ for full access.
+
+    Raises:
+        TushareFallbackUnavailable: No usable token / Tushare not importable.
+    """
+    ts_code = _ts_code(code)
+    start_date, end_date = _date_window(lookback_days)
+    rows = _records(
+        _pro_api().report_rc(ts_code=ts_code, start_date=start_date, end_date=end_date)
+    )
+    parsed = [
+        {
+            "report_date": _dashed_date(row.get("report_date")),
+            "org_name": row.get("org_name"),
+            "author_name": row.get("author_name"),
+            "quarter": row.get("quarter"),
+            "rating": row.get("rating"),
+            "eps": _to_float(row.get("eps")),
+            "pe": _to_float(row.get("pe")),
+            "roe": _to_float(row.get("roe")),
+            "net_profit": _to_float(row.get("np")),
+            "max_price": _to_float(row.get("max_price")),
+            "min_price": _to_float(row.get("min_price")),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("report_date") or "", reverse=True)
+    return {
+        "code": ts_code.split(".", 1)[0],
+        "ts_code": ts_code,
+        "source": "tushare",
+        "rows": parsed,
+    }
+
+
+def fetch_hk_hold(code: str, *, lookback_days: int = 400) -> dict[str, Any]:
+    """Fetch northbound (Stock Connect) holding ratio (``hk_hold``) for one symbol.
+
+    ``ratio`` is the held-share ratio (%), sourced from HKEX. Since 2024-08 the
+    exchange stopped daily northbound disclosure and moved to quarterly, so this
+    is naturally low-frequency. 120 points trial.
+
+    Raises:
+        TushareFallbackUnavailable: No usable token / Tushare not importable.
+    """
+    ts_code = _ts_code(code)
+    start_date, end_date = _date_window(lookback_days)
+    rows = _records(
+        _pro_api().hk_hold(ts_code=ts_code, start_date=start_date, end_date=end_date)
+    )
+    parsed = [
+        {
+            "trade_date": _dashed_date(row.get("trade_date")),
+            "vol": _to_float(row.get("vol")),
+            "ratio": _to_float(row.get("ratio")),
+            "exchange": row.get("exchange"),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("trade_date") or "")
+    return {
+        "code": ts_code.split(".", 1)[0],
+        "ts_code": ts_code,
+        "source": "tushare",
+        "rows": parsed,
+    }
+
+
+def fetch_fund_portfolio(code: str, *, lookback_days: int = 400) -> dict[str, Any]:
+    """Fetch mutual-fund holdings (``fund_portfolio``) for one stock, quarterly.
+
+    ``stk_mkv_ratio`` is the held value as a share of the stock's market cap
+    (%). 5000+ Tushare points.
+
+    Raises:
+        TushareFallbackUnavailable: No usable token / Tushare not importable.
+    """
+    ts_code = _ts_code(code)
+    start_date, end_date = _date_window(lookback_days)
+    rows = _records(
+        _pro_api().fund_portfolio(symbol=ts_code, start_date=start_date, end_date=end_date)
+    )
+    parsed = [
+        {
+            "end_date": _dashed_date(row.get("end_date")),
+            "ann_date": _dashed_date(row.get("ann_date")),
+            "fund_code": row.get("ts_code"),
+            "mkv": _to_float(row.get("mkv")),
+            "amount": _to_float(row.get("amount")),
+            "stk_mkv_ratio": _to_float(row.get("stk_mkv_ratio")),
+            "stk_float_ratio": _to_float(row.get("stk_float_ratio")),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("end_date") or "")
+    return {
+        "code": ts_code.split(".", 1)[0],
+        "ts_code": ts_code,
+        "source": "tushare",
+        "rows": parsed,
+    }

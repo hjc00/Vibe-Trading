@@ -1,7 +1,7 @@
 # Vibe-Trading — 项目导航
 
 > 本文件是 AI 上下文索引，每次会话自动加载。改动代码后请同步更新本文件或 [docs/PROJECT_INDEX.md](docs/PROJECT_INDEX.md)（见文末「文档同步约定」）。
-> 最后更新：2026-09-02（已落地 2.2 RPS、2.3 风险指标、2.5 行业强度看板、2.6 估值与质量）
+> 最后更新：2026-09-03（已落地 2.2 RPS、2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度）
 
 ## 项目定位
 
@@ -53,7 +53,7 @@
 
 **组合与交易**：`portfolio`(只读多券商聚合)、`trading`(连接器 profiles / 操作)、`live`(有界自主实盘)、`shadow_account`(盈利模式 → 回测 → 渲染)
 
-**扩展与技能**：`skills`(90 个打包技能)、`strategy_discovery`(Alpha Zoo + SDM 实证门控 facade)、`strategy_store`(策略开发管理器 + 衰减)、`scheduled_research`(定时研究 + playbooks)、`ui_services.py`(前端 run 分析整形)、`stock_tracker`(A股多周期追踪，活跃功能；已支持资金流信号、个股相对强弱 RPS、风险指标、行业强度看板 `sector_data.py` 与估值质量评分)
+**扩展与技能**：`skills`(90 个打包技能)、`strategy_discovery`(Alpha Zoo + SDM 实证门控 facade)、`strategy_store`(策略开发管理器 + 衰减)、`scheduled_research`(定时研究 + playbooks)、`ui_services.py`(前端 run 分析整形)、`stock_tracker`(A股多周期追踪，活跃功能；已支持资金流信号、个股相对强弱 RPS、风险指标、行业强度看板 `sector_data.py`、估值质量评分、题材/概念热度 `concept_data.py`、市场情绪温度计 `sentiment_data.py`、盈利预期/一致预期 `consensus_data.py` 与筹码集中度 `chip_data.py`)
 
 **通道与集成**：`channels`(多 IM 插件适配)、`channelsui`(WebUI 兼容)、`api`(HTTP 路由包)、`utils`(media_decode)
 

@@ -52,7 +52,7 @@ def test_get_settings_default(client):
     assert data["config"]["watchlist"] == TrackerConfig().watchlist
     assert data["config"]["periods"] == [10, 20, 60]
     assert data["config"]["refresh_interval_seconds"] == 10
-    assert data["config"]["detail_card_count"] == 6
+    assert data["config"]["detail_card_count"] == 9
 
 
 def test_update_settings_validation(client):

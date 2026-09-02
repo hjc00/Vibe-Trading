@@ -356,3 +356,60 @@ export function formatPriceZoneText(
   if (low != null) return `≥ ${low}`;
   return null;
 }
+
+/**
+ * Tone for a concept-heat score (0-100). Hotter themes render hotter colors,
+ * mirroring the market-sentiment temperature metaphor (overheating = danger).
+ */
+export function getConceptHeatToneClass(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value >= 80) return "text-danger";
+  if (value >= 60) return "text-warning";
+  if (value >= 40) return "text-foreground";
+  return "text-info";
+}
+
+/** Five-band sentiment temperature label key (冰点/偏冷/中性/偏热/过热). */
+export function getSentimentBandLabelKey(
+  value: number | null | undefined,
+): string | null {
+  if (value === undefined || value === null) return null;
+  if (value >= 80) return "stockTracker.sentimentOverheated";
+  if (value >= 60) return "stockTracker.sentimentWarm";
+  if (value >= 40) return "stockTracker.sentimentNeutral";
+  if (value >= 20) return "stockTracker.sentimentCool";
+  return "stockTracker.sentimentFrozen";
+}
+
+/** Text color for a sentiment temperature band (blue -> gray -> red). */
+export function getSentimentBandClass(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value >= 80) return "text-danger";
+  if (value >= 60) return "text-warning";
+  if (value >= 40) return "text-foreground";
+  return "text-info";
+}
+
+/** Tone for a consensus rating score (0-100, higher = more bullish). */
+export function getConsensusRatingToneClass(
+  value: number | null | undefined,
+): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value >= 80) return "text-success";
+  if (value >= 60) return "text-info";
+  if (value >= 40) return "text-warning";
+  return "text-danger";
+}
+
+/** Tone for a chip-concentration trend label (accumulating vs distributing). */
+export function getChipTrendToneClass(trend: string | null | undefined): string {
+  if (trend === "accumulating") return "text-success";
+  if (trend === "distributing") return "text-danger";
+  return "text-muted-foreground";
+}
+
+/** Format an already-percent value (e.g. 1.57 -> "1.57%"). */
+export function formatChipPct(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  return `${value.toFixed(2)}%`;
+}

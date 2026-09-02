@@ -77,7 +77,7 @@ class TrackerConfig(BaseModel):
     # row; the rest wrap onto the next row. Defaults to the full card set so no
     # card is hidden unless the user lowers the count.
     detail_card_count: int = Field(
-        default=6,
+        default=9,
         ge=1,
         description="Number of detail cards to show (max three per row; extras wrap).",
     )
@@ -391,6 +391,133 @@ class EventSnapshot(BaseModel):
     error: Optional[str] = None
 
 
+class ConceptSnapshot(BaseModel):
+    """Concept / thematic-board heat for one symbol (题材/概念热度).
+
+    Populated by :mod:`src.stock_tracker.concept_data` from the Eastmoney
+    concept-board taxonomy (``clist`` ``fs=m:90+t:3`` ranking plus ``slist``
+    ``spt=3`` membership). ``boards`` lists every concept board the stock
+    belongs to; ``hottest_concept`` / ``hottest_concept_rank`` point at its
+    most-heated board on the whole-market ranking; ``concept_heat_score`` is the
+    0-100 composite. Degrades with ``error`` so a blocked source never breaks
+    the refresh.
+    """
+
+    boards: List[str] = Field(default_factory=list)
+    hottest_concept: Optional[str] = None
+    hottest_concept_rank: Optional[int] = None  # 1-based rank on the concept board ranking
+    concept_heat_score: Optional[float] = None  # 0-100
+    limit_up_count: Optional[int] = None  # 最热概念内涨停家数（复用 2.16 市场涨停池）
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
+class ConceptStrength(BaseModel):
+    """Strength snapshot for one Eastmoney concept board (概念板块).
+
+    Mirrors :class:`SectorStrength` but trades the fundamental ``prosperity_score``
+    for ``limit_up_count`` (the number of limit-up stocks inside the concept,
+    aggregated from the market limit-up pool). Populated by
+    :mod:`src.stock_tracker.concept_data`.
+    """
+
+    board_code: Optional[str] = None
+    board_name: str
+    change_pct: Optional[float] = None
+    fund_flow_net: Optional[float] = None  # main-force net inflow, CNY
+    up_count: Optional[float] = None
+    down_count: Optional[float] = None
+    leader: Optional[str] = None
+    limit_up_count: Optional[int] = None
+    market_rank: Optional[int] = None  # 1-based rank by change_pct
+    member_count: int = 0
+    members: List[str] = Field(default_factory=list)
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
+class MarketSentimentSnapshot(BaseModel):
+    """Whole-market breadth and limit-up temperature (市场情绪温度计).
+
+    Populated by :mod:`src.stock_tracker.sentiment_data` from the Eastmoney
+    limit-up pool (``push2ex getTopicZTPool``) with a Tushare ``limit_list_d`` /
+    ``limit_step`` fallback. ``sentiment_score`` is the composite 0-100
+    temperature (higher = hotter); ``board_ladder`` maps each consecutive-board
+    height (连板次数) to its count. Degrades with ``error``.
+    """
+
+    limit_up_count: Optional[int] = None
+    limit_down_count: Optional[int] = None
+    broken_board_count: Optional[int] = None  # 炸板家数
+    broken_ratio: Optional[float] = None  # 炸板率 0-1
+    max_board_height: Optional[int] = None  # 最高连板
+    board_ladder: Dict[str, int] = Field(default_factory=dict)  # 连板高度 -> 家数
+    up_count: Optional[int] = None  # 全市场上涨家数
+    down_count: Optional[int] = None  # 全市场下跌家数
+    prev_limit_up_perf: Optional[float] = None  # 昨日涨停股今日平均表现（溢价）
+    sentiment_score: Optional[float] = None  # 0-100
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
+class ConsensusSnapshot(BaseModel):
+    """Sell-side consensus estimates for one symbol (盈利预期/一致预期).
+
+    Populated by :mod:`src.stock_tracker.consensus_data` from the Eastmoney
+    research-report feed (``reportapi``) and THS consensus EPS, with a Tushare
+    ``report_rc`` fallback for target prices and EPS revision. ``forward_pe`` is
+    derived from the next-year consensus EPS and the latest close. Degrades with
+    ``error``; the fallback feeds may be ``None`` when no token / insufficient
+    Tushare points.
+    """
+
+    analyst_count: Optional[int] = None
+    consensus_eps_cur: Optional[float] = None
+    consensus_eps_next: Optional[float] = None
+    forward_pe: Optional[float] = None
+    target_price_avg: Optional[float] = None
+    target_price_low: Optional[float] = None
+    target_price_high: Optional[float] = None
+    upside_pct: Optional[float] = None  # target_price_avg / close - 1, fraction
+    rating_distribution: Dict[str, int] = Field(default_factory=dict)  # 评级 -> 家数
+    rating_score: Optional[float] = None  # 0-100 评级综合分
+    eps_revision_pct: Optional[float] = None  # EPS 上/下修幅度（分率）
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
+class ChipHolderItem(BaseModel):
+    """One quarterly shareholder-count observation for chip charting."""
+
+    end_date: Optional[date] = None
+    holder_count: Optional[float] = None
+    holder_count_change_pct: Optional[float] = None
+    avg_hold_amount: Optional[float] = None
+
+
+class ChipSnapshot(BaseModel):
+    """Chip concentration / institutional movement for one symbol (筹码集中度).
+
+    Populated by :mod:`src.stock_tracker.chip_data` from the Eastmoney
+    shareholder-count report (``RPT_HOLDERNUMLATEST``) plus Tushare ``hk_hold``
+    (northbound) and ``fund_portfolio`` (mutual-fund) fallbacks.
+    ``holder_trend`` is ``"accumulating"`` when the holder count falls for two
+    consecutive periods (吸筹), ``"distributing"`` when it rises (派发);
+    ``chip_concentration_score`` is the 0-100 composite. Degrades with ``error``.
+    """
+
+    holder_count: Optional[float] = None
+    holder_count_change_pct: Optional[float] = None  # 环比%，负=户数下降
+    holder_trend: Optional[str] = None  # accumulating | distributing
+    avg_hold_amount: Optional[float] = None  # 户均持股市值
+    northbound_holding_ratio: Optional[float] = None  # 北向持股占比%
+    fund_holding_ratio: Optional[float] = None  # 公募持股占比%
+    chip_concentration_score: Optional[float] = None  # 0-100
+    holder_history: List[ChipHolderItem] = Field(default_factory=list)
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
 class SymbolSnapshot(BaseModel):
     """One symbol's slice of a tracker snapshot."""
 
@@ -408,6 +535,9 @@ class SymbolSnapshot(BaseModel):
     risk: Optional[RiskMetrics] = None
     valuation: Optional[ValuationSnapshot] = None
     events: Optional[EventSnapshot] = None
+    concept: Optional[ConceptSnapshot] = None
+    consensus: Optional[ConsensusSnapshot] = None
+    chip: Optional[ChipSnapshot] = None
     diff: Optional[CrossDayDiff] = None
     sector_board: Optional[str] = None
     sector_board_source: Optional[str] = None
@@ -424,6 +554,8 @@ class TrackerSnapshot(BaseModel):
     symbols: List[SymbolSnapshot] = Field(default_factory=list)
     rankings: Dict[str, List[str]] = Field(default_factory=dict)
     sectors: List[SectorStrength] = Field(default_factory=list)
+    concepts: List[ConceptStrength] = Field(default_factory=list)
+    market_sentiment: Optional[MarketSentimentSnapshot] = None
     unresolved: List[str] = Field(default_factory=list)
     data_gaps: List[Dict[str, Any]] = Field(default_factory=list)
 
@@ -588,6 +720,12 @@ __all__ = [
     "EventSnapshot",
     "SectorPeriodMetric",
     "SectorStrength",
+    "ConceptSnapshot",
+    "ConceptStrength",
+    "MarketSentimentSnapshot",
+    "ConsensusSnapshot",
+    "ChipHolderItem",
+    "ChipSnapshot",
     "CrossDayDiff",
     "SymbolSnapshot",
     "TrackerSnapshot",

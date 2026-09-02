@@ -88,6 +88,7 @@ export function TrackerTable({
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.change")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.rps")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.valuation")}</th>
+              <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.concept")}</th>
               <th className="py-2 pr-4 text-right font-medium">{t("stockTracker.delete")}</th>
             </tr>
           </thead>
@@ -163,6 +164,9 @@ export function TrackerTable({
                       <ValuationPill symbol={symbol} />
                     </td>
                     <td className="py-3 pr-4 text-right">
+                      <ConceptCell symbol={symbol} />
+                    </td>
+                    <td className="py-3 pr-4 text-right">
                       {onRemoveSymbol && (
                         <button
                           type="button"
@@ -183,7 +187,7 @@ export function TrackerTable({
                       key={`${symbol.code}-expanded`}
                       className={cn("border-b last:border-0", isSelected ? "bg-primary/10" : "bg-muted/5")}
                     >
-                      <td colSpan={6} className="p-0">
+                      <td colSpan={7} className="p-0">
                         <div className="grid grid-cols-1 gap-4 px-4 py-3 sm:grid-cols-[1fr_auto]">
                           <div className="flex flex-col gap-2">
                             {quotesUpdatedAt && (
@@ -400,6 +404,26 @@ function RpsPill({ symbol }: { symbol: SymbolSnapshot }) {
         {formatRps(value)}
       </span>
       <span className="text-[10px] text-muted-foreground">{t("stockTracker.rpsMarket")}</span>
+    </div>
+  );
+}
+
+function ConceptCell({ symbol }: { symbol: SymbolSnapshot }) {
+  const concept = symbol.concept;
+  const hottest = concept?.hottest_concept;
+  if (!hottest) {
+    return <span className="text-[10px] text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="max-w-[120px] truncate rounded-full bg-muted/40 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+        {hottest}
+      </span>
+      {concept?.hottest_concept_rank != null && (
+        <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+          #{concept.hottest_concept_rank}
+        </span>
+      )}
     </div>
   );
 }

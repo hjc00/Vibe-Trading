@@ -1967,6 +1967,89 @@ export interface SectorPeriodMetric {
   error?: string | null;
 }
 
+/** Concept / thematic-board heat for one symbol (题材/概念热度). */
+export interface ConceptSnapshot {
+  boards: string[];
+  hottest_concept?: string | null;
+  hottest_concept_rank?: number | null;
+  concept_heat_score?: number | null;
+  limit_up_count?: number | null;
+  source?: string;
+  error?: string | null;
+}
+
+/** Strength snapshot for one Eastmoney concept board (概念板块). */
+export interface ConceptStrength {
+  board_code?: string | null;
+  board_name: string;
+  change_pct?: number | null;
+  fund_flow_net?: number | null;
+  up_count?: number | null;
+  down_count?: number | null;
+  leader?: string | null;
+  limit_up_count?: number | null;
+  market_rank?: number | null;
+  member_count: number;
+  members: string[];
+  source: string;
+  error?: string | null;
+}
+
+/** Whole-market breadth + limit-up temperature (市场情绪温度计). */
+export interface MarketSentimentSnapshot {
+  limit_up_count?: number | null;
+  limit_down_count?: number | null;
+  broken_board_count?: number | null;
+  broken_ratio?: number | null;
+  max_board_height?: number | null;
+  board_ladder: Record<string, number>;
+  up_count?: number | null;
+  down_count?: number | null;
+  prev_limit_up_perf?: number | null;
+  sentiment_score?: number | null;
+  source?: string;
+  error?: string | null;
+}
+
+/** Sell-side consensus estimates for one symbol (盈利预期/一致预期). */
+export interface ConsensusSnapshot {
+  analyst_count?: number | null;
+  consensus_eps_cur?: number | null;
+  consensus_eps_next?: number | null;
+  forward_pe?: number | null;
+  target_price_avg?: number | null;
+  target_price_low?: number | null;
+  target_price_high?: number | null;
+  upside_pct?: number | null;
+  rating_distribution: Record<string, number>;
+  rating_score?: number | null;
+  eps_revision_pct?: number | null;
+  source?: string;
+  error?: string | null;
+}
+
+/** One quarterly shareholder-count observation for chip charting. */
+export interface ChipHolderItem {
+  end_date?: string | null;
+  holder_count?: number | null;
+  holder_count_change_pct?: number | null;
+  avg_hold_amount?: number | null;
+}
+
+/** Chip concentration / institutional movement for one symbol (筹码集中度). */
+export interface ChipSnapshot {
+  holder_count?: number | null;
+  holder_count_change_pct?: number | null;
+  holder_trend?: string | null;
+  avg_hold_amount?: number | null;
+  northbound_holding_ratio?: number | null;
+  fund_holding_ratio?: number | null;
+  chip_concentration_score?: number | null;
+  holder_history: ChipHolderItem[];
+  source?: string;
+  error?: string | null;
+}
+
 export type EventRiskLevel = "info" | "warning" | "danger";
 
 /** One upcoming/recent corporate event for a symbol (解禁/业绩预告/龙虎榜/增减持). */
@@ -2007,6 +2090,9 @@ export interface SymbolSnapshot {
   risk?: RiskMetrics | null;
   valuation?: ValuationSnapshot | null;
   events?: EventSnapshot | null;
+  concept?: ConceptSnapshot | null;
+  consensus?: ConsensusSnapshot | null;
+  chip?: ChipSnapshot | null;
   diff?: CrossDayDiff | null;
   sector_board?: string | null;
   sector_board_source?: string | null;
@@ -2021,6 +2107,8 @@ export interface TrackerSnapshot {
   symbols: SymbolSnapshot[];
   rankings: Record<string, string[]>;
   sectors: SectorStrength[];
+  concepts?: ConceptStrength[];
+  market_sentiment?: MarketSentimentSnapshot | null;
   unresolved: string[];
   data_gaps: Array<Record<string, unknown>>;
 }

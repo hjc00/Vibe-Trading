@@ -157,29 +157,14 @@ class ResearchReportsTool(BaseTool):
                 "would be indistinguishable from genuinely missing coverage"
             )
 
-        try:
-            # Eastmoney's reportapi expects the bare numeric ``code`` together
-            # with a mandatory [beginTime, endTime] window in %Y%m%d form;
-            # omitting the window yields HTTP 400 ("Required String parameter
-            # 'beginTime' is not present"). Default window is the last two years.
-            payload = get_json(
-                _REPORT_LIST_URL,
-                params={
-                    "code": _bare_code(code),
-                    "beginTime": begin_time.strftime("%Y%m%d"),
-                    "endTime": end_time.strftime("%Y%m%d"),
-                    "qType": "0",
-                    "pageSize": str(limit),
-                    "pageNo": "1",
-                },
-            )
-        except Exception as exc:  # noqa: BLE001 - surface any fetch failure as envelope
-            return _error(f"eastmoney report list request failed: {exc}")
-
-        reports = _parse_reports(payload)
-
-        # Consensus EPS is best-effort: a THS outage must not sink the reports.
-        consensus_eps = _fetch_consensus_eps(code)
+        data = fetch_research_reports_data(
+            code,
+            limit=limit,
+            begin_time=begin_time,
+            end_time=end_time,
+        )
+        reports = data["reports"]
+        consensus_eps = data["consensus_eps"]
 
         if not reports and not consensus_eps:
             return _error(f"no research coverage found for '{code}'")
@@ -232,6 +217,68 @@ def _clamp_limit(value: Any) -> int:
     except (TypeError, ValueError, OverflowError):
         return _DEFAULT_LIMIT
     return max(1, min(n, _MAX_LIMIT))
+
+
+def fetch_research_reports_data(
+    code: str,
+    limit: int = _DEFAULT_LIMIT,
+    begin_time: datetime | None = None,
+    end_time: datetime | None = None,
+) -> dict[str, Any]:
+    """Fetch sell-side reports + consensus EPS for one A-share as plain dicts.
+
+    Code-level counterpart to :class:`ResearchReportsTool` for programmatic
+    consumers (e.g. the stock-tracker consensus loader). Assumes a valid A-share
+    symbol and returns ``{"reports": [...], "consensus_eps": [...]}`` (empty
+    lists, never raises) on any failure. The Eastmoney report list is the
+    primary feed; THS consensus EPS is best-effort.
+
+    Args:
+        code: A-share symbol (e.g. ``"600519.SH"``).
+        limit: Maximum number of most-recent reports to keep.
+        begin_time: Optional lower bound on report publish date (defaults to the
+            trailing two years).
+        end_time: Optional upper bound on report publish date (defaults to now).
+
+    Returns:
+        ``{"reports": [...], "consensus_eps": [...]}``; both lists empty when
+        the symbol is unresolvable or the request fails.
+    """
+    code = code.strip().upper()
+    if code.rpartition(".")[2] not in _A_SHARE_SUFFIXES:
+        return {"reports": [], "consensus_eps": []}
+    if resolve_secid(code) is None:
+        return {"reports": [], "consensus_eps": []}
+
+    limit = _clamp_limit(limit)
+    now = datetime.now()
+    if end_time is None:
+        end_time = now
+    if begin_time is None:
+        begin_time = now - timedelta(days=730)
+
+    try:
+        # Eastmoney's reportapi expects the bare numeric ``code`` together
+        # with a mandatory [beginTime, endTime] window in %Y%m%d form;
+        # omitting the window yields HTTP 400.
+        payload = get_json(
+            _REPORT_LIST_URL,
+            params={
+                "code": _bare_code(code),
+                "beginTime": begin_time.strftime("%Y%m%d"),
+                "endTime": end_time.strftime("%Y%m%d"),
+                "qType": "0",
+                "pageSize": str(limit),
+                "pageNo": "1",
+            },
+        )
+    except Exception as exc:  # noqa: BLE001 - degraded to empty lists
+        logger.warning("eastmoney report list fetch failed for %s: %s", code, exc)
+        return {"reports": [], "consensus_eps": []}
+
+    reports = _parse_reports(payload)
+    consensus_eps = _fetch_consensus_eps(code)
+    return {"reports": reports[:limit], "consensus_eps": consensus_eps}
 
 
 def _parse_reports(payload: Any) -> list[dict]:

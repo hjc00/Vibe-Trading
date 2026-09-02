@@ -9,17 +9,37 @@ import {
   getQualityToneClass,
 } from "@/lib/stockTracker";
 import { ChartCardHeader } from "./ChartCardHeader";
-import type { SectorPeriodMetric, SectorStrength } from "@/lib/api";
+import type { ConceptStrength, SectorPeriodMetric, SectorStrength } from "@/lib/api";
 
 interface SectorStrengthBoardProps {
   sectors: SectorStrength[] | undefined;
+  concepts?: ConceptStrength[] | undefined;
   tradingDate?: string | null;
 }
 
+type BoardTab = "industry" | "concept";
+
 const COLLAPSE_STORAGE_KEY = "stockTracker.sectorStrengthCollapsed";
+const TAB_STORAGE_KEY = "stockTracker.sectorStrengthTab";
 // Boards the watchlist holds are pinned to the top; the whole list is capped at
 // this many rows so the dashboard stays compact.
 const DISPLAY_LIMIT = 20;
+
+/** A unified row shape so the industry and concept tabs share one table. */
+interface BoardRow {
+  key: string;
+  boardName: string;
+  memberCount: number;
+  marketRank?: number | null;
+  changePct?: number | null;
+  fundFlowNet?: number | null;
+  upCount?: number | null;
+  downCount?: number | null;
+  leader?: string | null;
+  prosperityScore?: number | null;
+  limitUpCount?: number | null;
+  periodMetrics?: SectorPeriodMetric[];
+}
 
 function formatChangePct(value: number | null | undefined): string {
   if (value === undefined || value === null) return "—";
@@ -60,13 +80,20 @@ function PeriodTrendCell({ metrics }: { metrics: SectorPeriodMetric[] | undefine
   );
 }
 
-export function SectorStrengthBoard({ sectors, tradingDate }: SectorStrengthBoardProps) {
+export function SectorStrengthBoard({ sectors, concepts, tradingDate }: SectorStrengthBoardProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1";
     } catch {
       return false;
+    }
+  });
+  const [tab, setTab] = useState<BoardTab>(() => {
+    try {
+      return localStorage.getItem(TAB_STORAGE_KEY) === "concept" ? "concept" : "industry";
+    } catch {
+      return "industry";
     }
   });
   const toggleCollapsed = useCallback(() => {
@@ -80,117 +107,198 @@ export function SectorStrengthBoard({ sectors, tradingDate }: SectorStrengthBoar
       return next;
     });
   }, []);
+  const selectTab = useCallback((next: BoardTab) => {
+    setTab(next);
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, next);
+    } catch {
+      /* storage unavailable — keep the in-memory state only */
+    }
+  }, []);
 
-  const hasData = sectors !== undefined && sectors.length > 0;
+  const isIndustry = tab === "industry";
 
   // Pin the boards the watchlist holds to the top (in market-rank order), then
   // fill up to DISPLAY_LIMIT with the strongest remaining boards.
-  const visibleSectors = useMemo(() => {
-    if (!sectors || sectors.length === 0) return [];
-    const byRank = (a: SectorStrength, b: SectorStrength) =>
-      (a.market_rank ?? Number.POSITIVE_INFINITY) - (b.market_rank ?? Number.POSITIVE_INFINITY);
-    const mine = sectors.filter((s) => s.member_count > 0).sort(byRank);
-    const others = sectors.filter((s) => s.member_count === 0).sort(byRank);
+  const visibleRows = useMemo<BoardRow[]>(() => {
+    const raw = isIndustry ? (sectors ?? []) : (concepts ?? []);
+    const mapped: BoardRow[] = raw.map((s) => {
+      if (!isIndustry) {
+        const c = s as ConceptStrength;
+        return {
+          key: c.board_name,
+          boardName: c.board_name,
+          memberCount: c.member_count,
+          marketRank: c.market_rank,
+          changePct: c.change_pct,
+          fundFlowNet: c.fund_flow_net,
+          upCount: c.up_count,
+          downCount: c.down_count,
+          leader: c.leader,
+          limitUpCount: c.limit_up_count,
+        };
+      }
+      const sec = s as SectorStrength;
+      return {
+        key: sec.board_name,
+        boardName: sec.board_name,
+        memberCount: sec.member_count,
+        marketRank: sec.market_rank,
+        changePct: sec.change_pct,
+        fundFlowNet: sec.fund_flow_net,
+        upCount: sec.up_count,
+        downCount: sec.down_count,
+        leader: sec.leader,
+        prosperityScore: sec.prosperity_score,
+        periodMetrics: sec.period_metrics,
+      };
+    });
+    const byRank = (a: BoardRow, b: BoardRow) =>
+      (a.marketRank ?? Number.POSITIVE_INFINITY) - (b.marketRank ?? Number.POSITIVE_INFINITY);
+    const mine = mapped.filter((s) => s.memberCount > 0).sort(byRank);
+    const others = mapped.filter((s) => s.memberCount === 0).sort(byRank);
     return [...mine, ...others].slice(0, DISPLAY_LIMIT);
-  }, [sectors]);
+  }, [isIndustry, sectors, concepts]);
+
+  const hasData = visibleRows.length > 0;
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
       <ChartCardHeader
         title={t("stockTracker.sectorStrengthTitle")}
-        helpText={t("stockTracker.sectorStrengthExplanation")}
+        helpText={t(
+          isIndustry ? "stockTracker.sectorStrengthExplanation" : "stockTracker.conceptStrengthExplanation",
+        )}
         meta={t("stockTracker.dataDate", { date: formatDataDate(tradingDate) })}
         collapsed={collapsed}
         onToggle={toggleCollapsed}
       />
-      {!collapsed &&
-        (!hasData ? (
-          <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Layers className="h-8 w-8 opacity-40" />
-            <span className="text-xs">{t("stockTracker.sectorNoData")}</span>
+      {!collapsed && (
+        <>
+          <div className="mb-2 flex gap-1">
+            <button
+              type="button"
+              onClick={() => selectTab("industry")}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition",
+                isIndustry
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              )}
+            >
+              {t("stockTracker.sectorTabIndustry")}
+            </button>
+            <button
+              type="button"
+              onClick={() => selectTab("concept")}
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium transition",
+                !isIndustry
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              )}
+            >
+              {t("stockTracker.sectorTabConcept")}
+            </button>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-xs">
-              <thead>
-                <tr className="border-b border-border/60 text-left text-[10px] text-muted-foreground">
-                  <th className="py-2 pr-2 font-medium">{t("stockTracker.sectorRank")}</th>
-                  <th className="py-2 pr-2 font-medium">{t("stockTracker.sectorBoard")}</th>
-                  <th className="py-2 pr-2 text-right font-medium">
-                    {t("stockTracker.sectorChangePct")}
-                  </th>
-                  <th className="py-2 pr-2 text-right font-medium">
-                    {t("stockTracker.sectorTrend")}
-                  </th>
-                  <th className="py-2 pr-2 text-right font-medium">
-                    {t("stockTracker.sectorFundFlow")}
-                  </th>
-                  <th className="py-2 pr-2 text-center font-medium">
-                    {t("stockTracker.sectorUpDown")}
-                  </th>
-                  <th className="py-2 pr-2 text-right font-medium">
-                    {t("stockTracker.sectorProsperity")}
-                  </th>
-                  <th className="py-2 font-medium">{t("stockTracker.sectorLeader")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleSectors.map((sector) => {
-                  const inWatchlist = sector.member_count > 0;
-                  return (
-                    <tr
-                      key={sector.board_name}
-                      className={cn(
-                        "border-b border-border/40 last:border-0",
-                        inWatchlist && "bg-primary/5",
-                      )}
-                    >
-                      <td className="py-1.5 pr-2 font-mono tabular-nums text-muted-foreground">
-                        {sector.market_rank != null ? `#${sector.market_rank}` : "—"}
-                      </td>
-                      <td className="py-1.5 pr-2">
-                        <span className="font-medium">{sector.board_name}</span>
-                        {inWatchlist ? (
-                          <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                            {sector.member_count}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td
+          {!hasData ? (
+            <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-muted-foreground">
+              <Layers className="h-8 w-8 opacity-40" />
+              <span className="text-xs">{t("stockTracker.sectorNoData")}</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-border/60 text-left text-[10px] text-muted-foreground">
+                    <th className="py-2 pr-2 font-medium">{t("stockTracker.sectorRank")}</th>
+                    <th className="py-2 pr-2 font-medium">{t("stockTracker.sectorBoard")}</th>
+                    <th className="py-2 pr-2 text-right font-medium">
+                      {t("stockTracker.sectorChangePct")}
+                    </th>
+                    {isIndustry && (
+                      <th className="py-2 pr-2 text-right font-medium">
+                        {t("stockTracker.sectorTrend")}
+                      </th>
+                    )}
+                    <th className="py-2 pr-2 text-right font-medium">
+                      {t("stockTracker.sectorFundFlow")}
+                    </th>
+                    <th className="py-2 pr-2 text-center font-medium">
+                      {t("stockTracker.sectorUpDown")}
+                    </th>
+                    <th className="py-2 pr-2 text-right font-medium">
+                      {isIndustry
+                        ? t("stockTracker.sectorProsperity")
+                        : t("stockTracker.conceptLimitUpCount")}
+                    </th>
+                    <th className="py-2 font-medium">{t("stockTracker.sectorLeader")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map((row) => {
+                    const inWatchlist = row.memberCount > 0;
+                    return (
+                      <tr
+                        key={row.key}
                         className={cn(
-                          "py-1.5 pr-2 text-right font-mono tabular-nums",
-                          getChangeToneClass(sector.change_pct),
+                          "border-b border-border/40 last:border-0",
+                          inWatchlist && "bg-primary/5",
                         )}
                       >
-                        {formatChangePct(sector.change_pct)}
-                      </td>
-                      <td className="py-1.5 pr-2">
-                        <PeriodTrendCell metrics={sector.period_metrics} />
-                      </td>
-                      <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-muted-foreground">
-                        {formatCapitalAmount(sector.fund_flow_net)}
-                      </td>
-                      <td className="py-1.5 pr-2 text-center font-mono tabular-nums text-muted-foreground">
-                        {sector.up_count != null || sector.down_count != null
-                          ? `${sector.up_count ?? "—"}/${sector.down_count ?? "—"}`
-                          : "—"}
-                      </td>
-                      <td
-                        className={cn(
-                          "py-1.5 pr-2 text-right font-mono tabular-nums",
-                          getQualityToneClass(sector.prosperity_score),
+                        <td className="py-1.5 pr-2 font-mono tabular-nums text-muted-foreground">
+                          {row.marketRank != null ? `#${row.marketRank}` : "—"}
+                        </td>
+                        <td className="py-1.5 pr-2">
+                          <span className="font-medium">{row.boardName}</span>
+                          {inWatchlist ? (
+                            <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                              {row.memberCount}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td
+                          className={cn(
+                            "py-1.5 pr-2 text-right font-mono tabular-nums",
+                            getChangeToneClass(row.changePct),
+                          )}
+                        >
+                          {formatChangePct(row.changePct)}
+                        </td>
+                        {isIndustry && (
+                          <td className="py-1.5 pr-2">
+                            <PeriodTrendCell metrics={row.periodMetrics} />
+                          </td>
                         )}
-                      >
-                        {sector.prosperity_score != null ? sector.prosperity_score.toFixed(0) : "—"}
-                      </td>
-                      <td className="py-1.5 text-muted-foreground">{sector.leader ?? "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        ))}
+                        <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-muted-foreground">
+                          {formatCapitalAmount(row.fundFlowNet)}
+                        </td>
+                        <td className="py-1.5 pr-2 text-center font-mono tabular-nums text-muted-foreground">
+                          {row.upCount != null || row.downCount != null
+                            ? `${row.upCount ?? "—"}/${row.downCount ?? "—"}`
+                            : "—"}
+                        </td>
+                        <td className="py-1.5 pr-2 text-right font-mono tabular-nums">
+                          {isIndustry ? (
+                            <span className={getQualityToneClass(row.prosperityScore)}>
+                              {row.prosperityScore != null ? row.prosperityScore.toFixed(0) : "—"}
+                            </span>
+                          ) : (
+                            <span className="text-foreground">
+                              {row.limitUpCount != null ? row.limitUpCount : "—"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-1.5 text-muted-foreground">{row.leader ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -44,7 +44,9 @@ _ANALYSIS_DIRECTIVE = """\
 - 估值与质量：PE/PB 的 3 年分位（近 1 年分位为辅）、基本面质量评分、ROE 稳定性、现金流质量；
 - 风险：ATR 波动、最大回撤、Beta、距止损参考价的距离；
 - 事件日历：未来 90 天解禁、业绩预告、龙虎榜、股东增减持，及综合事件风险分；
-- 行业背景：所属行业景气度评分、板块强弱排名与资金流。
+- 行业背景：所属行业景气度评分、板块强弱排名与资金流；
+- 题材热度与市场情绪：所属概念热度评分、最热概念排名、市场情绪温度（涨停/炸板/连板）；
+- 预期与筹码：一致预期（评级分布、目标价、一致预期 EPS、forward PE）、筹码集中度（股东户数变化、北向/公募持仓）。
 
 不要套用一个固定模板，按每个标的实际的数据特点给出差异化判断；用 structured 的
 action 与价位区间把结论表达清楚，让报告可直接被跟踪验证。
@@ -232,6 +234,9 @@ def _serialize_symbol(symbol: SymbolSnapshot) -> Dict[str, Any]:
         "risk": _dump(symbol.risk),
         "valuation": _dump(symbol.valuation),
         "events": _dump(symbol.events),
+        "concept": _dump(symbol.concept),
+        "consensus": _dump(symbol.consensus),
+        "chip": _dump(symbol.chip),
         "sector_board": symbol.sector_board,
         "sector_strength_rank": symbol.sector_strength_rank,
         "diff": _dump(symbol.diff),
@@ -252,6 +257,20 @@ def _serialize_sector(sector: Any) -> Optional[Dict[str, Any]]:
         "avg_gross_margin": sector.avg_gross_margin,
         "avg_revenue_yoy": sector.avg_revenue_yoy,
         "members": sector.members,
+    }
+
+
+def _serialize_concept(concept: Any) -> Optional[Dict[str, Any]]:
+    """Project one concept strength record into a compact context dict."""
+    if concept is None:
+        return None
+    return {
+        "board_name": concept.board_name,
+        "change_pct": concept.change_pct,
+        "fund_flow_net": concept.fund_flow_net,
+        "limit_up_count": concept.limit_up_count,
+        "market_rank": concept.market_rank,
+        "members": concept.members,
     }
 
 
@@ -305,6 +324,14 @@ def build_analysis_prompt(
         "sectors": [
             _serialize_sector(s) for s in snapshot.sectors if s is not None
         ],
+        "concepts": [
+            _serialize_concept(c) for c in snapshot.concepts if c is not None
+        ],
+        "market_sentiment": (
+            snapshot.market_sentiment.model_dump(mode="json")
+            if snapshot.market_sentiment is not None
+            else None
+        ),
         "symbols": [_serialize_symbol(s) for s in symbols],
     }
     extra = f"\n用户补充指令：{user_prompt}" if user_prompt else ""

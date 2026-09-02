@@ -10,9 +10,20 @@ import pandas as pd
 
 from src.market_data import fetch_market_data
 from src.stock_tracker.capital_data import _FUND_FLOW_LOOKBACK, CapitalDataCache, load_capital_data
+from src.stock_tracker.chip_data import ChipDataCache, load_chip_data
+from src.stock_tracker.concept_data import load_concept_data
+from src.stock_tracker.consensus_data import (
+    ConsensusDataCache,
+    compute_forward_metrics,
+    load_consensus_data,
+)
 from src.stock_tracker.events_data import EventsDataCache, load_events_data
 from src.stock_tracker.models import (
     CapitalMetrics,
+    ChipSnapshot,
+    ConceptSnapshot,
+    ConceptStrength,
+    ConsensusSnapshot,
     CrossDayDiff,
     EventSnapshot,
     PeriodMetrics,
@@ -29,9 +40,10 @@ from src.stock_tracker.models import (
 from src.stock_tracker.names import fetch_a_share_names
 from src.stock_tracker.risk import compute_atr, compute_beta, compute_max_drawdown
 from src.stock_tracker.sector_data import load_sector_strength
+from src.stock_tracker.sentiment_data import fetch_market_breadth, load_market_sentiment
 from src.stock_tracker.signals import compute_mas, compute_rsi, get_detector, get_detector_meta
 from src.stock_tracker.valuation_data import ValuationDataCache, load_valuation_data
-from src.tools.sector_tool import resolve_industry_board
+from src.tools.sector_tool import resolve_concept_boards, resolve_industry_board
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +71,8 @@ class StockTrackerEngine:
         self._capital_cache = CapitalDataCache()
         self._valuation_cache = ValuationDataCache()
         self._events_cache = EventsDataCache()
+        self._chip_cache = ChipDataCache()
+        self._consensus_cache = ConsensusDataCache()
 
     def refresh(
         self,
@@ -149,6 +163,56 @@ class StockTrackerEngine:
         except Exception:  # noqa: BLE001
             logger.exception("Event data fetch failed")
 
+        # Fetch chip-concentration data (股东户数/北向/公募) with low-frequency
+        # caching; tolerate failure so a blocked source never breaks the refresh.
+        chip_data: Dict[str, ChipSnapshot] = {}
+        try:
+            chip_data = load_chip_data(
+                self.config.watchlist,
+                end_date=trading_date,
+                cache=self._chip_cache,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Chip data fetch failed")
+
+        # Fetch consensus estimates (研报评级/一致预期 EPS/目标价) with
+        # low-frequency caching; tolerate failure.
+        consensus_data: Dict[str, ConsensusSnapshot] = {}
+        try:
+            consensus_data = load_consensus_data(
+                self.config.watchlist,
+                end_date=trading_date,
+                cache=self._consensus_cache,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Consensus data fetch failed")
+
+        # Resolve concept boards, reusing the prior same-trading-day mapping so a
+        # repeat refresh skips the throttled Eastmoney membership calls.
+        concept_boards = self._resolve_concept_boards(previous, trading_date)
+
+        # Fetch the whole-market limit-up pool once and share it across market
+        # sentiment and concept heat (2.16 -> 2.15 zero extra requests).
+        try:
+            market_breadth = fetch_market_breadth()
+        except Exception:  # noqa: BLE001
+            logger.exception("Market breadth fetch failed")
+            market_breadth = {"source": "unavailable", "limit_up_rows": []}
+        market_sentiment = load_market_sentiment(market_breadth)
+
+        # Concept heat: reuse the prior same-day concept ranking, and the shared
+        # market breadth, so a repeat refresh skips both network fetches.
+        concepts: List[ConceptStrength] = []
+        concept_snapshots: Dict[str, ConceptSnapshot] = {}
+        try:
+            concepts, concept_snapshots = load_concept_data(
+                concept_boards,
+                ranking=self._cached_concept_ranking(previous, trading_date),
+                breadth=market_breadth,
+            )
+        except Exception:  # noqa: BLE001 - concept view must not break refresh
+            logger.exception("Concept data computation failed")
+
         symbol_snapshots: List[SymbolSnapshot] = []
         unresolved: List[str] = []
         data_gaps: List[Dict[str, Any]] = []
@@ -179,6 +243,9 @@ class StockTrackerEngine:
                     benchmark_df=benchmark_df,
                     valuation=valuation_data.get(code),
                     events=events_data.get(code),
+                    chip=chip_data.get(code),
+                    concept=concept_snapshots.get(code),
+                    consensus=consensus_data.get(code),
                 )
                 # Use the latest available trading date from actual data.
                 if snapshot.period_signals:
@@ -202,9 +269,12 @@ class StockTrackerEngine:
         rankings = self._compute_rankings(symbol_snapshots)
         diff_map = self._compute_diff_map(symbol_snapshots, previous)
 
-        # Attach diffs to snapshots.
+        # Attach diffs and close-derived consensus metrics (forward PE / upside)
+        # once the per-symbol close is known.
         for snapshot in symbol_snapshots:
             snapshot.diff = diff_map.get(snapshot.code)
+            if snapshot.consensus is not None:
+                compute_forward_metrics(snapshot.consensus, snapshot.close)
 
         return TrackerSnapshot(
             generated_at=datetime.now().astimezone(),
@@ -213,6 +283,8 @@ class StockTrackerEngine:
             symbols=symbol_snapshots,
             rankings=rankings,
             sectors=sectors,
+            concepts=concepts,
+            market_sentiment=market_sentiment,
             unresolved=unresolved,
             data_gaps=data_gaps,
         )
@@ -321,6 +393,12 @@ class StockTrackerEngine:
             events = symbol.events
             if events is not None and events.error is None:
                 self._events_cache.set(code, trading_date, events)
+            chip = symbol.chip
+            if chip is not None and chip.error is None:
+                self._chip_cache.set(code, trading_date, chip)
+            consensus = symbol.consensus
+            if consensus is not None and consensus.error is None:
+                self._consensus_cache.set(code, trading_date, consensus)
 
     def _resolve_sector_boards(
         self,
@@ -348,6 +426,33 @@ class StockTrackerEngine:
             except Exception:  # noqa: BLE001 — per-symbol failure degrades to None
                 logger.exception("Sector board resolution failed for %s", code)
                 boards[code] = None
+        return boards
+
+    def _resolve_concept_boards(
+        self,
+        previous: TrackerSnapshot | None,
+        trading_date: date,
+    ) -> Dict[str, List[str]]:
+        """Resolve each watchlist symbol's Eastmoney concept boards.
+
+        Reuses the prior snapshot's ``concept.boards`` when it was captured on
+        the same trading date, so a repeat refresh skips the throttled per-symbol
+        membership requests. Only symbols absent from the prior mapping are
+        resolved fresh; failures degrade to ``[]`` and are retried next refresh.
+        """
+        boards: Dict[str, List[str]] = {}
+        if previous is not None and previous.trading_date == trading_date:
+            for symbol in previous.symbols:
+                if symbol.concept is not None and symbol.concept.boards:
+                    boards[symbol.code] = symbol.concept.boards
+        for code in self.config.watchlist:
+            if code in boards:
+                continue
+            try:
+                boards[code] = resolve_concept_boards(code)
+            except Exception:  # noqa: BLE001 — per-symbol failure degrades to []
+                logger.exception("Concept board resolution failed for %s", code)
+                boards[code] = []
         return boards
 
     def _fetch_capital_data(
@@ -407,6 +512,9 @@ class StockTrackerEngine:
         benchmark_df: Optional[pd.DataFrame] = None,
         valuation: Optional[ValuationSnapshot] = None,
         events: Optional[EventSnapshot] = None,
+        chip: Optional[ChipSnapshot] = None,
+        concept: Optional[ConceptSnapshot] = None,
+        consensus: Optional[ConsensusSnapshot] = None,
     ) -> SymbolSnapshot:
         """Compute metrics, signals, risk measures, and summary for one symbol."""
         df = compute_mas(df)
@@ -445,6 +553,9 @@ class StockTrackerEngine:
             risk=risk,
             valuation=valuation,
             events=events,
+            chip=chip,
+            concept=concept,
+            consensus=consensus,
             period_signals=period_signals,
             sector_board=sector_board,
             sector_board_source="eastmoney" if sector_board else None,
@@ -677,6 +788,39 @@ class StockTrackerEngine:
                 "leader": sector.leader,
             }
             for sector in sorted(ranked, key=lambda s: s.market_rank)
+        ]
+
+    def _cached_concept_ranking(
+        self,
+        previous: TrackerSnapshot | None,
+        trading_date: date | None,
+    ) -> Optional[List[Dict[str, Any]]]:
+        """Reconstruct the whole-market concept ranking from the prior snapshot.
+
+        Only the network-fetched part (the Eastmoney ``clist`` concept ranking)
+        is frozen; watchlist membership is recomputed fresh. Returns ``None``
+        when there is nothing reusable so the caller refetches.
+        """
+        if previous is None or previous.trading_date != trading_date:
+            return None
+        ranked = [
+            concept
+            for concept in previous.concepts
+            if concept.source == "eastmoney" and concept.market_rank is not None
+        ]
+        if not ranked:
+            return None
+        return [
+            {
+                "board_code": concept.board_code,
+                "board_name": concept.board_name,
+                "change_pct": concept.change_pct,
+                "fund_flow_net": concept.fund_flow_net,
+                "up_count": concept.up_count,
+                "down_count": concept.down_count,
+                "leader": concept.leader,
+            }
+            for concept in sorted(ranked, key=lambda c: c.market_rank)
         ]
 
     def _compute_sector_strength(

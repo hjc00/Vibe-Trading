@@ -36,6 +36,50 @@ _MAX_PERIODS = 24
 _A_SHARE_SUFFIXES = ("SH", "SZ", "BJ")
 
 
+def fetch_shareholder_count(code: str, max_periods: int = _MAX_PERIODS) -> list[dict]:
+    """Fetch quarterly shareholder-count records for one A-share as plain dicts.
+
+    Code-level counterpart to :class:`ShareholderCountTool` for programmatic
+    consumers (e.g. the stock-tracker chip-concentration loader). Assumes a valid
+    A-share symbol and returns ``[]`` (never raises) on any failure.
+
+    Args:
+        code: A-share symbol (e.g. ``"600519.SH"``).
+        max_periods: Cap on the number of most-recent periods to return.
+
+    Returns:
+        A list of normalized period dicts (newest first) shaped
+        ``{end_date, holder_count, holder_count_change, holder_count_change_pct,
+        avg_hold_shares, avg_hold_amount, total_market_cap}``.
+    """
+    code = code.strip().upper()
+    if code.rpartition(".")[2] not in _A_SHARE_SUFFIXES:
+        return []
+    if resolve_secid(code) is None:
+        return []
+
+    limit = _clamp_periods(max_periods)
+    try:
+        payload = get_json(
+            _DATACENTER_URL,
+            params={
+                "reportName": _REPORT_NAME,
+                "columns": _COLUMNS,
+                "filter": f'(SECUCODE="{code}")',
+                "sortColumns": "END_DATE",
+                "sortTypes": "-1",
+                "pageNumber": "1",
+                "pageSize": str(limit),
+                "source": "WEB",
+                "client": "WEB",
+            },
+        )
+    except Exception:  # noqa: BLE001 - degraded to empty list
+        return []
+
+    return _parse_periods(payload)[:limit]
+
+
 class ShareholderCountTool(BaseTool):
     """Fetch A-share quarterly shareholder counts with QoQ change and avg holding."""
 
@@ -97,25 +141,7 @@ class ShareholderCountTool(BaseTool):
 
         limit = _clamp_periods(kwargs.get("max_periods", _MAX_PERIODS))
 
-        try:
-            payload = get_json(
-                _DATACENTER_URL,
-                params={
-                    "reportName": _REPORT_NAME,
-                    "columns": _COLUMNS,
-                    "filter": f'(SECUCODE="{code}")',
-                    "sortColumns": "END_DATE",
-                    "sortTypes": "-1",
-                    "pageNumber": "1",
-                    "pageSize": str(limit),
-                    "source": "WEB",
-                    "client": "WEB",
-                },
-            )
-        except Exception as exc:  # noqa: BLE001 - surface any fetch failure as envelope
-            return _error(f"eastmoney datacenter request failed: {exc}")
-
-        periods = _parse_periods(payload)
+        periods = fetch_shareholder_count(code, max_periods=limit)
         if not periods:
             return _error(f"no shareholder-count disclosure found for '{code}'")
 

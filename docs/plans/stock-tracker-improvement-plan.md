@@ -2,7 +2,7 @@
 
 > 本文档用于跟踪 A 股多周期股票追踪器（`stock_tracker`）的后续优化方向。
 > 创建时间：2026-09-01
-> 最后更新：2026-09-02（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.9 事件日历、2.10 AI 分析结构化升级）
+> 最后更新：2026-09-03（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.9 事件日历、2.10 AI 分析结构化升级、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度）
 
 ## 一、现状概述
 
@@ -16,7 +16,7 @@
 - 基于快照的 LLM 量化分析报告
 - 配置、快照、分析报告的本地持久化
 
-**核心短板**：信号维度偏技术面单一，缺少资金面、基本面、风险控制和横向比较能力；多周期分析停留在「同一信号重复计算」，未形成共振/背离判断；信号触发后缺少绩效验证。
+**核心短板（2026-09-02 更新）**：资金面 / 基本面 / 风险 / 横向比较已补齐；当前缺口是**题材热度与市场情绪面**（「炒作预期」的直接构成）以及**一致预期与筹码集中度**（中长线择时的领先指标，低频口径与日频维度不同）。另多周期共振（2.4）与信号绩效验证（2.7）仍未落地。
 
 ---
 
@@ -128,6 +128,70 @@
 
 ---
 
+### P1.5 —— 题材、情绪、预期与筹码（炒作预期 + 中长线择时）
+
+> 前置背景：P0–P1 已补齐技术面 / 资金面 / 基本面 / 事件面，但「炒作预期」与「中长线择时」所需的两类信息仍缺——题材热度与市场情绪（高频），以及一致预期与筹码集中度（低频，数据口径与缓存策略与日频维度不同）。本节补齐，编号延续 2.15–2.18。
+
+#### 2.15 题材 / 概念热度
+- **目标**：识别个股所属概念板块、概念热度排名与概念内涨停家数，回答「这只票挂没挂进当前主线、离风口有多远」。
+- **投资人价值**：A 股炒作按「概念」而非「行业」展开；中长线需分辨「有产业逻辑的题材」与「纯情绪脉冲」，避免买入蹭概念的边缘股。
+- **涉及模块**：`src/tools/sector_tool.py`（新增 `resolve_concept_boards` / `fetch_concept_board_ranking`）、新增 `src/stock_tracker/concept_data.py`、`models.py`、`engine.py`、前端 `ConceptHeatCard.tsx`、表格「概念」列、`SectorStrengthBoard.tsx` 加「行业|概念」tab。
+- **大致方案**：
+  1. `resolve_concept_boards(code)`：复用 `slist` `spt=3`（已返回行业+概念混合列表），拆出概念类行返回概念板块名列表。
+  2. `fetch_concept_board_ranking(limit)`：复用 `clist`，`fs=m:90+t:3`（概念板块口径），返回涨幅 / 主力净流入 / 涨跌家数 / 龙头。
+  3. 新增 `ConceptSnapshot`（挂 `SymbolSnapshot.concept`）与 `ConceptBoardStrength`（挂 `TrackerSnapshot.concepts`），含 `hottest_concept`、`hottest_concept_rank`、`concept_heat_score`、`limit_up_count`。
+  4. 热度评分：`0.40×概念涨幅分位 + 0.30×主力净流入分位 + 0.30×概念内涨停家数分位`（缺维重归一化，仿 `_PROSPERITY_WEIGHTS`）；涨停家数复用 2.16 全市场涨停池聚合，零额外请求。
+  5. 前端：概念 chips（最热着色）+ 最热概念排名 + 热度分；表格加「概念」列；`SectorStrengthBoard` 加「行业|概念」tab（概念榜表头「景气度」换「涨停家数」）。
+- **验收标准**：
+  - 每个 symbol 展示所属概念与最热概念排名。
+  - 新增「概念热度」榜单，概念榜覆盖东财概念板块。
+  - 热度评分规则可解释、有单测。
+
+#### 2.16 市场情绪温度计
+- **目标**：产出全市场涨停 / 跌停 / 炸板 / 连板高度 / 涨跌家数等情绪指标，合成 0–100 情绪温度，回答「当前是进场还是退潮时点」。
+- **投资人价值**：情绪温度到顶（高炸板率、连板断板）正是中长线应避开「炒作退潮」的时刻，是择时避雷的关键。
+- **涉及模块**：新增 `src/stock_tracker/sentiment_data.py`、`models.py`（`MarketSentimentSnapshot`）、`engine.py`、前端 `MarketSentimentBar.tsx`。
+- **大致方案**：
+  1. 新增 `MarketSentimentSnapshot`（挂 `TrackerSnapshot.market_sentiment`）：`limit_up_count` / `limit_down_count` / `broken_board_count` / `broken_ratio` / `max_board_height` / `board_ladder` / `up_count` / `down_count` / `prev_limit_up_perf` / `sentiment_score`。
+  2. 数据源：东财涨停池（`push2ex` getTopicZTPool，半开放）为主源，Tushare `limit_list_d` 与打板专题「涨停连板天梯」兜底（复用 `tushare_fallbacks`，token 缺失自动降级）。
+  3. 情绪评分：`0.30×涨停家数分位(相对近20日) + 0.25×(1−炸板率) + 0.25×连板高度分位 + 0.20×昨日涨停溢价分位`，全部相对近 20 日分位。
+  4. 前端：全宽情绪温度条（冰点/偏冷/中性/偏热/过热五档，蓝→灰→红渐变）+ 关键分项。
+- **验收标准**：
+  - 快照含市场情绪字段，涨停/连板数据来源稳定或有降级。
+  - 情绪温度分档规则可解释、有单测。
+  - 前端展示温度条与关键分项。
+
+#### 2.17 盈利预期 / 一致预期
+- **目标**：引入机构一致预期 EPS、目标价、评级分布与盈利预测修正，回答「当前 PE 是真贵还是假贵」。
+- **投资人价值**：中长线收益 = 预期差；`forward_pe` 对比历史 PE 分位能区分「估值高但利润将爆发」与「真泡沫」。
+- **涉及模块**：新增 `src/stock_tracker/consensus_data.py`、`models.py`（`ConsensusSnapshot`）、`engine.py`、前端 `ConsensusCard.tsx`。
+- **大致方案**：
+  1. 新增 `ConsensusSnapshot`（挂 `SymbolSnapshot.consensus`）：`analyst_count` / `consensus_eps_cur` / `consensus_eps_next` / `forward_pe` / `target_price_avg` / `upside_pct` / `rating_distribution` / `rating_score` / `eps_revision_pct`。
+  2. 数据源：东财研报（datacenter 券商研报，no-auth）为主源，Tushare `report_rc`（需 120+ 积分、试用每天 10 次）兜底。
+  3. 派生「预期差」：`forward_pe` vs 历史 PE 分位并排展示；`eps_revision_pct` 上/下修着色。
+  4. 前端 `ConsensusCard`：目标价区间条（现价 marker）+ 覆盖机构 + 评级分布 + 预期 PE vs 历史分位。
+- **验收标准**：
+  - 一致预期字段展示正确，目标价空间计算有单测。
+  - 东财失败时 Tushare 兜底、无 token/积分时降级为 `None` 不影响主流程。
+  - LLM 分析注入一致预期字段。
+
+#### 2.18 筹码集中度 / 机构动向
+- **目标**：引入股东户数变化、户均持股、北向/公募持仓变动，合成筹码集中度评分，回答「谁在买、主力吸够没有」。
+- **投资人价值**：股东户数下降（吸筹）是中长线最领先的指标之一，比价格早 1–2 个季度。
+- **涉及模块**：`src/tools/shareholder_count_tool.py`（拆出代码级 `fetch_shareholder_count`）、新增 `src/stock_tracker/chip_data.py`、`models.py`（`ChipSnapshot`）、`engine.py`、前端 `ChipCard.tsx`。
+- **大致方案**：
+  1. 新增 `ChipSnapshot`（挂 `SymbolSnapshot.chip`）：`holder_count` / `holder_count_change_pct` / `holder_trend` / `avg_hold_amount` / `northbound_holding_ratio` / `fund_holding_ratio` / `chip_concentration_score`。
+  2. 数据源：股东户数复用现有 `shareholder_count_tool`（东财 `RPT_HOLDERNUMLATEST`，拆出代码级函数）；北向个股持股 Tushare `hk_hold`（历史/季度口径）；公募持仓 Tushare `fund_portfolio`（季度，滞后 15–45 天，仅辅助）。
+  3. 评分：`0.40×股东户数下降分位 + 0.30×户均持股上升分位 + 0.30×(北向/公募增持分位)`；`holder_trend` 连续 2 期下降判「吸筹」。
+  4. 低频缓存：股东户数/基金持仓季度级，新增 `ChipDataCache`（TTL 7 天）与 `ConsensusDataCache`（TTL 1 天），与现有日频 `ValuationDataCache` 分离。
+  5. 前端 `ChipCard`：股东户数 mini 折线（下降绿/上升红）+ 北向/公募持仓 + 集中度进度条。
+- **验收标准**：
+  - 股东户数/北向/公募数据展示正确，环比符号清晰。
+  - 集中度评分规则可解释、有单测。
+  - 低频缓存命中时跳过网络，避免撞东财/Tushare 节流与积分墙。
+
+---
+
 ### P2 —— 风险控制与交易闭环（建议 2–3 个月内启动）
 
 #### 2.8 组合风险检查
@@ -188,6 +252,7 @@
 2. **第二阶段（3–4 周）**：落地 2.4 多周期共振评分 + 2.5 行业强度 + 2.6 估值指标。
 3. **第三阶段（4–6 周）**：落地 2.7 信号绩效追踪 + 2.8 组合风险检查 + 2.9 事件日历 + 2.10 AI 分析升级。
 4. **第四阶段（持续）**：按需推进 P3 基础设施项。
+5. **第五阶段（4–6 周，炒作预期 + 中长线择时）**：先 2.18 筹码集中度（股东户数数据现成，成本最低）与 2.15 概念热度（纯东财、零 token、最稳）；再 2.16 市场情绪温度计（依赖涨停数据源稳定性）；最后 2.17 一致预期（受 `report_rc` 积分门槛，先以东财研报为主源跑通）。
 
 ---
 
@@ -209,14 +274,18 @@
 | 2.12 | 预警通知系统 | 待开始 | - | - | - | |
 | 2.13 | 多 watchlist / 组合管理 | 待开始 | - | - | - | |
 | 2.14 | 每日复盘报告导出 | 待开始 | - | - | - | |
+| 2.15 | 题材/概念热度 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `concept_data.py`（概念榜 `clist fs=m:90+t:3` + watchlist 概念归属，`ConceptStrength` + `ConceptSnapshot`）；热度分 = 0.40×涨幅分位 + 0.30×主力净流入分位 + 0.30×涨停家数分位（缺维重归一化），涨停家数复用 2.16 市场涨停池；前端 `ConceptHeatCard` + `SectorStrengthBoard` 加「行业|概念」tab（概念 tab 以涨停家数替代景气度） |
+| 2.16 | 市场情绪温度计 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `sentiment_data.py`（东财 `push2ex getTopicZTPool` 主源 + tushare `limit_list_d`/`limit_step` 兜底，token 缺失静默降级）；温度分 0–100（涨停家数/炸板率/连板高度/昨日涨停溢价 0.30/0.25/0.25/0.20，固定参考刻度近似近 20 日分位）；前端 `MarketSentimentBar` 全宽温度条 |
+| 2.17 | 盈利预期/一致预期 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `consensus_data.py`（东财研报主源 + THS 一致预期 + tushare `report_rc` 目标价/EPS 修正兜底）；`ConsensusDataCache` TTL 1 天；forward PE/上行空间由 engine 拿 close 后回填；前端 `ConsensusCard` |
+| 2.18 | 筹码集中度/机构动向 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `chip_data.py`（东财股东户数主源 + 北向 `hk_hold`/公募 `fund_portfolio` tushare 兜底）；`ChipDataCache` TTL 7 天；集中度分 0–100（户数下降/户均上升/机构增持 0.40/0.30/0.30）；前端 `ChipCard` |
 
 ---
 
 ## 五、相关文件
 
-- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`events_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`、`track_record.py`
+- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`events_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`、`track_record.py`（规划中：`concept_data.py`、`sentiment_data.py`、`consensus_data.py`、`chip_data.py`）
 - API 路由：`agent/src/api/stock_tracker_routes.py`
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`EventTimelineCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`、`TrackerAnalyzePanel.tsx`、`TrackerAnalysisReport.tsx`、`TrackerTrackRecord.tsx`
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`EventTimelineCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`、`TrackerAnalyzePanel.tsx`、`TrackerAnalysisReport.tsx`、`TrackerTrackRecord.tsx`（规划中：`ConceptHeatCard.tsx`、`MarketSentimentBar.tsx`、`ConsensusCard.tsx`、`ChipCard.tsx`）
 - 前端库：`frontend/src/lib/stockTracker.ts`（含 action/status tone 与 label key 助手）、`frontend/src/lib/api.ts`（分析/预测类型）
 - 项目索引：`docs/PROJECT_INDEX.md`

@@ -18,6 +18,10 @@ import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
 import { EventTimelineCard } from "@/components/stock-tracker/EventTimelineCard";
+import { ConceptHeatCard } from "@/components/stock-tracker/ConceptHeatCard";
+import { ConsensusCard } from "@/components/stock-tracker/ConsensusCard";
+import { ChipCard } from "@/components/stock-tracker/ChipCard";
+import { MarketSentimentBar } from "@/components/stock-tracker/MarketSentimentBar";
 import { SectorStrengthBoard } from "@/components/stock-tracker/SectorStrengthBoard";
 import { TrackerTrackRecord } from "@/components/stock-tracker/TrackerTrackRecord";
 
@@ -32,6 +36,9 @@ const DETAIL_CARD_COMPONENTS = [
   RiskMetricsCard,
   ValuationCard,
   EventTimelineCard,
+  ConceptHeatCard,
+  ConsensusCard,
+  ChipCard,
 ] as const;
 
 export function StockTracker() {
@@ -289,7 +296,7 @@ export function StockTracker() {
         signals: [],
         thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 },
         refresh_interval_seconds: 10,
-        detail_card_count: 6,
+        detail_card_count: 9,
       },
     [config],
   );
@@ -360,6 +367,8 @@ export function StockTracker() {
               </section>
             ) : (
               <section className="flex flex-col gap-4">
+                <MarketSentimentBar sentiment={snapshot.market_sentiment} />
+
                 <TrackerTable
                   symbols={snapshot.symbols}
                   periods={config?.periods ?? []}
@@ -378,6 +387,7 @@ export function StockTracker() {
 
                 <SectorStrengthBoard
                   sectors={snapshot.sectors}
+                  concepts={snapshot.concepts}
                   tradingDate={snapshot.trading_date}
                 />
 

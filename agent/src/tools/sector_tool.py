@@ -48,6 +48,10 @@ _INDUSTRY_FIELDS = "f12,f13,f14"
 # t:2 = industry board sub-type). Sort by f3 (change percent), descending.
 _RANKING_FS = "m:90+t:2"
 
+# Concept-board universe selector (t:3 = concept board sub-type). Same clist
+# endpoint and field mapping as the industry ranking, only the sub-type differs.
+_RANKING_FS_CONCEPT = "m:90+t:3"
+
 # Defensive caps so a payload can never blow up the LLM context.
 _MAX_RANKING = 100
 _DEFAULT_RANKING = 30
@@ -160,19 +164,20 @@ def _diff_rows(payload: Any) -> list:
     return []
 
 
-def _fetch_membership(code: str) -> str:
-    """Fetch the industry / concept boards one stock belongs to.
+def _fetch_membership_boards(code: str) -> list[dict[str, Any]]:
+    """Fetch the industry / concept boards one stock belongs to as plain dicts.
 
     Args:
         code: Vibe-Trading A-share symbol (e.g. ``"600519.SH"``).
 
     Returns:
-        A JSON envelope string with the resolved boards, or an error envelope
-        when the symbol is unresolvable or the request fails.
+        A list of ``{board_code, board_name, change_pct, price}`` dicts, or
+        ``[]`` when the symbol is unresolvable or the request fails. Never
+        raises.
     """
     secid = resolve_secid(code)
     if secid is None:
-        return _error(f"unresolvable symbol: {code}")
+        return []
 
     try:
         payload = get_json(
@@ -187,15 +192,32 @@ def _fetch_membership(code: str) -> str:
                 "po": "1",
             },
         )
-    except Exception as exc:  # noqa: BLE001 - surface a clean error envelope
+    except Exception as exc:  # noqa: BLE001 - a failed lookup degrades to []
         logger.warning("sector membership fetch failed for %s: %s", code, exc)
-        return _error(f"membership request failed: {exc}")
+        return []
 
-    boards = [
+    return [
         parsed
         for parsed in (_parse_membership_row(r) for r in _diff_rows(payload))
         if parsed is not None
     ]
+
+
+def _fetch_membership(code: str) -> str:
+    """Fetch the industry / concept boards one stock belongs to.
+
+    Args:
+        code: Vibe-Trading A-share symbol (e.g. ``"600519.SH"``).
+
+    Returns:
+        A JSON envelope string with the resolved boards, or an error envelope
+        when the symbol is unresolvable or the request fails.
+    """
+    secid = resolve_secid(code)
+    if secid is None:
+        return _error(f"unresolvable symbol: {code}")
+
+    boards = _fetch_membership_boards(code)
     envelope = {
         "ok": True,
         "market": "stock",
@@ -257,6 +279,40 @@ def resolve_industry_board(code: str) -> str | None:
     return None
 
 
+def resolve_concept_boards(code: str) -> list[str]:
+    """Resolve the Eastmoney concept-board (概念板块) names for an A-share.
+
+    The ``slist`` ``spt=3`` membership view mixes the stock's single industry
+    board with its concept boards. Subtracting the industry board (resolved via
+    :func:`resolve_industry_board`) leaves the concept-board names.
+
+    Args:
+        code: Vibe-Trading symbol (e.g. ``"600519.SH"``).
+
+    Returns:
+        The list of concept-board names, or ``[]`` when the symbol is not an
+        A-share, is unresolvable, or the request fails. Never raises.
+    """
+    if _detect_market(code) != "a_share":
+        return []
+
+    industry = resolve_industry_board(code)
+    boards = _fetch_membership_boards(code)
+
+    names: list[str] = []
+    for board in boards:
+        name = board.get("board_name")
+        if not name:
+            continue
+        name = str(name)
+        # Drop the industry board so only concept boards remain. When the
+        # industry board could not be resolved, keep every board (a mild
+        # over-inclusion, still useful, and never worse than an empty list).
+        if industry is None or name != industry:
+            names.append(name)
+    return names
+
+
 def fetch_industry_board_ranking(limit: int) -> list[dict[str, Any]]:
     """Fetch the top ``limit`` industry boards ranked by percent change.
 
@@ -272,11 +328,42 @@ def fetch_industry_board_ranking(limit: int) -> list[dict[str, Any]]:
     Returns:
         The ranked board dicts, most positive first, or ``[]`` on failure.
     """
+    return _fetch_board_ranking(limit, _RANKING_FS)
+
+
+def fetch_concept_board_ranking(limit: int) -> list[dict[str, Any]]:
+    """Fetch the top ``limit`` concept boards (概念板块) ranked by percent change.
+
+    Identical to :func:`fetch_industry_board_ranking` but over the concept-board
+    universe (``fs=m:90+t:3``). Returns ``[]`` (never raises) on failure.
+
+    Args:
+        limit: Number of top boards to keep.
+
+    Returns:
+        The ranked concept-board dicts, most positive first, or ``[]``.
+    """
+    return _fetch_board_ranking(limit, _RANKING_FS_CONCEPT)
+
+
+def _fetch_board_ranking(limit: int, fs: str) -> list[dict[str, Any]]:
+    """Fetch the top ``limit`` boards of one sub-type ranked by change percent.
+
+    Shared implementation for the industry (``t:2``) and concept (``t:3``)
+    ranking views over the same ``clist`` endpoint and field mapping.
+
+    Args:
+        limit: Number of top boards to keep.
+        fs: Eastmoney board-universe selector (e.g. ``"m:90+t:2"``).
+
+    Returns:
+        The ranked board dicts, most positive first, or ``[]`` on failure.
+    """
     try:
         payload = get_json(
             _RANKING_URL,
             params={
-                "fs": _RANKING_FS,
+                "fs": fs,
                 "fields": _RANKING_FIELDS,
                 "pn": "1",
                 "pz": str(limit),
@@ -286,7 +373,7 @@ def fetch_industry_board_ranking(limit: int) -> list[dict[str, Any]]:
             },
         )
     except Exception as exc:  # noqa: BLE001 - degraded to empty list
-        logger.warning("sector ranking fetch failed: %s", exc)
+        logger.warning("board ranking fetch failed (fs=%s): %s", fs, exc)
         return []
 
     boards = [
