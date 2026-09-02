@@ -1,0 +1,2595 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "generated_at": "2026-09-02T19:41:54.394161+08:00",
+    "trading_date": "2026-09-02",
+    "config": {
+      "watchlist": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "periods": [
+        5,
+        10,
+        20,
+        60
+      ],
+      "signals": [
+        "volume_spike",
+        "ma_alignment",
+        "rsi",
+        "margin_expansion",
+        "breakout",
+        "main_force_inflow",
+        "net_inflow_spike"
+      ],
+      "thresholds": {
+        "volume_spike": 1.0,
+        "rsi_overbought": 70.0,
+        "rsi_oversold": 30.0,
+        "breakout_window": 20,
+        "atr_period": 14,
+        "max_drawdown_window": 60,
+        "beta_window": 60,
+        "stop_loss_atr_multiple": 2.0
+      },
+      "refresh_interval_seconds": 600,
+      "detail_card_count": 5
+    },
+    "symbols": [
+      {
+        "code": "603228.SH",
+        "name": "景旺电子",
+        "market": "a_share",
+        "close": 88.81,
+        "prev_close": 89.3,
+        "daily_return": -0.005487,
+        "volume": 228076.0,
+        "avg_volume_20": 465185.7,
+        "currency": "CNY",
+        "period_signals": {
+          "5": {
+            "metrics": {
+              "period": 5,
+              "start_date": "2026-08-27",
+              "end_date": "2026-09-02",
+              "sessions": 5,
+              "return_pct": -0.081972,
+              "annualized_volatility": 0.681768,
+              "volume_ratio": 0.996,
+              "rsi": 50.34,
+              "price_vs_ma20": -0.04763,
+              "ma5": 93.04799999999999,
+              "ma10": 92.212,
+              "ma20": 93.2515,
+              "ma60": 79.6615,
+              "rps_market": 0.0,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.017779
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.623,
+                "threshold": 1.0,
+                "description": "Volume 0.62x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.16804,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 39.17,
+                "threshold": null,
+                "description": "RSI 39.2"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.02546,
+                "threshold": 0.03,
+                "description": "Financing balance -2.55% over 5 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.463,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.0,
+                "threshold": 3.0,
+                "description": "Main-force inflow 0 consecutive days, below 3"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.12,
+                "threshold": 2.0,
+                "description": "Main-force net 0.12x average, below 2.0x threshold"
+              }
+            }
+          },
+          "10": {
+            "metrics": {
+              "period": 10,
+              "start_date": "2026-08-20",
+              "end_date": "2026-09-02",
+              "sessions": 10,
+              "return_pct": -0.004595,
+              "annualized_volatility": 0.748609,
+              "volume_ratio": 0.574,
+              "rsi": 50.34,
+              "price_vs_ma20": -0.04763,
+              "ma5": 93.04799999999999,
+              "ma10": 92.212,
+              "ma20": 93.2515,
+              "ma60": 79.6615,
+              "rps_market": 66.67,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.009752
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.649,
+                "threshold": 1.0,
+                "description": "Volume 0.65x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.16804,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 39.17,
+                "threshold": null,
+                "description": "RSI 39.2"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.04721,
+                "threshold": 0.03,
+                "description": "Financing balance -4.72% over 10 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.463,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.0,
+                "threshold": 3.0,
+                "description": "Main-force inflow 0 consecutive days, below 3"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.12,
+                "threshold": 2.0,
+                "description": "Main-force net 0.12x average, below 2.0x threshold"
+              }
+            }
+          },
+          "20": {
+            "metrics": {
+              "period": 20,
+              "start_date": "2026-08-06",
+              "end_date": "2026-09-02",
+              "sessions": 20,
+              "return_pct": 0.028846,
+              "annualized_volatility": 0.863113,
+              "volume_ratio": 0.91,
+              "rsi": 50.34,
+              "price_vs_ma20": -0.04763,
+              "ma5": 93.04799999999999,
+              "ma10": 92.212,
+              "ma20": 93.2515,
+              "ma60": 79.6615,
+              "rps_market": 100.0,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.02222
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.477,
+                "threshold": 1.0,
+                "description": "Volume 0.48x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.16804,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 39.17,
+                "threshold": null,
+                "description": "RSI 39.2"
+              },
+              "margin_expansion": {
+                "triggered": true,
+                "state": "strong",
+                "value": 0.28369,
+                "threshold": 0.03,
+                "description": "Financing balance +28.37% over 20 session(s) (>= 3.00%)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.463,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.0,
+                "threshold": 3.0,
+                "description": "Main-force inflow 0 consecutive days, below 3"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.12,
+                "threshold": 2.0,
+                "description": "Main-force net 0.12x average, below 2.0x threshold"
+              }
+            }
+          },
+          "60": {
+            "metrics": {
+              "period": 60,
+              "start_date": "2026-06-10",
+              "end_date": "2026-09-02",
+              "sessions": 60,
+              "return_pct": 0.178789,
+              "annualized_volatility": 0.886563,
+              "volume_ratio": null,
+              "rsi": 50.34,
+              "price_vs_ma20": -0.04763,
+              "ma5": 93.04799999999999,
+              "ma10": 92.212,
+              "ma20": 93.2515,
+              "ma60": 79.6615,
+              "rps_market": 66.67,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.04225
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.492,
+                "threshold": 1.0,
+                "description": "Volume 0.49x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.16804,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 39.17,
+                "threshold": null,
+                "description": "RSI 39.2"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.03874,
+                "threshold": 0.03,
+                "description": "Financing balance -3.87% over 60 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.463,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.0,
+                "threshold": 3.0,
+                "description": "Main-force inflow 0 consecutive days, below 3"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.12,
+                "threshold": 2.0,
+                "description": "Main-force net 0.12x average, below 2.0x threshold"
+              }
+            }
+          }
+        },
+        "capital": {
+          "fund_flow": {
+            "trade_date": "2026-09-02",
+            "main_net": -39736022.0,
+            "main_net_ratio": null,
+            "main_5d_net": -226435014.0,
+            "super_large_net": -16656326.0,
+            "large_net": -23079696.0,
+            "medium_net": 94076320.0,
+            "small_net": -54340288.0,
+            "history": [
+              {
+                "trade_date": "2026-07-23",
+                "main_net": -228401936.0,
+                "super_large_net": -122610208.0,
+                "large_net": -105791728.0,
+                "medium_net": 114077392.0,
+                "small_net": 114324544.0
+              },
+              {
+                "trade_date": "2026-07-24",
+                "main_net": -46411584.0,
+                "super_large_net": -17710144.0,
+                "large_net": -28701440.0,
+                "medium_net": -46067920.0,
+                "small_net": 92479488.0
+              },
+              {
+                "trade_date": "2026-07-27",
+                "main_net": 585772480.0,
+                "super_large_net": 623617920.0,
+                "large_net": -37845440.0,
+                "medium_net": -383739392.0,
+                "small_net": -202033088.0
+              },
+              {
+                "trade_date": "2026-07-28",
+                "main_net": -377061424.0,
+                "super_large_net": -336407936.0,
+                "large_net": -40653488.0,
+                "medium_net": 56875264.0,
+                "small_net": 320186176.0
+              },
+              {
+                "trade_date": "2026-07-29",
+                "main_net": 50013456.0,
+                "super_large_net": -30043968.0,
+                "large_net": 80057424.0,
+                "medium_net": -70096608.0,
+                "small_net": 20083168.0
+              },
+              {
+                "trade_date": "2026-07-30",
+                "main_net": -423591104.0,
+                "super_large_net": -162952368.0,
+                "large_net": -260638736.0,
+                "medium_net": 84081792.0,
+                "small_net": 339509312.0
+              },
+              {
+                "trade_date": "2026-07-31",
+                "main_net": 309849328.0,
+                "super_large_net": 539241360.0,
+                "large_net": -229392032.0,
+                "medium_net": -283066336.0,
+                "small_net": -26782992.0
+              },
+              {
+                "trade_date": "2026-08-03",
+                "main_net": 99538704.0,
+                "super_large_net": -109730496.0,
+                "large_net": 209269200.0,
+                "medium_net": 6219120.0,
+                "small_net": -105757824.0
+              },
+              {
+                "trade_date": "2026-08-04",
+                "main_net": 318658080.0,
+                "super_large_net": 238877792.0,
+                "large_net": 79780288.0,
+                "medium_net": -88950816.0,
+                "small_net": -229707280.0
+              },
+              {
+                "trade_date": "2026-08-05",
+                "main_net": -356723728.0,
+                "super_large_net": -222936304.0,
+                "large_net": -133787424.0,
+                "medium_net": 101444624.0,
+                "small_net": 255279104.0
+              },
+              {
+                "trade_date": "2026-08-06",
+                "main_net": 1046794448.0,
+                "super_large_net": 1368066656.0,
+                "large_net": -321272208.0,
+                "medium_net": -704648720.0,
+                "small_net": -342145733.0
+              },
+              {
+                "trade_date": "2026-08-07",
+                "main_net": 373754656.0,
+                "super_large_net": 619930352.0,
+                "large_net": -246175696.0,
+                "medium_net": -282143678.0,
+                "small_net": -91610977.0
+              },
+              {
+                "trade_date": "2026-08-10",
+                "main_net": -968442496.0,
+                "super_large_net": -598755856.0,
+                "large_net": -369686640.0,
+                "medium_net": 139869584.0,
+                "small_net": 828572928.0
+              },
+              {
+                "trade_date": "2026-08-11",
+                "main_net": -493942048.0,
+                "super_large_net": -318885520.0,
+                "large_net": -175056528.0,
+                "medium_net": 238756448.0,
+                "small_net": 255185600.0
+              },
+              {
+                "trade_date": "2026-08-12",
+                "main_net": 715577424.0,
+                "super_large_net": 438678688.0,
+                "large_net": 276898736.0,
+                "medium_net": -226036320.0,
+                "small_net": -489541104.0
+              },
+              {
+                "trade_date": "2026-08-13",
+                "main_net": -642986288.0,
+                "super_large_net": -413934800.0,
+                "large_net": -229051488.0,
+                "medium_net": 80742240.0,
+                "small_net": 562244048.0
+              },
+              {
+                "trade_date": "2026-08-14",
+                "main_net": -84389456.0,
+                "super_large_net": 81190656.0,
+                "large_net": -165580112.0,
+                "medium_net": -15536912.0,
+                "small_net": 99926368.0
+              },
+              {
+                "trade_date": "2026-08-17",
+                "main_net": -127289296.0,
+                "super_large_net": -197767104.0,
+                "large_net": 70477808.0,
+                "medium_net": -45134144.0,
+                "small_net": 172423440.0
+              },
+              {
+                "trade_date": "2026-08-18",
+                "main_net": 142572752.0,
+                "super_large_net": -41903008.0,
+                "large_net": 184475760.0,
+                "medium_net": -113525552.0,
+                "small_net": -29047200.0
+              },
+              {
+                "trade_date": "2026-08-19",
+                "main_net": -258199136.0,
+                "super_large_net": -209879232.0,
+                "large_net": -48319904.0,
+                "medium_net": 83913504.0,
+                "small_net": 174285600.0
+              },
+              {
+                "trade_date": "2026-08-20",
+                "main_net": 120541888.0,
+                "super_large_net": 166790928.0,
+                "large_net": -46249040.0,
+                "medium_net": -53160880.0,
+                "small_net": -67381008.0
+              },
+              {
+                "trade_date": "2026-08-21",
+                "main_net": 233933456.0,
+                "super_large_net": 189866112.0,
+                "large_net": 44067344.0,
+                "medium_net": -229817184.0,
+                "small_net": -4116256.0
+              },
+              {
+                "trade_date": "2026-08-24",
+                "main_net": -139050320.0,
+                "super_large_net": -37390432.0,
+                "large_net": -101659888.0,
+                "medium_net": -30901824.0,
+                "small_net": 169952128.0
+              },
+              {
+                "trade_date": "2026-08-25",
+                "main_net": 49463467.0,
+                "super_large_net": 68957915.0,
+                "large_net": -19494448.0,
+                "medium_net": -22212096.0,
+                "small_net": -27251376.0
+              },
+              {
+                "trade_date": "2026-08-26",
+                "main_net": 112329728.0,
+                "super_large_net": 97482464.0,
+                "large_net": 14847264.0,
+                "medium_net": 60245312.0,
+                "small_net": -172575056.0
+              },
+              {
+                "trade_date": "2026-08-27",
+                "main_net": 384142672.0,
+                "super_large_net": 286828336.0,
+                "large_net": 97314336.0,
+                "medium_net": -304551008.0,
+                "small_net": -79591680.0
+              },
+              {
+                "trade_date": "2026-08-28",
+                "main_net": -201431536.0,
+                "super_large_net": -117054656.0,
+                "large_net": -84376880.0,
+                "medium_net": -10417600.0,
+                "small_net": 211849120.0
+              },
+              {
+                "trade_date": "2026-08-31",
+                "main_net": 42283008.0,
+                "super_large_net": -4356016.0,
+                "large_net": 46639024.0,
+                "medium_net": -111603552.0,
+                "small_net": 69320528.0
+              },
+              {
+                "trade_date": "2026-09-01",
+                "main_net": -411693136.0,
+                "super_large_net": -181728080.0,
+                "large_net": -229965056.0,
+                "medium_net": 138704000.0,
+                "small_net": 272989136.0
+              },
+              {
+                "trade_date": "2026-09-02",
+                "main_net": -39736022.0,
+                "super_large_net": -16656326.0,
+                "large_net": -23079696.0,
+                "medium_net": 94076320.0,
+                "small_net": -54340288.0
+              }
+            ]
+          },
+          "margin": {
+            "trade_date": "2026-09-01",
+            "financing_balance": 2452920700.0,
+            "financing_balance_change": -39384116.0,
+            "margin_total_balance": 2458501950.0,
+            "margin_total_change": -39833491.0,
+            "history": [
+              {
+                "trade_date": "2026-09-01",
+                "financing_balance": 2452920700.0,
+                "margin_total_balance": 2458501950.0
+              },
+              {
+                "trade_date": "2026-08-31",
+                "financing_balance": 2492304816.0,
+                "margin_total_balance": 2498335441.0
+              },
+              {
+                "trade_date": "2026-08-28",
+                "financing_balance": 2538986511.0,
+                "margin_total_balance": 2546029011.0
+              },
+              {
+                "trade_date": "2026-08-27",
+                "financing_balance": 2511233563.0,
+                "margin_total_balance": 2519175917.0
+              },
+              {
+                "trade_date": "2026-08-26",
+                "financing_balance": 2539167836.0,
+                "margin_total_balance": 2542746791.0
+              },
+              {
+                "trade_date": "2026-08-25",
+                "financing_balance": 2517001861.0,
+                "margin_total_balance": 2519942130.0
+              },
+              {
+                "trade_date": "2026-08-24",
+                "financing_balance": 2510159671.0,
+                "margin_total_balance": 2512808067.0
+              },
+              {
+                "trade_date": "2026-08-21",
+                "financing_balance": 2543585927.0,
+                "margin_total_balance": 2548590159.6
+              },
+              {
+                "trade_date": "2026-08-20",
+                "financing_balance": 2614316758.0,
+                "margin_total_balance": 2622851989.3
+              },
+              {
+                "trade_date": "2026-08-19",
+                "financing_balance": 2665986578.0,
+                "margin_total_balance": 2674397999.15
+              },
+              {
+                "trade_date": "2026-08-18",
+                "financing_balance": 2574461125.0,
+                "margin_total_balance": 2583425338.5
+              },
+              {
+                "trade_date": "2026-08-17",
+                "financing_balance": 2585143592.0,
+                "margin_total_balance": 2593834820.45
+              },
+              {
+                "trade_date": "2026-08-14",
+                "financing_balance": 2644202383.0,
+                "margin_total_balance": 2650657811.65
+              },
+              {
+                "trade_date": "2026-08-13",
+                "financing_balance": 2590192310.0,
+                "margin_total_balance": 2596458308.0
+              },
+              {
+                "trade_date": "2026-08-12",
+                "financing_balance": 2530989806.0,
+                "margin_total_balance": 2537291450.65
+              },
+              {
+                "trade_date": "2026-08-11",
+                "financing_balance": 2322416629.0,
+                "margin_total_balance": 2328020288.2
+              },
+              {
+                "trade_date": "2026-08-10",
+                "financing_balance": 2320026086.0,
+                "margin_total_balance": 2326022726.0
+              },
+              {
+                "trade_date": "2026-08-07",
+                "financing_balance": 2398224886.0,
+                "margin_total_balance": 2407164333.55
+              },
+              {
+                "trade_date": "2026-08-06",
+                "financing_balance": 2025458085.0,
+                "margin_total_balance": 2033740402.68
+              },
+              {
+                "trade_date": "2026-08-05",
+                "financing_balance": 2062485473.0,
+                "margin_total_balance": 2070014591.03
+              },
+              {
+                "trade_date": "2026-08-04",
+                "financing_balance": 1910842914.0,
+                "margin_total_balance": 1918510834.0
+              },
+              {
+                "trade_date": "2026-08-03",
+                "financing_balance": 1840352081.0,
+                "margin_total_balance": 1847516793.75
+              },
+              {
+                "trade_date": "2026-07-31",
+                "financing_balance": 1975484917.0,
+                "margin_total_balance": 1982453139.3
+              },
+              {
+                "trade_date": "2026-07-30",
+                "financing_balance": 1963173419.0,
+                "margin_total_balance": 1969847276.71
+              },
+              {
+                "trade_date": "2026-07-29",
+                "financing_balance": 2041627001.0,
+                "margin_total_balance": 2048808687.68
+              },
+              {
+                "trade_date": "2026-07-28",
+                "financing_balance": 2114124313.0,
+                "margin_total_balance": 2120805153.25
+              },
+              {
+                "trade_date": "2026-07-27",
+                "financing_balance": 2144251518.0,
+                "margin_total_balance": 2151010389.9
+              },
+              {
+                "trade_date": "2026-07-24",
+                "financing_balance": 2062140803.0,
+                "margin_total_balance": 2068240472.0
+              },
+              {
+                "trade_date": "2026-07-23",
+                "financing_balance": 2087889064.0,
+                "margin_total_balance": 2094092220.35
+              },
+              {
+                "trade_date": "2026-07-22",
+                "financing_balance": 2187931151.0,
+                "margin_total_balance": 2194578998.7
+              },
+              {
+                "trade_date": "2026-07-21",
+                "financing_balance": 2128796856.0,
+                "margin_total_balance": 2135013282.9
+              },
+              {
+                "trade_date": "2026-07-20",
+                "financing_balance": 1998728270.0,
+                "margin_total_balance": 2004843117.0
+              },
+              {
+                "trade_date": "2026-07-17",
+                "financing_balance": 2038372697.0,
+                "margin_total_balance": 2045392127.0
+              },
+              {
+                "trade_date": "2026-07-16",
+                "financing_balance": 2454619745.0,
+                "margin_total_balance": 2461819088.0
+              },
+              {
+                "trade_date": "2026-07-15",
+                "financing_balance": 2626676678.0,
+                "margin_total_balance": 2633037938.0
+              },
+              {
+                "trade_date": "2026-07-14",
+                "financing_balance": 2640194386.0,
+                "margin_total_balance": 2647140946.0
+              },
+              {
+                "trade_date": "2026-07-13",
+                "financing_balance": 2628909404.0,
+                "margin_total_balance": 2635157380.0
+              },
+              {
+                "trade_date": "2026-07-10",
+                "financing_balance": 2642224621.0,
+                "margin_total_balance": 2649033481.0
+              },
+              {
+                "trade_date": "2026-07-09",
+                "financing_balance": 2680383020.0,
+                "margin_total_balance": 2687167070.0
+              },
+              {
+                "trade_date": "2026-07-08",
+                "financing_balance": 2676525031.0,
+                "margin_total_balance": 2682818781.0
+              },
+              {
+                "trade_date": "2026-07-07",
+                "financing_balance": 2696823697.0,
+                "margin_total_balance": 2703431415.0
+              },
+              {
+                "trade_date": "2026-07-06",
+                "financing_balance": 2675380316.0,
+                "margin_total_balance": 2686184448.0
+              },
+              {
+                "trade_date": "2026-07-03",
+                "financing_balance": 2719528860.0,
+                "margin_total_balance": 2731324743.0
+              },
+              {
+                "trade_date": "2026-07-02",
+                "financing_balance": 2779255762.0,
+                "margin_total_balance": 2790451726.0
+              },
+              {
+                "trade_date": "2026-07-01",
+                "financing_balance": 2819899940.0,
+                "margin_total_balance": 2826448100.0
+              },
+              {
+                "trade_date": "2026-06-30",
+                "financing_balance": 2824057444.0,
+                "margin_total_balance": 2830733646.0
+              },
+              {
+                "trade_date": "2026-06-29",
+                "financing_balance": 2828775352.0,
+                "margin_total_balance": 2835846981.0
+              },
+              {
+                "trade_date": "2026-06-26",
+                "financing_balance": 2835274617.0,
+                "margin_total_balance": 2842494039.0
+              },
+              {
+                "trade_date": "2026-06-25",
+                "financing_balance": 2894545252.0,
+                "margin_total_balance": 2902463512.0
+              },
+              {
+                "trade_date": "2026-06-24",
+                "financing_balance": 2934338072.0,
+                "margin_total_balance": 2942007152.0
+              },
+              {
+                "trade_date": "2026-06-23",
+                "financing_balance": 2961654120.0,
+                "margin_total_balance": 2969154408.0
+              },
+              {
+                "trade_date": "2026-06-22",
+                "financing_balance": 2885474299.0,
+                "margin_total_balance": 2894067697.0
+              },
+              {
+                "trade_date": "2026-06-18",
+                "financing_balance": 2624862378.0,
+                "margin_total_balance": 2629977264.0
+              },
+              {
+                "trade_date": "2026-06-17",
+                "financing_balance": 2644819741.0,
+                "margin_total_balance": 2649931849.0
+              },
+              {
+                "trade_date": "2026-06-16",
+                "financing_balance": 2601557363.0,
+                "margin_total_balance": 2605511753.0
+              },
+              {
+                "trade_date": "2026-06-15",
+                "financing_balance": 2459894215.0,
+                "margin_total_balance": 2463804631.0
+              },
+              {
+                "trade_date": "2026-06-12",
+                "financing_balance": 2517430983.0,
+                "margin_total_balance": 2529225375.6
+              },
+              {
+                "trade_date": "2026-06-11",
+                "financing_balance": 2475325876.0,
+                "margin_total_balance": 2478869222.8
+              },
+              {
+                "trade_date": "2026-06-10",
+                "financing_balance": 2545622361.0,
+                "margin_total_balance": 2549739390.64
+              },
+              {
+                "trade_date": "2026-06-09",
+                "financing_balance": 2573603521.0,
+                "margin_total_balance": 2577137911.66
+              },
+              {
+                "trade_date": "2026-06-08",
+                "financing_balance": 2551786257.0,
+                "margin_total_balance": 2561668225.0
+              }
+            ]
+          },
+          "fund_flow_source": "eastmoney",
+          "margin_source": "eastmoney",
+          "fund_flow_error": null,
+          "margin_error": null
+        },
+        "risk": {
+          "atr_14": 6.7329,
+          "atr_pct": 0.075812,
+          "max_drawdown_60d": -0.228966,
+          "beta_vs_index": 1.7086,
+          "beta_window": 60,
+          "benchmark_code": "000300.SH",
+          "stop_loss_price": 75.344,
+          "stop_loss_atr_multiple": 2.0
+        },
+        "valuation": {
+          "trade_date": "2026-09-02",
+          "pe_ttm": 75.16666408,
+          "pb": 6.74127609,
+          "ps_ttm": 5.28548672,
+          "pcf_ocf_ttm": 54.7988299,
+          "peg": 13.975525132073,
+          "dividend_yield": null,
+          "total_market_cap": 88924850601.77,
+          "pe_percentile_3y": 97.2,
+          "pe_percentile_1y": 91.6,
+          "pb_percentile_3y": 97.73,
+          "pb_percentile_1y": 93.2,
+          "roe": 4.55,
+          "roe_mean_5y": 7.43,
+          "roe_std_5y": 3.73,
+          "gross_margin": 20.2229981612,
+          "gross_margin_std_5y": 1.72,
+          "net_margin": 7.0934240542,
+          "net_profit_yoy": -7.379569626912,
+          "revenue_yoy": 21.370723423655,
+          "operating_cashflow_to_net_profit": 1.005,
+          "debt_to_assets": 51.1605772124,
+          "fundamental_quality_score": 42.95,
+          "source": "eastmoney",
+          "error": null
+        },
+        "events": {
+          "as_of": "2026-09-02",
+          "items": [
+            {
+              "event_type": "dragon_tiger",
+              "event_date": "2026-09-01",
+              "title": "净卖出",
+              "summary": "景旺电子 龙虎榜有价格涨跌幅限制的日收盘价格跌幅偏离值达到7%的前五只证券",
+              "risk_level": "warning",
+              "risk_score": 50.0,
+              "days_until": -1,
+              "source": "eastmoney",
+              "details": {
+                "code_bare": "603228",
+                "net_buy": -329403938.96,
+                "reason": "有价格涨跌幅限制的日收盘价格跌幅偏离值达到7%的前五只证券",
+                "change_pct": -7.4515
+              }
+            }
+          ],
+          "event_risk_score": 50.0,
+          "high_risk_count": 0,
+          "source": "eastmoney",
+          "error": null
+        },
+        "diff": {
+          "signal_count": {
+            "prev": 3,
+            "curr": 1
+          },
+          "return_pct": 0.069028,
+          "rank_return_10": null,
+          "rank_change_10": null,
+          "new_signals": [],
+          "cleared_signals": [
+            "volume_spike"
+          ]
+        },
+        "sector_board": "元件",
+        "sector_board_source": "eastmoney",
+        "sector_strength_rank": null,
+        "error": null
+      },
+      {
+        "code": "000938.SZ",
+        "name": "紫光股份",
+        "market": "a_share",
+        "close": 37.99,
+        "prev_close": 38.32,
+        "daily_return": -0.008612,
+        "volume": 1369865.0,
+        "avg_volume_20": 2206253.15,
+        "currency": "CNY",
+        "period_signals": {
+          "5": {
+            "metrics": {
+              "period": 5,
+              "start_date": "2026-08-27",
+              "end_date": "2026-09-02",
+              "sessions": 5,
+              "return_pct": 0.042822,
+              "annualized_volatility": 0.783277,
+              "volume_ratio": 1.341,
+              "rsi": 53.38,
+              "price_vs_ma20": 0.01674,
+              "ma5": 37.516000000000005,
+              "ma10": 36.417,
+              "ma20": 37.3645,
+              "ma60": 34.50866666666666,
+              "rps_market": 100.0,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.017779
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.719,
+                "threshold": 1.0,
+                "description": "Volume 0.72x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.08715,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 49.57,
+                "threshold": null,
+                "description": "RSI 49.6"
+              },
+              "margin_expansion": {
+                "triggered": true,
+                "state": "strong",
+                "value": 0.07116,
+                "threshold": 0.03,
+                "description": "Financing balance +7.12% over 5 session(s) (>= 3.00%)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.524,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          },
+          "10": {
+            "metrics": {
+              "period": 10,
+              "start_date": "2026-08-20",
+              "end_date": "2026-09-02",
+              "sessions": 10,
+              "return_pct": 0.065339,
+              "annualized_volatility": 0.637261,
+              "volume_ratio": 0.552,
+              "rsi": 53.38,
+              "price_vs_ma20": 0.01674,
+              "ma5": 37.516000000000005,
+              "ma10": 36.417,
+              "ma20": 37.3645,
+              "ma60": 34.50866666666666,
+              "rps_market": 100.0,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.009752
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.861,
+                "threshold": 1.0,
+                "description": "Volume 0.86x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.08715,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 49.57,
+                "threshold": null,
+                "description": "RSI 49.6"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.08673,
+                "threshold": 0.03,
+                "description": "Financing balance -8.67% over 10 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.524,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          },
+          "20": {
+            "metrics": {
+              "period": 20,
+              "start_date": "2026-08-06",
+              "end_date": "2026-09-02",
+              "sessions": 20,
+              "return_pct": 0.001318,
+              "annualized_volatility": 0.66256,
+              "volume_ratio": 0.538,
+              "rsi": 53.38,
+              "price_vs_ma20": 0.01674,
+              "ma5": 37.516000000000005,
+              "ma10": 36.417,
+              "ma20": 37.3645,
+              "ma60": 34.50866666666666,
+              "rps_market": 33.33,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.02222
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.609,
+                "threshold": 1.0,
+                "description": "Volume 0.61x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.08715,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 49.57,
+                "threshold": null,
+                "description": "RSI 49.6"
+              },
+              "margin_expansion": {
+                "triggered": true,
+                "state": "triggered",
+                "value": 0.04452,
+                "threshold": 0.03,
+                "description": "Financing balance +4.45% over 20 session(s) (>= 3.00%)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.524,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          },
+          "60": {
+            "metrics": {
+              "period": 60,
+              "start_date": "2026-06-10",
+              "end_date": "2026-09-02",
+              "sessions": 60,
+              "return_pct": 0.469348,
+              "annualized_volatility": 0.838947,
+              "volume_ratio": null,
+              "rsi": 53.38,
+              "price_vs_ma20": 0.01674,
+              "ma5": 37.516000000000005,
+              "ma10": 36.417,
+              "ma20": 37.3645,
+              "ma60": 34.50866666666666,
+              "rps_market": 100.0,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.04225
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.496,
+                "threshold": 1.0,
+                "description": "Volume 0.50x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.08715,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 49.57,
+                "threshold": null,
+                "description": "RSI 49.6"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.01619,
+                "threshold": 0.03,
+                "description": "Financing balance -1.62% over 60 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.524,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          }
+        },
+        "capital": {
+          "fund_flow": {
+            "trade_date": null,
+            "main_net": null,
+            "main_net_ratio": null,
+            "main_5d_net": null,
+            "super_large_net": null,
+            "large_net": null,
+            "medium_net": null,
+            "small_net": null,
+            "history": []
+          },
+          "margin": {
+            "trade_date": "2026-09-01",
+            "financing_balance": 4550813423.0,
+            "financing_balance_change": -20300255.0,
+            "margin_total_balance": 4562451207.0,
+            "margin_total_change": -23775071.0,
+            "history": [
+              {
+                "trade_date": "2026-09-01",
+                "financing_balance": 4550813423.0,
+                "margin_total_balance": 4562451207.0
+              },
+              {
+                "trade_date": "2026-08-31",
+                "financing_balance": 4571113678.0,
+                "margin_total_balance": 4586226278.0
+              },
+              {
+                "trade_date": "2026-08-28",
+                "financing_balance": 4398385117.0,
+                "margin_total_balance": 4409848383.0
+              },
+              {
+                "trade_date": "2026-08-27",
+                "financing_balance": 4355379006.0,
+                "margin_total_balance": 4366971032.0
+              },
+              {
+                "trade_date": "2026-08-26",
+                "financing_balance": 4263859724.0,
+                "margin_total_balance": 4275240614.0
+              },
+              {
+                "trade_date": "2026-08-25",
+                "financing_balance": 4248493580.0,
+                "margin_total_balance": 4258974440.0
+              },
+              {
+                "trade_date": "2026-08-24",
+                "financing_balance": 4262689794.0,
+                "margin_total_balance": 4273485164.0
+              },
+              {
+                "trade_date": "2026-08-21",
+                "financing_balance": 4376630009.0,
+                "margin_total_balance": 4389416805.0
+              },
+              {
+                "trade_date": "2026-08-20",
+                "financing_balance": 4563747968.0,
+                "margin_total_balance": 4576521380.0
+              },
+              {
+                "trade_date": "2026-08-19",
+                "financing_balance": 4547766863.0,
+                "margin_total_balance": 4559620078.0
+              },
+              {
+                "trade_date": "2026-08-18",
+                "financing_balance": 4982980291.0,
+                "margin_total_balance": 4996545091.0
+              },
+              {
+                "trade_date": "2026-08-17",
+                "financing_balance": 4979204400.0,
+                "margin_total_balance": 4994697328.0
+              },
+              {
+                "trade_date": "2026-08-14",
+                "financing_balance": 4734714265.0,
+                "margin_total_balance": 4749583655.0
+              },
+              {
+                "trade_date": "2026-08-13",
+                "financing_balance": 4622209433.0,
+                "margin_total_balance": 4637142593.0
+              },
+              {
+                "trade_date": "2026-08-12",
+                "financing_balance": 4685077369.0,
+                "margin_total_balance": 4698082869.0
+              },
+              {
+                "trade_date": "2026-08-11",
+                "financing_balance": 4641168544.0,
+                "margin_total_balance": 4654670073.0
+              },
+              {
+                "trade_date": "2026-08-10",
+                "financing_balance": 4402622551.0,
+                "margin_total_balance": 4416778957.0
+              },
+              {
+                "trade_date": "2026-08-07",
+                "financing_balance": 4384524170.0,
+                "margin_total_balance": 4398527170.0
+              },
+              {
+                "trade_date": "2026-08-06",
+                "financing_balance": 4207002126.0,
+                "margin_total_balance": 4220061074.0
+              },
+              {
+                "trade_date": "2026-08-05",
+                "financing_balance": 4425002227.0,
+                "margin_total_balance": 4439512259.0
+              },
+              {
+                "trade_date": "2026-08-04",
+                "financing_balance": 4356831429.0,
+                "margin_total_balance": 4368157029.0
+              },
+              {
+                "trade_date": "2026-08-03",
+                "financing_balance": 4338590893.0,
+                "margin_total_balance": 4348458003.0
+              },
+              {
+                "trade_date": "2026-07-31",
+                "financing_balance": 4392282968.0,
+                "margin_total_balance": 4403566394.0
+              },
+              {
+                "trade_date": "2026-07-30",
+                "financing_balance": 4641972953.0,
+                "margin_total_balance": 4651834553.0
+              },
+              {
+                "trade_date": "2026-07-29",
+                "financing_balance": 4737628281.0,
+                "margin_total_balance": 4749267775.0
+              },
+              {
+                "trade_date": "2026-07-28",
+                "financing_balance": 4968396700.0,
+                "margin_total_balance": 4981048100.0
+              },
+              {
+                "trade_date": "2026-07-27",
+                "financing_balance": 5009340961.0,
+                "margin_total_balance": 5022358518.0
+              },
+              {
+                "trade_date": "2026-07-24",
+                "financing_balance": 4971230468.0,
+                "margin_total_balance": 4984030228.0
+              },
+              {
+                "trade_date": "2026-07-23",
+                "financing_balance": 4960545467.0,
+                "margin_total_balance": 4974027587.0
+              },
+              {
+                "trade_date": "2026-07-22",
+                "financing_balance": 4918354417.0,
+                "margin_total_balance": 4932870587.0
+              },
+              {
+                "trade_date": "2026-07-21",
+                "financing_balance": 5041003253.0,
+                "margin_total_balance": 5054407271.0
+              },
+              {
+                "trade_date": "2026-07-20",
+                "financing_balance": 4750757402.0,
+                "margin_total_balance": 4763398628.0
+              },
+              {
+                "trade_date": "2026-07-17",
+                "financing_balance": 4160178911.0,
+                "margin_total_balance": 4171237835.0
+              },
+              {
+                "trade_date": "2026-07-16",
+                "financing_balance": 4848430797.0,
+                "margin_total_balance": 4860841341.0
+              },
+              {
+                "trade_date": "2026-07-15",
+                "financing_balance": 4599279450.0,
+                "margin_total_balance": 4610965267.0
+              },
+              {
+                "trade_date": "2026-07-14",
+                "financing_balance": 4512878917.0,
+                "margin_total_balance": 4524157817.0
+              },
+              {
+                "trade_date": "2026-07-13",
+                "financing_balance": 4486370360.0,
+                "margin_total_balance": 4497940280.0
+              },
+              {
+                "trade_date": "2026-07-10",
+                "financing_balance": 4485934554.0,
+                "margin_total_balance": 4498364030.0
+              },
+              {
+                "trade_date": "2026-07-09",
+                "financing_balance": 4387402696.0,
+                "margin_total_balance": 4397717784.0
+              },
+              {
+                "trade_date": "2026-07-08",
+                "financing_balance": 4264114334.0,
+                "margin_total_balance": 4274126370.0
+              },
+              {
+                "trade_date": "2026-07-07",
+                "financing_balance": 4378108442.0,
+                "margin_total_balance": 4385185146.0
+              },
+              {
+                "trade_date": "2026-07-06",
+                "financing_balance": 4246415183.0,
+                "margin_total_balance": 4255918526.0
+              },
+              {
+                "trade_date": "2026-07-03",
+                "financing_balance": 4226312870.0,
+                "margin_total_balance": 4233643658.0
+              },
+              {
+                "trade_date": "2026-07-02",
+                "financing_balance": 4333277204.0,
+                "margin_total_balance": 4340157314.0
+              },
+              {
+                "trade_date": "2026-07-01",
+                "financing_balance": 4274554694.0,
+                "margin_total_balance": 4282171879.0
+              },
+              {
+                "trade_date": "2026-06-30",
+                "financing_balance": 4325059810.0,
+                "margin_total_balance": 4332032386.0
+              },
+              {
+                "trade_date": "2026-06-29",
+                "financing_balance": 4397953315.0,
+                "margin_total_balance": 4404581539.0
+              },
+              {
+                "trade_date": "2026-06-26",
+                "financing_balance": 4478286290.0,
+                "margin_total_balance": 4484447900.0
+              },
+              {
+                "trade_date": "2026-06-25",
+                "financing_balance": 4490988094.0,
+                "margin_total_balance": 4497936575.0
+              },
+              {
+                "trade_date": "2026-06-24",
+                "financing_balance": 4358169134.0,
+                "margin_total_balance": 4363474322.0
+              },
+              {
+                "trade_date": "2026-06-23",
+                "financing_balance": 4352673262.0,
+                "margin_total_balance": 4357619320.0
+              },
+              {
+                "trade_date": "2026-06-22",
+                "financing_balance": 4403805341.0,
+                "margin_total_balance": 4409029138.0
+              },
+              {
+                "trade_date": "2026-06-18",
+                "financing_balance": 4394626188.0,
+                "margin_total_balance": 4399855413.0
+              },
+              {
+                "trade_date": "2026-06-17",
+                "financing_balance": 4455972558.0,
+                "margin_total_balance": 4462176438.0
+              },
+              {
+                "trade_date": "2026-06-16",
+                "financing_balance": 4439762950.0,
+                "margin_total_balance": 4445108238.0
+              },
+              {
+                "trade_date": "2026-06-15",
+                "financing_balance": 4451899957.0,
+                "margin_total_balance": 4457648765.0
+              },
+              {
+                "trade_date": "2026-06-12",
+                "financing_balance": 4428894768.0,
+                "margin_total_balance": 4434616393.0
+              },
+              {
+                "trade_date": "2026-06-11",
+                "financing_balance": 4521443965.0,
+                "margin_total_balance": 4527616690.0
+              },
+              {
+                "trade_date": "2026-06-10",
+                "financing_balance": 4547133904.0,
+                "margin_total_balance": 4552424176.0
+              },
+              {
+                "trade_date": "2026-06-09",
+                "financing_balance": 4568867237.0,
+                "margin_total_balance": 4575121935.0
+              },
+              {
+                "trade_date": "2026-06-08",
+                "financing_balance": 4625719329.0,
+                "margin_total_balance": 4630235442.0
+              }
+            ]
+          },
+          "fund_flow_source": "unavailable",
+          "margin_source": "eastmoney",
+          "fund_flow_error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+          "margin_error": null
+        },
+        "risk": {
+          "atr_14": 2.2809,
+          "atr_pct": 0.060038,
+          "max_drawdown_60d": -0.262806,
+          "beta_vs_index": 1.6369,
+          "beta_window": 60,
+          "benchmark_code": "000300.SH",
+          "stop_loss_price": 33.428,
+          "stop_loss_atr_multiple": 2.0
+        },
+        "valuation": {
+          "trade_date": "2026-09-02",
+          "pe_ttm": 38.64534081,
+          "pb": 6.08020898,
+          "ps_ttm": 0.96291233,
+          "pcf_ocf_ttm": 51.88821877,
+          "peg": 4.446232469826,
+          "dividend_yield": null,
+          "total_market_cap": 108654434413.26,
+          "pe_percentile_3y": 55.73,
+          "pe_percentile_1y": 9.2,
+          "pb_percentile_3y": 92.13,
+          "pb_percentile_1y": 90.4,
+          "roe": 13.32,
+          "roe_mean_5y": 5.54,
+          "roe_std_5y": 3.29,
+          "gross_margin": 13.4056966831,
+          "gross_margin_std_5y": 2.89,
+          "net_margin": 3.9469856337,
+          "net_profit_yoy": 108.182144610531,
+          "revenue_yoy": 33.929615071212,
+          "operating_cashflow_to_net_profit": -1.942,
+          "debt_to_assets": 81.7900487711,
+          "fundamental_quality_score": 38.93,
+          "source": "eastmoney",
+          "error": null
+        },
+        "events": {
+          "as_of": "2026-09-02",
+          "items": [],
+          "event_risk_score": null,
+          "high_risk_count": 0,
+          "source": "unavailable",
+          "error": "事件源不可用（业绩预告/增减持未获取，且无解禁/龙虎榜数据）"
+        },
+        "diff": {
+          "signal_count": {
+            "prev": 4,
+            "curr": 2
+          },
+          "return_pct": 0.007563,
+          "rank_return_10": null,
+          "rank_change_10": null,
+          "new_signals": [],
+          "cleared_signals": [
+            "volume_spike"
+          ]
+        },
+        "sector_board": "IT服务Ⅱ",
+        "sector_board_source": "eastmoney",
+        "sector_strength_rank": null,
+        "error": null
+      },
+      {
+        "code": "603986.SH",
+        "name": "兆易创新",
+        "market": "a_share",
+        "close": 388.86,
+        "prev_close": 393.0,
+        "daily_return": -0.010534,
+        "volume": 209513.0,
+        "avg_volume_20": 457446.05,
+        "currency": "CNY",
+        "period_signals": {
+          "5": {
+            "metrics": {
+              "period": 5,
+              "start_date": "2026-08-27",
+              "end_date": "2026-09-02",
+              "sessions": 5,
+              "return_pct": -0.054329,
+              "annualized_volatility": 0.425442,
+              "volume_ratio": 0.842,
+              "rsi": 42.85,
+              "price_vs_ma20": -0.04045,
+              "ma5": 399.17600000000004,
+              "ma10": 397.81100000000004,
+              "ma20": 405.254,
+              "ma60": 505.69899999999996,
+              "rps_market": 33.33,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.017779
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.628,
+                "threshold": 1.0,
+                "description": "Volume 0.63x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.21065,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 40.67,
+                "threshold": null,
+                "description": "RSI 40.7"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.03743,
+                "threshold": 0.03,
+                "description": "Financing balance -3.74% over 5 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.316,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          },
+          "10": {
+            "metrics": {
+              "period": 10,
+              "start_date": "2026-08-20",
+              "end_date": "2026-09-02",
+              "sessions": 10,
+              "return_pct": -0.036283,
+              "annualized_volatility": 0.591498,
+              "volume_ratio": 0.585,
+              "rsi": 42.85,
+              "price_vs_ma20": -0.04045,
+              "ma5": 399.17600000000004,
+              "ma10": 397.81100000000004,
+              "ma20": 405.254,
+              "ma60": 505.69899999999996,
+              "rps_market": 0.0,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.009752
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.596,
+                "threshold": 1.0,
+                "description": "Volume 0.60x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.21065,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 40.67,
+                "threshold": null,
+                "description": "RSI 40.7"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.08873,
+                "threshold": 0.03,
+                "description": "Financing balance -8.87% over 10 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.316,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          },
+          "20": {
+            "metrics": {
+              "period": 20,
+              "start_date": "2026-08-06",
+              "end_date": "2026-09-02",
+              "sessions": 20,
+              "return_pct": 0.010026,
+              "annualized_volatility": 0.663746,
+              "volume_ratio": 0.674,
+              "rsi": 42.85,
+              "price_vs_ma20": -0.04045,
+              "ma5": 399.17600000000004,
+              "ma10": 397.81100000000004,
+              "ma20": 405.254,
+              "ma60": 505.69899999999996,
+              "rps_market": 66.67,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.02222
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.445,
+                "threshold": 1.0,
+                "description": "Volume 0.45x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.21065,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 40.67,
+                "threshold": null,
+                "description": "RSI 40.7"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.00836,
+                "threshold": 0.03,
+                "description": "Financing balance +0.84% over 20 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.316,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          },
+          "60": {
+            "metrics": {
+              "period": 60,
+              "start_date": "2026-06-10",
+              "end_date": "2026-09-02",
+              "sessions": 60,
+              "return_pct": -0.19129,
+              "annualized_volatility": 0.97282,
+              "volume_ratio": null,
+              "rsi": 42.85,
+              "price_vs_ma20": -0.04045,
+              "ma5": 399.17600000000004,
+              "ma10": 397.81100000000004,
+              "ma20": 405.254,
+              "ma60": 505.69899999999996,
+              "rps_market": 0.0,
+              "rps_sector": null,
+              "benchmark_return_pct": -0.04225
+            },
+            "signals": {
+              "volume_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.379,
+                "threshold": 1.0,
+                "description": "Volume 0.38x average, below 1.0x threshold"
+              },
+              "ma_alignment": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.21065,
+                "threshold": null,
+                "description": "MA alignment mixed"
+              },
+              "rsi": {
+                "triggered": false,
+                "state": "none",
+                "value": 40.67,
+                "threshold": null,
+                "description": "RSI 40.7"
+              },
+              "margin_expansion": {
+                "triggered": false,
+                "state": "none",
+                "value": -0.04217,
+                "threshold": 0.03,
+                "description": "Financing balance -4.22% over 60 session(s)"
+              },
+              "breakout": {
+                "triggered": false,
+                "state": "none",
+                "value": 0.316,
+                "threshold": null,
+                "description": "Within 20-day range"
+              },
+              "main_force_inflow": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No fund-flow history"
+              },
+              "net_inflow_spike": {
+                "triggered": false,
+                "state": "none",
+                "value": null,
+                "threshold": null,
+                "description": "No main net inflow data"
+              }
+            }
+          }
+        },
+        "capital": {
+          "fund_flow": {
+            "trade_date": null,
+            "main_net": null,
+            "main_net_ratio": null,
+            "main_5d_net": null,
+            "super_large_net": null,
+            "large_net": null,
+            "medium_net": null,
+            "small_net": null,
+            "history": []
+          },
+          "margin": {
+            "trade_date": "2026-09-01",
+            "financing_balance": 17835342977.0,
+            "financing_balance_change": -32976206.0,
+            "margin_total_balance": 17881324763.0,
+            "margin_total_change": -42211232.0,
+            "history": [
+              {
+                "trade_date": "2026-09-01",
+                "financing_balance": 17835342977.0,
+                "margin_total_balance": 17881324763.0
+              },
+              {
+                "trade_date": "2026-08-31",
+                "financing_balance": 17868319183.0,
+                "margin_total_balance": 17923535995.0
+              },
+              {
+                "trade_date": "2026-08-28",
+                "financing_balance": 17977986760.0,
+                "margin_total_balance": 18025724999.64
+              },
+              {
+                "trade_date": "2026-08-27",
+                "financing_balance": 18470172015.0,
+                "margin_total_balance": 18530002437.4
+              },
+              {
+                "trade_date": "2026-08-26",
+                "financing_balance": 18376154333.0,
+                "margin_total_balance": 18429574368.0
+              },
+              {
+                "trade_date": "2026-08-25",
+                "financing_balance": 18528881979.0,
+                "margin_total_balance": 18590819636.02
+              },
+              {
+                "trade_date": "2026-08-24",
+                "financing_balance": 18381845552.0,
+                "margin_total_balance": 18435431379.32
+              },
+              {
+                "trade_date": "2026-08-21",
+                "financing_balance": 18981791351.0,
+                "margin_total_balance": 19046546367.12
+              },
+              {
+                "trade_date": "2026-08-20",
+                "financing_balance": 18963293758.0,
+                "margin_total_balance": 19016233765.0
+              },
+              {
+                "trade_date": "2026-08-19",
+                "financing_balance": 18895917252.0,
+                "margin_total_balance": 18961803531.42
+              },
+              {
+                "trade_date": "2026-08-18",
+                "financing_balance": 19572032503.0,
+                "margin_total_balance": 19630817707.0
+              },
+              {
+                "trade_date": "2026-08-17",
+                "financing_balance": 19501715588.0,
+                "margin_total_balance": 19567249988.0
+              },
+              {
+                "trade_date": "2026-08-14",
+                "financing_balance": 18988601219.0,
+                "margin_total_balance": 19042289147.0
+              },
+              {
+                "trade_date": "2026-08-13",
+                "financing_balance": 18992818224.0,
+                "margin_total_balance": 19051834774.0
+              },
+              {
+                "trade_date": "2026-08-12",
+                "financing_balance": 18838689536.0,
+                "margin_total_balance": 18894219584.0
+              },
+              {
+                "trade_date": "2026-08-11",
+                "financing_balance": 18691157553.0,
+                "margin_total_balance": 18749087313.0
+              },
+              {
+                "trade_date": "2026-08-10",
+                "financing_balance": 18721173112.0,
+                "margin_total_balance": 18778403372.0
+              },
+              {
+                "trade_date": "2026-08-07",
+                "financing_balance": 18084452070.0,
+                "margin_total_balance": 18148928000.0
+              },
+              {
+                "trade_date": "2026-08-06",
+                "financing_balance": 18115397209.0,
+                "margin_total_balance": 18173147209.0
+              },
+              {
+                "trade_date": "2026-08-05",
+                "financing_balance": 17871698233.0,
+                "margin_total_balance": 17927509945.0
+              },
+              {
+                "trade_date": "2026-08-04",
+                "financing_balance": 17687501902.0,
+                "margin_total_balance": 17734781358.0
+              },
+              {
+                "trade_date": "2026-08-03",
+                "financing_balance": 17576309221.0,
+                "margin_total_balance": 17620912087.0
+              },
+              {
+                "trade_date": "2026-07-31",
+                "financing_balance": 18272599781.0,
+                "margin_total_balance": 18325717361.0
+              },
+              {
+                "trade_date": "2026-07-30",
+                "financing_balance": 18202338667.0,
+                "margin_total_balance": 18248800387.0
+              },
+              {
+                "trade_date": "2026-07-29",
+                "financing_balance": 17995488978.0,
+                "margin_total_balance": 18034203568.5
+              },
+              {
+                "trade_date": "2026-07-28",
+                "financing_balance": 18622041151.0,
+                "margin_total_balance": 18672139448.5
+              },
+              {
+                "trade_date": "2026-07-27",
+                "financing_balance": 20019324231.0,
+                "margin_total_balance": 20068174307.5
+              },
+              {
+                "trade_date": "2026-07-24",
+                "financing_balance": 20143007950.0,
+                "margin_total_balance": 20200955550.0
+              },
+              {
+                "trade_date": "2026-07-23",
+                "financing_balance": 19930635466.0,
+                "margin_total_balance": 19983966746.0
+              },
+              {
+                "trade_date": "2026-07-22",
+                "financing_balance": 19985966447.0,
+                "margin_total_balance": 20043790077.0
+              },
+              {
+                "trade_date": "2026-07-21",
+                "financing_balance": 20246949330.0,
+                "margin_total_balance": 20302110810.0
+              },
+              {
+                "trade_date": "2026-07-20",
+                "financing_balance": 20695905536.0,
+                "margin_total_balance": 20746960166.0
+              },
+              {
+                "trade_date": "2026-07-17",
+                "financing_balance": 21084124036.0,
+                "margin_total_balance": 21129234846.0
+              },
+              {
+                "trade_date": "2026-07-16",
+                "financing_balance": 21809793789.0,
+                "margin_total_balance": 21867224265.0
+              },
+              {
+                "trade_date": "2026-07-15",
+                "financing_balance": 22893946880.0,
+                "margin_total_balance": 22954956873.0
+              },
+              {
+                "trade_date": "2026-07-14",
+                "financing_balance": 22594918187.0,
+                "margin_total_balance": 22653433985.0
+              },
+              {
+                "trade_date": "2026-07-13",
+                "financing_balance": 21850500949.0,
+                "margin_total_balance": 21902716789.0
+              },
+              {
+                "trade_date": "2026-07-10",
+                "financing_balance": 22027948936.0,
+                "margin_total_balance": 22090115896.0
+              },
+              {
+                "trade_date": "2026-07-09",
+                "financing_balance": 22906454339.0,
+                "margin_total_balance": 22976452534.0
+              },
+              {
+                "trade_date": "2026-07-08",
+                "financing_balance": 22124246419.0,
+                "margin_total_balance": 22178833907.17
+              },
+              {
+                "trade_date": "2026-07-07",
+                "financing_balance": 21895657370.0,
+                "margin_total_balance": 21955363990.0
+              },
+              {
+                "trade_date": "2026-07-06",
+                "financing_balance": 22322651779.0,
+                "margin_total_balance": 22380033012.0
+              },
+              {
+                "trade_date": "2026-07-03",
+                "financing_balance": 22170044877.0,
+                "margin_total_balance": 22235517459.0
+              },
+              {
+                "trade_date": "2026-07-02",
+                "financing_balance": 22872045929.0,
+                "margin_total_balance": 22935760006.0
+              },
+              {
+                "trade_date": "2026-07-01",
+                "financing_balance": 23627505022.0,
+                "margin_total_balance": 23705169228.0
+              },
+              {
+                "trade_date": "2026-06-30",
+                "financing_balance": 23640578086.0,
+                "margin_total_balance": 23716617586.0
+              },
+              {
+                "trade_date": "2026-06-29",
+                "financing_balance": 23230339035.0,
+                "margin_total_balance": 23317783035.0
+              },
+              {
+                "trade_date": "2026-06-26",
+                "financing_balance": 22615222797.0,
+                "margin_total_balance": 22689912797.0
+              },
+              {
+                "trade_date": "2026-06-25",
+                "financing_balance": 22542169230.0,
+                "margin_total_balance": 22617752205.0
+              },
+              {
+                "trade_date": "2026-06-24",
+                "financing_balance": 21983772990.0,
+                "margin_total_balance": 22054070463.0
+              },
+              {
+                "trade_date": "2026-06-23",
+                "financing_balance": 21561712734.0,
+                "margin_total_balance": 21614530310.0
+              },
+              {
+                "trade_date": "2026-06-22",
+                "financing_balance": 21570635472.0,
+                "margin_total_balance": 21631880832.0
+              },
+              {
+                "trade_date": "2026-06-18",
+                "financing_balance": 21020898677.0,
+                "margin_total_balance": 21078577977.0
+              },
+              {
+                "trade_date": "2026-06-17",
+                "financing_balance": 21271535733.0,
+                "margin_total_balance": 21327502553.0
+              },
+              {
+                "trade_date": "2026-06-16",
+                "financing_balance": 20283799062.0,
+                "margin_total_balance": 20333185914.0
+              },
+              {
+                "trade_date": "2026-06-15",
+                "financing_balance": 20128739265.0,
+                "margin_total_balance": 20173442665.0
+              },
+              {
+                "trade_date": "2026-06-12",
+                "financing_balance": 19515728615.0,
+                "margin_total_balance": 19558097975.0
+              },
+              {
+                "trade_date": "2026-06-11",
+                "financing_balance": 19325834114.0,
+                "margin_total_balance": 19364514114.0
+              },
+              {
+                "trade_date": "2026-06-10",
+                "financing_balance": 19160101611.0,
+                "margin_total_balance": 19202511699.0
+              },
+              {
+                "trade_date": "2026-06-09",
+                "financing_balance": 19522209673.0,
+                "margin_total_balance": 19564902323.0
+              },
+              {
+                "trade_date": "2026-06-08",
+                "financing_balance": 18620494573.0,
+                "margin_total_balance": 18659458195.0
+              }
+            ]
+          },
+          "fund_flow_source": "unavailable",
+          "margin_source": "eastmoney",
+          "fund_flow_error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))",
+          "margin_error": null
+        },
+        "risk": {
+          "atr_14": 26.6705,
+          "atr_pct": 0.068587,
+          "max_drawdown_60d": -0.594357,
+          "beta_vs_index": 2.9443,
+          "beta_window": 60,
+          "benchmark_code": "000300.SH",
+          "stop_loss_price": 335.519,
+          "stop_loss_atr_multiple": 2.0
+        },
+        "valuation": {
+          "trade_date": "2026-09-02",
+          "pe_ttm": 34.52324593,
+          "pb": 7.34231076,
+          "ps_ttm": 16.47197367,
+          "pcf_ocf_ttm": 37.9201283,
+          "peg": 0.573157784122,
+          "dividend_yield": null,
+          "total_market_cap": 273746329103.22,
+          "pe_percentile_3y": 0.27,
+          "pe_percentile_1y": 0.8,
+          "pb_percentile_3y": 72.27,
+          "pb_percentile_1y": 16.8,
+          "roe": 23.13,
+          "roe_mean_5y": 7.58,
+          "roe_std_5y": 6.31,
+          "gross_margin": 63.1304509177,
+          "gross_margin_std_5y": 7.71,
+          "net_margin": 59.5291512331,
+          "net_profit_yoy": 1091.4990564908,
+          "revenue_yoy": 178.672297778593,
+          "operating_cashflow_to_net_profit": 0.877,
+          "debt_to_assets": 11.4652091084,
+          "fundamental_quality_score": 80.71,
+          "source": "eastmoney",
+          "error": null
+        },
+        "events": {
+          "as_of": "2026-09-02",
+          "items": [],
+          "event_risk_score": null,
+          "high_risk_count": 0,
+          "source": "unavailable",
+          "error": "事件源不可用（业绩预告/增减持未获取，且无解禁/龙虎榜数据）"
+        },
+        "diff": {
+          "signal_count": {
+            "prev": 0,
+            "curr": 0
+          },
+          "return_pct": 0.021486,
+          "rank_return_10": null,
+          "rank_change_10": null,
+          "new_signals": [],
+          "cleared_signals": []
+        },
+        "sector_board": "半导体",
+        "sector_board_source": "eastmoney",
+        "sector_strength_rank": null,
+        "error": null
+      }
+    ],
+    "rankings": {
+      "return_5": [
+        "000938.SZ",
+        "603986.SH",
+        "603228.SH"
+      ],
+      "return_10": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "return_20": [
+        "603228.SH",
+        "603986.SH",
+        "000938.SZ"
+      ],
+      "return_60": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "volume_spike": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "breakout": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "main_force_inflow": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "rsi": [
+        "603228.SH",
+        "603986.SH",
+        "000938.SZ"
+      ],
+      "net_inflow_spike": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "margin_expansion": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "signal_count": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "rps_market_5": [
+        "000938.SZ",
+        "603986.SH",
+        "603228.SH"
+      ],
+      "rps_sector_5": [],
+      "rps_market_10": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "rps_sector_10": [],
+      "rps_market_20": [
+        "603228.SH",
+        "603986.SH",
+        "000938.SZ"
+      ],
+      "rps_sector_20": [],
+      "rps_market_60": [
+        "000938.SZ",
+        "603228.SH",
+        "603986.SH"
+      ],
+      "rps_sector_60": []
+    },
+    "sectors": [
+      {
+        "board_code": null,
+        "board_name": "元件",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "market_rank": null,
+        "member_count": 1,
+        "members": [
+          "603228.SH"
+        ],
+        "period_metrics": [
+          {
+            "period": 5,
+            "avg_return_pct": -0.082,
+            "avg_rps_market": 0.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 10,
+            "avg_return_pct": -0.0046,
+            "avg_rps_market": 66.67,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 20,
+            "avg_return_pct": 0.0288,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 60,
+            "avg_return_pct": 0.1788,
+            "avg_rps_market": 66.67,
+            "avg_rps_sector": null
+          }
+        ],
+        "total_main_net": -39736022.0,
+        "prosperity_score": 35.24,
+        "avg_roe": 4.55,
+        "avg_gross_margin": 20.223,
+        "avg_revenue_yoy": 21.3707,
+        "source": "watchlist",
+        "error": null
+      },
+      {
+        "board_code": null,
+        "board_name": "IT服务Ⅱ",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "market_rank": null,
+        "member_count": 1,
+        "members": [
+          "000938.SZ"
+        ],
+        "period_metrics": [
+          {
+            "period": 5,
+            "avg_return_pct": 0.0428,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 10,
+            "avg_return_pct": 0.0653,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 20,
+            "avg_return_pct": 0.0013,
+            "avg_rps_market": 33.33,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 60,
+            "avg_return_pct": 0.4693,
+            "avg_rps_market": 100.0,
+            "avg_rps_sector": null
+          }
+        ],
+        "total_main_net": null,
+        "prosperity_score": 51.63,
+        "avg_roe": 13.32,
+        "avg_gross_margin": 13.4057,
+        "avg_revenue_yoy": 33.9296,
+        "source": "watchlist",
+        "error": null
+      },
+      {
+        "board_code": null,
+        "board_name": "半导体",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "market_rank": null,
+        "member_count": 1,
+        "members": [
+          "603986.SH"
+        ],
+        "period_metrics": [
+          {
+            "period": 5,
+            "avg_return_pct": -0.0543,
+            "avg_rps_market": 33.33,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 10,
+            "avg_return_pct": -0.0363,
+            "avg_rps_market": 0.0,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 20,
+            "avg_return_pct": 0.01,
+            "avg_rps_market": 66.67,
+            "avg_rps_sector": null
+          },
+          {
+            "period": 60,
+            "avg_return_pct": -0.1913,
+            "avg_rps_market": 0.0,
+            "avg_rps_sector": null
+          }
+        ],
+        "total_main_net": null,
+        "prosperity_score": 90.84,
+        "avg_roe": 23.13,
+        "avg_gross_margin": 63.1305,
+        "avg_revenue_yoy": 178.6723,
+        "source": "watchlist",
+        "error": null
+      }
+    ],
+    "unresolved": [],
+    "data_gaps": []
+  }
+}

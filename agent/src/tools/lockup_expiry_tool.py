@@ -174,13 +174,16 @@ def _extract_rows(payload: Any) -> list[dict]:
     return data if isinstance(data, list) else []
 
 
-def _fetch_lockups(code: str | None, horizon_days: int) -> list[dict]:
+def _fetch_lockups(code: str | None, horizon_days: int, *, rich: bool = False) -> list[dict]:
     """Fetch and normalize lockup-expiry records from Eastmoney.
 
     Args:
         code: Bare 6-digit code, or ``None`` for a market-wide calendar.
         horizon_days: Upcoming-window length in days (used only when ``code``
             is ``None``).
+        rich: When True, request every report column and return the extended
+            record shape (see :func:`_shape_rich_record`). The compact shape is
+            the default to keep the agent-facing envelope small.
 
     Returns:
         Normalized records (capped at :data:`_MAX_RECORDS`).
@@ -198,7 +201,7 @@ def _fetch_lockups(code: str | None, horizon_days: int) -> list[dict]:
         _DATACENTER_URL,
         params={
             "reportName": _REPORT_NAME,
-            "columns": _COLUMNS,
+            "columns": "ALL" if rich else _COLUMNS,
             "filter": _build_filter(code, start, end),
             "sortColumns": sort_column,
             "sortTypes": sort_type,
@@ -209,14 +212,64 @@ def _fetch_lockups(code: str | None, horizon_days: int) -> list[dict]:
         },
     )
 
+    shaper = _shape_rich_record if rich else _shape_record
     records: list[dict] = []
     for raw in _extract_rows(payload):
-        shaped = _shape_record(raw)
+        shaped = shaper(raw)
         if shaped is not None:
             records.append(shaped)
         if len(records) >= _MAX_RECORDS:
             break
     return records
+
+
+def _shape_rich_record(raw: Any) -> dict[str, Any] | None:
+    """Extend :func:`_shape_record` with the report's unlock-ratio fields.
+
+    The agent-facing ``RPT_LIFT_STOCK`` projection deliberately drops the ratio
+    and market-cap columns (``FREE_RATIO`` / ``LIFT_MARKET_CAP``) because the
+    datacenter report does not populate them. The event tracker needs a supply
+    pressure signal, so this extended shape reads the report's actual
+    ``ADD_LISTSHARES_RATIO`` (newly-tradable shares / total shares, 0-1) and the
+    unlock amount / market value as they are reported.
+    """
+    shaped = _shape_record(raw)
+    if shaped is None:
+        return None
+    shaped["add_listing_shares"] = _to_float(raw.get("ADD_LISTING_SHARES"))
+    shaped["add_listing_cap"] = _to_float(raw.get("ADD_LISTING_CAP"))
+    # Unlock ratio vs the company's current total shares; Eastmoney emits it as
+    # a 0-1 fraction (e.g. 0.05762 == 5.76%). Reuse the familiar *_ratio_* name
+    # but keep the report's native fraction scale so rounding is unambiguous.
+    ratio = _to_float(raw.get("ADD_LISTSHARES_RATIO"))
+    shaped["free_ratio"] = ratio
+    return shaped
+
+
+def fetch_lockup_records(code: str, horizon_days: int = _DEFAULT_HORIZON_DAYS) -> list[dict]:
+    """Return a stock's upcoming lockup-expiry records within ``horizon_days``.
+
+    This is the public, code-first entry point the stock tracker uses; it always
+    scopes to a single code's *upcoming* window (today .. +horizon) and returns
+    the extended record shape carrying ``free_ratio`` (unlock/total-shares
+    fraction) and the unlock market value. Raises on upstream failure so the
+    caller can apply its own error isolation.
+
+    Args:
+        code: A-share symbol (``"600519"`` or ``"600519.SH"``).
+        horizon_days: Upcoming-window length in days, clamped to ``[1, 365]``.
+
+    Returns:
+        Extended lockup records, oldest unlock first. Empty when none in window.
+
+    Raises:
+        requests.RequestException: Network failure from the shared client.
+        requests.HTTPError: Non-2xx response status.
+    """
+    bare = _normalize_code(str(code).strip())
+    if bare is None:
+        raise ValueError(f"unrecognized A-share code {code!r}")
+    return _fetch_lockups(bare, _clamp_horizon(horizon_days), rich=True)
 
 
 def get_lockup_expiry(code: str | None, horizon_days: int) -> str:

@@ -119,9 +119,11 @@ def _appearance_row(raw: dict[str, Any]) -> dict[str, Any]:
     Returns:
         A flat dict of the fields a research caller cares about.
     """
+    trade_date = str(raw.get("TRADE_DATE") or "")[:10]
     return {
         "code": raw.get("SECURITY_CODE"),
         "name": raw.get("SECURITY_NAME_ABBR"),
+        "trade_date": trade_date or None,
         "close": raw.get("CLOSE_PRICE"),
         "change_pct": raw.get("CHANGE_RATE"),
         "net_buy": raw.get("BILLBOARD_NET_AMT"),
@@ -130,6 +132,77 @@ def _appearance_row(raw: dict[str, Any]) -> dict[str, Any]:
         "turnover": raw.get("ACCUM_AMOUNT"),
         "reason": raw.get("EXPLANATION"),
     }
+
+
+def _fetch_appearances(trade_date: str, code: str | None = None) -> list[dict[str, Any]]:
+    """Fetch normalized dragon-tiger appearance rows for one trade date.
+
+    Args:
+        trade_date: Dashed ``YYYY-MM-DD`` trade date.
+        code: Bare A-share code to narrow to, or ``None`` for the whole board.
+
+    Returns:
+        Normalized appearance rows (capped at :data:`_MAX_APPEARANCES`).
+
+    Raises:
+        requests.RequestException: Network failure from the shared client.
+        requests.HTTPError: Non-2xx response status.
+    """
+    appear_filter = f"(TRADE_DATE='{trade_date}')"
+    if code:
+        appear_filter += f'(SECURITY_CODE="{code}")'
+    raw_rows = _fetch_report(
+        _APPEARANCE_REPORT,
+        filter_expr=appear_filter,
+        sort_columns="BILLBOARD_NET_AMT",
+        sort_types="-1",
+    )
+    return [_appearance_row(r) for r in raw_rows[:_MAX_APPEARANCES]]
+
+
+def fetch_recent_board(days: int = 5) -> list[dict[str, Any]]:
+    """Return the dragon-tiger appearances for the most recent ``days`` boards.
+
+    The datacenter report keys on an exact ``TRADE_DATE`` (no range filter), so
+    this walks calendar days back from today and probes each one, keeping only
+    the days that actually produced a board. Non-trading days return an empty
+    board and are skipped, which keeps the request count to roughly one per
+    trading day plus weekends/holidays. This is the code-first entry point the
+    stock tracker uses to cover a whole watchlist with one board pull.
+
+    Args:
+        days: Number of most-recent *trading* boards to collect (1-10).
+
+    Returns:
+        Flat appearance rows across those boards (each carrying ``trade_date``),
+        oldest board first. Empty when the network is unavailable.
+    """
+    from datetime import date, timedelta
+
+    if not isinstance(days, int) or days < 1:
+        days = 5
+    days = min(days, 10)
+
+    rows_by_date: list[tuple[str, list[dict[str, Any]]]] = []
+    cursor = date.today()
+    lookback = date.today() - timedelta(days=45)  # generous upper bound
+    while cursor >= lookback and len(rows_by_date) < days:
+        day_str = cursor.isoformat()
+        try:
+            day_rows = _fetch_appearances(day_str)
+        except Exception as exc:  # noqa: BLE001 - a failing day is non-fatal
+            logger.warning("dragon-tiger board fetch failed for %s: %s", day_str, exc)
+            cursor -= timedelta(days=1)
+            continue
+        if day_rows:
+            rows_by_date.append((day_str, day_rows))
+        cursor -= timedelta(days=1)
+
+    # Oldest board first so the event timeline reads chronologically.
+    flat: list[dict[str, Any]] = []
+    for _day, day_rows in reversed(rows_by_date):
+        flat.extend(day_rows)
+    return flat
 
 
 def _seat_row(raw: dict[str, Any]) -> dict[str, Any]:

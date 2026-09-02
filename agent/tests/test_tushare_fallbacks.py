@@ -107,3 +107,59 @@ def test_margin_trading_maps_and_sorts_most_recent_first() -> None:
     assert data["rows"][0]["trade_date"] == "2024-01-03"
     assert data["rows"][0]["financing_balance"] == 7.0
     assert data["rows"][1]["margin_total_balance"] == 6.0
+
+
+def test_forecast_maps_announcements_newest_first() -> None:
+    pro = SimpleNamespace(
+        forecast=lambda **_: [
+            {"ts_code": "600519.SH", "ann_date": "20240110", "end_date": "20231231",
+             "type": "预增", "p_change_min": 20.0, "p_change_max": 30.0,
+             "net_profit_min": 1000.0, "net_profit_max": 1100.0},
+            {"ts_code": "600519.SH", "ann_date": "20231010", "end_date": "20230930",
+             "type": "略增", "p_change_min": 5.0, "p_change_max": 10.0,
+             "net_profit_min": 900.0, "net_profit_max": 950.0},
+        ]
+    )
+    with patch.object(tf, "_pro_api", return_value=pro):
+        data = tf.fetch_forecast("600519.SH")
+
+    assert data["ts_code"] == "600519.SH"
+    assert data["source"] == "tushare"
+    # Newest announcement first.
+    assert data["rows"][0]["ann_date"] == "2024-01-10"
+    assert data["rows"][0]["type"] == "预增"
+    assert data["rows"][0]["p_change_min"] == 20.0
+    assert data["rows"][1]["ann_date"] == "2023-10-10"
+
+
+def test_holder_trade_maps_in_de_and_ratio() -> None:
+    pro = SimpleNamespace(
+        stk_holdertrade=lambda **_: [
+            {"ts_code": "600519.SH", "ann_date": "20240108", "holder_name": "大股东",
+             "holder_type": "控股股东", "in_de": "DE", "change_vol": 500.0,
+             "change_ratio": 1.5, "avg_price": 1500.0},
+            {"ts_code": "600519.SH", "ann_date": "20240115", "holder_name": "高管",
+             "holder_type": "高管", "in_de": "IN", "change_vol": 20.0,
+             "change_ratio": 0.05, "avg_price": 1520.0},
+        ]
+    )
+    with patch.object(tf, "_pro_api", return_value=pro), patch.object(
+        tf, "_date_window", return_value=("20231001", "20240115")
+    ):
+        data = tf.fetch_holder_trade("600519.SH")
+
+    assert data["source"] == "tushare"
+    # Sorted by announcement date ascending.
+    assert [r["in_de"] for r in data["rows"]] == ["DE", "IN"]
+    assert data["rows"][0]["change_ratio"] == 1.5
+    assert data["rows"][1]["holder_type"] == "高管"
+
+
+def test_forecast_raises_when_token_missing() -> None:
+    with patch.object(
+        tf, "_pro_api", side_effect=tf.TushareFallbackUnavailable("TUSHARE_TOKEN is not configured")
+    ):
+        import pytest
+
+        with pytest.raises(tf.TushareFallbackUnavailable):
+            tf.fetch_forecast("600519.SH")

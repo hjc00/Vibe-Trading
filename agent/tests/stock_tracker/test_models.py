@@ -38,7 +38,7 @@ def test_tracker_config_accepts_rsi() -> None:
 
 def test_tracker_config_detail_card_count_default() -> None:
     config = TrackerConfig()
-    assert config.detail_card_count == 5
+    assert config.detail_card_count == 6
 
 
 def test_tracker_config_rejects_nonpositive_detail_card_count() -> None:
@@ -152,3 +152,38 @@ def test_symbol_snapshot_serializes_valuation() -> None:
     assert dumped["valuation"]["pe_percentile_3y"] == 80.0
     assert dumped["valuation"]["trade_date"] == "2026-08-31"
     assert "history" not in dumped["valuation"]
+
+
+def test_symbol_snapshot_serializes_events() -> None:
+    from datetime import date
+
+    from src.stock_tracker.models import EventItem, EventSnapshot, SymbolSnapshot
+
+    snapshot = SymbolSnapshot(
+        code="600519.SH",
+        events=EventSnapshot(
+            as_of=date(2026, 8, 31),
+            source="eastmoney",
+            event_risk_score=85.0,
+            high_risk_count=1,
+            items=[
+                EventItem(
+                    event_type="lockup",
+                    event_date=date(2026, 9, 15),
+                    title="限售解禁",
+                    risk_level="danger",
+                    risk_score=80.0,
+                    days_until=15,
+                    source="eastmoney",
+                    details={"free_ratio": 0.12},
+                )
+            ],
+        ),
+    )
+    dumped = snapshot.model_dump(mode="json")
+    events = dumped["events"]
+    assert events["event_risk_score"] == 85.0
+    assert events["as_of"] == "2026-08-31"
+    assert events["items"][0]["event_date"] == "2026-09-15"
+    assert events["items"][0]["risk_level"] == "danger"
+    assert events["items"][0]["details"]["free_ratio"] == 0.12

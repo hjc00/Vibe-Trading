@@ -1783,6 +1783,17 @@
     "sectorProsperity": "景气度",
     "sectorLeader": "领涨股",
     "sectorNoData": "暂无行业强度数据",
-    "sectorStrengthRank": "行业强度"
+    "sectorStrengthRank": "行业强度",
+    "dataSource": "数据源 {{source}}",
+    "eventTitle": "事件日历",
+    "eventExplanation": "展示未来 90 天解禁、近期业绩预告、龙虎榜与股东增减持事件，及综合事件风险分（0–100，主导风险 + 每多一个高危事件 +5，封顶 100）。大额解禁（占总股本高且临近）、业绩预减/首亏/续亏、大比例股东减持标红。解禁与龙虎榜来自东财；业绩预告与增减持为 Tushare 兜底，缺失不影响主流程。",
+    "eventTimelineLabel": "事件时间线",
+    "eventRiskScore": "事件风险",
+    "eventRiskScoreHint": "综合事件风险分：由事件子分中的最高者 + 每多一个高危事件 +5 计算，封顶 100",
+    "noEventData": "暂无事件数据",
+    "eventLockup": "解禁",
+    "eventForecast": "业绩预告",
+    "eventDragonTiger": "龙虎榜",
+    "eventHolderTrade": "增减持"
   }
 }

@@ -125,6 +125,42 @@ def test_serialize_symbol_with_capital_is_json_safe():
     json.dumps(data, ensure_ascii=False)  # must not raise TypeError
 
 
+def test_serialize_symbol_includes_events():
+    from src.stock_tracker.models import EventItem, EventSnapshot
+
+    symbol = _snapshot().symbols[0]
+    symbol.events = EventSnapshot(
+        as_of=date(2026, 8, 31),
+        source="eastmoney",
+        event_risk_score=88.0,
+        high_risk_count=1,
+        items=[
+            EventItem(
+                event_type="earnings_forecast",
+                event_date=date(2026, 8, 20),
+                title="业绩预减",
+                risk_level="danger",
+                risk_score=88.0,
+                source="tushare",
+                details={"forecast_type": "预减"},
+            )
+        ],
+    )
+    data = _serialize_symbol(symbol)
+    assert data["events"] is not None
+    assert data["events"]["event_risk_score"] == 88.0
+    assert data["events"]["as_of"] == "2026-08-31"
+    assert data["events"]["items"][0]["title"] == "业绩预减"
+    assert data["events"]["items"][0]["risk_level"] == "danger"
+
+
+def test_build_analysis_prompt_includes_event_risk_directive():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert "事件日历" in prompt
+    assert "综合事件风险分" in prompt
+
+
 def test_serialize_sector_is_compact():
     sector = SectorStrength(
         board_name="白酒",

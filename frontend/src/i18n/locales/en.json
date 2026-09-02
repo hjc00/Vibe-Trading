@@ -1783,6 +1783,17 @@
     "sectorProsperity": "Prosperity",
     "sectorLeader": "Leader",
     "sectorNoData": "No sector strength data",
-    "sectorStrengthRank": "Industry rank"
+    "sectorStrengthRank": "Industry rank",
+    "dataSource": "Source {{source}}",
+    "eventTitle": "Events",
+    "eventExplanation": "Upcoming 90-day lockup unlocks plus recent earnings forecasts, dragon-tiger appearances and shareholder trades, with a composite event-risk score (0-100; dominant risk +5 per extra high-risk event, capped at 100). Large near-term unlocks, negative earnings forecasts (预减/首亏/续亏) and big shareholder reductions are flagged red. Lockups and dragon-tiger come from Eastmoney; forecasts and holder trades are a Tushare best-effort.",
+    "eventTimelineLabel": "Event timeline",
+    "eventRiskScore": "Event risk",
+    "eventRiskScoreHint": "Composite event risk: highest event sub-score + 5 per additional high-risk event, capped at 100",
+    "noEventData": "No event data",
+    "eventLockup": "Lockup",
+    "eventForecast": "Forecast",
+    "eventDragonTiger": "Dragon-tiger",
+    "eventHolderTrade": "Holder trade"
   }
 }

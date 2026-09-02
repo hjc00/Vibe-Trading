@@ -10,6 +10,7 @@ import pytest
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.models import (
     CapitalMetrics,
+    EventSnapshot,
     FundFlowHistoryItem,
     FundFlowSnapshot,
     MarginSnapshot,
@@ -559,6 +560,49 @@ def test_valuation_metrics_attached():
     assert snapshot.valuation.fundamental_quality_score == 88.0
 
 
+def test_events_metrics_attached():
+    from datetime import date as _date, timedelta as _td
+
+    from src.stock_tracker.models import EventItem, EventSnapshot
+
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    df = _make_df(rows=80)
+
+    as_of = _date(2026, 8, 31)
+    events = EventSnapshot(
+        as_of=as_of,
+        source="eastmoney",
+        event_risk_score=80.0,
+        high_risk_count=1,
+        items=[
+            EventItem(
+                event_type="lockup",
+                event_date=as_of + _td(days=10),
+                title="限售解禁 1.00 亿股",
+                risk_level="danger",
+                risk_score=80.0,
+                days_until=10,
+                source="eastmoney",
+                details={"free_ratio": 0.15},
+            )
+        ],
+    )
+    snapshot = engine._analyze_symbol("000001.SZ", df, events=events)
+
+    assert snapshot.events is not None
+    assert snapshot.events.source == "eastmoney"
+    assert snapshot.events.event_risk_score == 80.0
+    assert snapshot.events.items[0].risk_level == "danger"
+
+
+def test_events_none_when_not_provided():
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+    snapshot = engine._analyze_symbol("000001.SZ", _make_df(rows=80))
+    assert snapshot.events is None
+
+
 def test_valuation_none_when_not_provided():
     config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
     engine = StockTrackerEngine(config)
@@ -587,8 +631,9 @@ def _make_previous_snapshot(
     *,
     capital: CapitalMetrics | None,
     valuation: ValuationSnapshot | None,
+    events: EventSnapshot | None = None,
 ) -> TrackerSnapshot:
-    """Build a minimal previous snapshot carrying capital/valuation."""
+    """Build a minimal previous snapshot carrying capital/valuation/events."""
     from datetime import datetime, timezone
 
     symbol = SymbolSnapshot(
@@ -597,6 +642,7 @@ def _make_previous_snapshot(
         close=10.0,
         capital=capital,
         valuation=valuation,
+        events=events,
     )
     return TrackerSnapshot(
         generated_at=datetime.now(timezone.utc),
@@ -652,6 +698,35 @@ def test_seed_skips_capital_with_errors():
 
     assert engine._capital_cache.get("fund_flow", "000001.SZ", trading_date) is None
     assert engine._capital_cache.get("margin", "000001.SZ", trading_date) is None
+
+
+def test_seed_caches_events_from_previous_same_day():
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    events = EventSnapshot(as_of=trading_date, source="eastmoney", event_risk_score=72.0)
+    previous = _make_previous_snapshot(config, trading_date, capital=None, valuation=None, events=events)
+    engine._seed_caches_from_previous(previous, trading_date)
+
+    assert engine._events_cache.get("000001.SZ", trading_date) is events
+
+    # A different trading date must not reuse the previous day's events.
+    engine._events_cache.clear()
+    engine._seed_caches_from_previous(previous, date(2026, 9, 1))
+    assert engine._events_cache.get("000001.SZ", date(2026, 9, 1)) is None
+
+
+def test_seed_skips_events_with_errors():
+    trading_date = date(2026, 8, 31)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    events = EventSnapshot(as_of=trading_date, source="unavailable", error="lockup: boom")
+    previous = _make_previous_snapshot(config, trading_date, capital=None, valuation=None, events=events)
+    engine._seed_caches_from_previous(previous, trading_date)
+
+    assert engine._events_cache.get("000001.SZ", trading_date) is None
 
 
 def test_compute_sector_strength_attaches_rank(monkeypatch):

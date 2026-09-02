@@ -1946,9 +1946,7 @@ export interface SectorPeriodMetric {
   avg_return_pct?: number | null;
   avg_rps_market?: number | null;
   avg_rps_sector?: number | null;
-}
-
-export interface SectorStrength {
+}export interface SectorStrength {
   board_code?: string | null;
   board_name: string;
   change_pct?: number | null;
@@ -1969,6 +1967,31 @@ export interface SectorStrength {
   error?: string | null;
 }
 
+export type EventRiskLevel = "info" | "warning" | "danger";
+
+/** One upcoming/recent corporate event for a symbol (解禁/业绩预告/龙虎榜/增减持). */
+export interface EventItem {
+  event_type: "lockup" | "earnings_forecast" | "dragon_tiger" | "holder_trade" | string;
+  event_date?: string | null;
+  title: string;
+  summary?: string;
+  risk_level: EventRiskLevel;
+  risk_score?: number | null;
+  days_until?: number | null;
+  source?: string;
+  details?: Record<string, unknown>;
+}
+
+/** Event calendar + composite risk for one symbol. */
+export interface EventSnapshot {
+  as_of?: string | null;
+  items: EventItem[];
+  event_risk_score?: number | null;
+  high_risk_count: number;
+  source?: string;
+  error?: string | null;
+}
+
 export interface SymbolSnapshot {
   code: string;
   name?: string | null;
@@ -1983,6 +2006,7 @@ export interface SymbolSnapshot {
   capital?: CapitalMetrics | null;
   risk?: RiskMetrics | null;
   valuation?: ValuationSnapshot | null;
+  events?: EventSnapshot | null;
   diff?: CrossDayDiff | null;
   sector_board?: string | null;
   sector_board_source?: string | null;

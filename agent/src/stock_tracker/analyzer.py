@@ -43,6 +43,7 @@ _ANALYSIS_DIRECTIVE = """\
 - 资金面：主力资金流向（当日与 5 日累计）、融资融券余额变化；
 - 估值与质量：PE/PB 的 3 年分位（近 1 年分位为辅）、基本面质量评分、ROE 稳定性、现金流质量；
 - 风险：ATR 波动、最大回撤、Beta、距止损参考价的距离；
+- 事件日历：未来 90 天解禁、业绩预告、龙虎榜、股东增减持，及综合事件风险分；
 - 行业背景：所属行业景气度评分、板块强弱排名与资金流。
 
 不要套用一个固定模板，按每个标的实际的数据特点给出差异化判断；用 structured 的
@@ -230,6 +231,7 @@ def _serialize_symbol(symbol: SymbolSnapshot) -> Dict[str, Any]:
         "capital": capital,
         "risk": _dump(symbol.risk),
         "valuation": _dump(symbol.valuation),
+        "events": _dump(symbol.events),
         "sector_board": symbol.sector_board,
         "sector_strength_rank": symbol.sector_strength_rank,
         "diff": _dump(symbol.diff),

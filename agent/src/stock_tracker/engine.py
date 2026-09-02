@@ -10,9 +10,11 @@ import pandas as pd
 
 from src.market_data import fetch_market_data
 from src.stock_tracker.capital_data import _FUND_FLOW_LOOKBACK, CapitalDataCache, load_capital_data
+from src.stock_tracker.events_data import EventsDataCache, load_events_data
 from src.stock_tracker.models import (
     CapitalMetrics,
     CrossDayDiff,
+    EventSnapshot,
     PeriodMetrics,
     PeriodSignals,
     RiskMetrics,
@@ -56,6 +58,7 @@ class StockTrackerEngine:
         self.config = config
         self._capital_cache = CapitalDataCache()
         self._valuation_cache = ValuationDataCache()
+        self._events_cache = EventsDataCache()
 
     def refresh(
         self,
@@ -137,6 +140,18 @@ class StockTrackerEngine:
         except Exception:  # noqa: BLE001
             logger.exception("Valuation data fetch failed")
 
+        # Fetch event-calendar data (解禁/龙虎榜/业绩预告/增减持) with daily
+        # caching; tolerate failure so a blocked source never breaks the refresh.
+        events_data: Dict[str, EventSnapshot] = {}
+        try:
+            events_data = load_events_data(
+                self.config.watchlist,
+                end_date=trading_date,
+                cache=self._events_cache,
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Event data fetch failed")
+
         symbol_snapshots: List[SymbolSnapshot] = []
         unresolved: List[str] = []
         data_gaps: List[Dict[str, Any]] = []
@@ -166,6 +181,7 @@ class StockTrackerEngine:
                     sector_board=sector_board,
                     benchmark_df=benchmark_df,
                     valuation=valuation_data.get(code),
+                    events=events_data.get(code),
                 )
                 # Use the latest available trading date from actual data.
                 if snapshot.period_signals:
@@ -283,12 +299,12 @@ class StockTrackerEngine:
         previous: TrackerSnapshot | None,
         trading_date: date,
     ) -> None:
-        """Seed capital/valuation caches from the prior snapshot.
+        """Seed capital/valuation/event caches from the prior snapshot.
 
         Reuses only data from the *same* trading date; a new trading date still
-        refetches. Seeding lets ``load_capital_data`` / ``load_valuation_data``
-        hit their TTL cache and skip re-requesting the throttled/blocked
-        Eastmoney capital endpoints on every refresh within one trading day.
+        refetches. Seeding lets the loaders hit their TTL cache and skip
+        re-requesting the throttled/blocked Eastmoney endpoints on every refresh
+        within one trading day.
         """
         if previous is None or previous.trading_date != trading_date:
             return
@@ -303,6 +319,9 @@ class StockTrackerEngine:
             valuation = symbol.valuation
             if valuation is not None and valuation.error is None:
                 self._valuation_cache.set(code, trading_date, valuation)
+            events = symbol.events
+            if events is not None and events.error is None:
+                self._events_cache.set(code, trading_date, events)
 
     def _fetch_capital_data(
         self,
@@ -360,6 +379,7 @@ class StockTrackerEngine:
         sector_board: Optional[str] = None,
         benchmark_df: Optional[pd.DataFrame] = None,
         valuation: Optional[ValuationSnapshot] = None,
+        events: Optional[EventSnapshot] = None,
     ) -> SymbolSnapshot:
         """Compute metrics, signals, risk measures, and summary for one symbol."""
         df = compute_mas(df)
@@ -397,6 +417,7 @@ class StockTrackerEngine:
             capital=capital,
             risk=risk,
             valuation=valuation,
+            events=events,
             period_signals=period_signals,
             sector_board=sector_board,
             sector_board_source="eastmoney" if sector_board else None,

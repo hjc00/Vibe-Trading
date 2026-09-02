@@ -293,3 +293,76 @@ def fetch_fina_indicator(code: str, *, periods: int = 40) -> dict[str, Any]:
     ]
     parsed.sort(key=lambda item: item.get("end_date") or "")
     return {"code": ts_code.split(".", 1)[0], "ts_code": ts_code, "source": "tushare", "rows": parsed}
+
+
+def fetch_forecast(code: str, *, periods: int = 2) -> dict[str, Any]:
+    """Fetch a stock's most recent earnings-forecast (业绩预告) announcements.
+
+    Tushare ``forecast`` carries one row per report period, each with a Chinese
+    ``type`` label (预增/略增/续盈/扭亏/略减/预减/首亏/续亏/减亏) plus the expected
+    net-profit change range. Only the latest ``periods`` announcements are kept,
+    newest announcement first, so the tracker can flag a fresh 预减/首亏/续亏.
+
+    Raises:
+        TushareFallbackUnavailable: No usable token / Tushare not importable.
+    """
+    ts_code = _ts_code(code)
+    rows = _records(_pro_api().forecast(ts_code=ts_code, limit=max(periods, 2)))
+    parsed = [
+        {
+            "ann_date": _dashed_date(row.get("ann_date")),
+            "end_date": _dashed_date(row.get("end_date")),
+            "type": row.get("type"),
+            "p_change_min": _to_float(row.get("p_change_min")),
+            "p_change_max": _to_float(row.get("p_change_max")),
+            "net_profit_min": _to_float(row.get("net_profit_min")),
+            "net_profit_max": _to_float(row.get("net_profit_max")),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("ann_date") or "", reverse=True)
+    return {
+        "code": ts_code.split(".", 1)[0],
+        "ts_code": ts_code,
+        "source": "tushare",
+        "rows": parsed[:periods],
+    }
+
+
+def fetch_holder_trade(code: str, *, days: int = 120) -> dict[str, Any]:
+    """Fetch a stock's recent shareholder increase/decrease (股东增减持) trades.
+
+    Tushare ``stk_holdertrade`` carries per-holder trades with a direction
+    (``in_de``: IN=增持 / DE=减持), the traded share count and its ratio to the
+    company's current total shares (``change_ratio``, as a percentage number),
+    the holder type and the announcement date.
+
+    Raises:
+        TushareFallbackUnavailable: No usable token / Tushare not importable.
+    """
+    ts_code = _ts_code(code)
+    start_date, end_date = _date_window(days)
+    rows = _records(
+        _pro_api().stk_holdertrade(ts_code=ts_code, start_date=start_date, end_date=end_date)
+    )
+    parsed = [
+        {
+            "ann_date": _dashed_date(row.get("ann_date")),
+            "holder_name": row.get("holder_name"),
+            "holder_type": row.get("holder_type"),
+            "in_de": row.get("in_de"),
+            "change_vol": _to_float(row.get("change_vol")),
+            "change_ratio": _to_float(row.get("change_ratio")),
+            "avg_price": _to_float(row.get("avg_price")),
+        }
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    parsed.sort(key=lambda item: item.get("ann_date") or "")
+    return {
+        "code": ts_code.split(".", 1)[0],
+        "ts_code": ts_code,
+        "source": "tushare",
+        "rows": parsed,
+    }

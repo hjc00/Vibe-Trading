@@ -77,7 +77,7 @@ class TrackerConfig(BaseModel):
     # row; the rest wrap onto the next row. Defaults to the full card set so no
     # card is hidden unless the user lowers the count.
     detail_card_count: int = Field(
-        default=5,
+        default=6,
         ge=1,
         description="Number of detail cards to show (max three per row; extras wrap).",
     )
@@ -352,6 +352,45 @@ class SectorStrength(BaseModel):
     error: Optional[str] = None
 
 
+class EventItem(BaseModel):
+    """One upcoming/recent corporate event for a symbol.
+
+    ``risk_level`` mirrors the conventional tone vocabulary used across the
+    tracker UI (``danger`` / ``warning`` / ``info``); ``risk_score`` is the
+    event's own 0-100 sub-score and drives that level. ``days_until`` counts
+    natural days to ``event_date`` (negative for historical events).
+    """
+
+    event_type: str = ""  # lockup | earnings_forecast | dragon_tiger | holder_trade
+    event_date: Optional[date] = None
+    title: str = ""  # 中文短标题，如「解禁 0.5 亿股」「中报业绩预减」
+    summary: str = ""  # 一句话说明
+    risk_level: str = "info"  # info | warning | danger（前端直接映射色调）
+    risk_score: Optional[float] = None  # 该事件自身的 0–100 风险分
+    days_until: Optional[int] = None  # 距事件日的自然日数（历史事件可为负）
+    source: str = "unavailable"  # eastmoney | tushare
+    details: Dict[str, Any] = Field(default_factory=dict)  # 事件特有字段
+
+
+class EventSnapshot(BaseModel):
+    """Event calendar + composite risk for one symbol.
+
+    Populated by :mod:`src.stock_tracker.events_data` from the lockup /
+    dragon-tiger Eastmoney reports plus the Tushare ``forecast`` /
+    ``stk_holdertrade`` fallbacks. Items are sorted by ``event_date`` ascending;
+    ``event_risk_score`` is the composite 0-100 risk and ``high_risk_count`` the
+    number of ``danger`` items. Degrades with ``error`` when a source fails so a
+    bad symbol never blocks the refresh.
+    """
+
+    as_of: Optional[date] = None
+    items: List[EventItem] = Field(default_factory=list)
+    event_risk_score: Optional[float] = None  # 0–100 综合事件风险
+    high_risk_count: int = 0  # risk_level == "danger" 的事件数
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
 class SymbolSnapshot(BaseModel):
     """One symbol's slice of a tracker snapshot."""
 
@@ -368,6 +407,7 @@ class SymbolSnapshot(BaseModel):
     capital: Optional[CapitalMetrics] = None
     risk: Optional[RiskMetrics] = None
     valuation: Optional[ValuationSnapshot] = None
+    events: Optional[EventSnapshot] = None
     diff: Optional[CrossDayDiff] = None
     sector_board: Optional[str] = None
     sector_board_source: Optional[str] = None
@@ -544,6 +584,8 @@ __all__ = [
     "CapitalMetrics",
     "RiskMetrics",
     "ValuationSnapshot",
+    "EventItem",
+    "EventSnapshot",
     "SectorPeriodMetric",
     "SectorStrength",
     "CrossDayDiff",

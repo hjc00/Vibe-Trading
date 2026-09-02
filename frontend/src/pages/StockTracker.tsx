@@ -17,6 +17,7 @@ import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard"
 import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
+import { EventTimelineCard } from "@/components/stock-tracker/EventTimelineCard";
 import { SectorStrengthBoard } from "@/components/stock-tracker/SectorStrengthBoard";
 import { TrackerTrackRecord } from "@/components/stock-tracker/TrackerTrackRecord";
 
@@ -30,6 +31,7 @@ const DETAIL_CARD_COMPONENTS = [
   RpsChartCard,
   RiskMetricsCard,
   ValuationCard,
+  EventTimelineCard,
 ] as const;
 
 export function StockTracker() {
@@ -286,7 +288,7 @@ export function StockTracker() {
         signals: [],
         thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 },
         refresh_interval_seconds: 10,
-        detail_card_count: 5,
+        detail_card_count: 6,
       },
     [config],
   );

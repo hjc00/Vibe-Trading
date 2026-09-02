@@ -2,7 +2,7 @@
 
 > 本文档用于跟踪 A 股多周期股票追踪器（`stock_tracker`）的后续优化方向。
 > 创建时间：2026-09-01
-> 最后更新：2026-09-02（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量指标、2.10 AI 分析结构化升级）
+> 最后更新：2026-09-02（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.9 事件日历、2.10 AI 分析结构化升级）
 
 ## 一、现状概述
 
@@ -203,7 +203,7 @@
 | 2.6 | 估值与质量指标 | 已完成 | jinchu | 2026-09-02 | 2026-09-02 | 东财 datacenter `RPT_VALUEANALYSIS_DET`（PE_TTM/PB/PS/PCF/PEG/总市值+3/5/10年分位）+ `RPT_F10_FINANCE_MAINFINADATA`（ROE/毛利率/增速/现金流质量/杠杆→质量评分 0–100）；股息率当前无稳定来源留空，研发投入强度未纳入评分（见 2.6 方案备注） |
 | 2.7 | 信号历史绩效追踪 | 待开始 | - | - | - | |
 | 2.8 | 组合风险检查 | 待开始 | - | - | - | |
-| 2.9 | 事件与日历集成 | 待开始 | - | - | - | |
+| 2.9 | 事件与日历集成 | 已完成 | jinchu | 2026-09-02 | 2026-09-02 | 新增 `events_data.py`（解禁/业绩预告/龙虎榜/增减持 → `EventSnapshot` + 综合事件风险分 0–100）挂到 `SymbolSnapshot.events`；`EventTimelineCard.tsx` 事件时间线卡；事件风险注入 LLM 分析。解禁与龙虎榜复用东财工具（`fetch_lockup_records` 取 ALL 列含 `free_ratio` 真实比例；`fetch_recent_board` 按天回扫近 5 交易日）；业绩预告/增减持走 Tushare 兜底（token 缺失自动降级，按 symbol 记 error）。默认 detail_card_count 提到 6，事件卡默认可见。详见 [stock-tracker-2.9-event-calendar.md](stock-tracker-2.9-event-calendar.md) |
 | 2.10 | AI 分析结构化升级 | 已完成 | jinchu | 2026-09-02 | 2026-09-02 | LLM 输出结构化 `AnalysisReport`：action 四值(buy/hold/reduce/avoid)+置信度 0–100+买入/目标区间+止损+减仓触发+跟踪指标；注入资金流/风险/行业景气度字段；**focus 概念已移除**（固定全维度，前端保留可选「补充指令」透传 user_prompt）；预测持久化 + 只读 track-record 清单（pending/active/hit_target/stopped_out，用最新价比对，暂不算胜率，见 2.7） |
 | 2.11 | 分钟级盘中监控 | 待开始 | - | - | - | |
 | 2.12 | 预警通知系统 | 待开始 | - | - | - | |
@@ -214,9 +214,9 @@
 
 ## 五、相关文件
 
-- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`、`track_record.py`
+- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`events_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`、`track_record.py`
 - API 路由：`agent/src/api/stock_tracker_routes.py`
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`、`TrackerAnalyzePanel.tsx`、`TrackerAnalysisReport.tsx`、`TrackerTrackRecord.tsx`
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`EventTimelineCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`、`TrackerAnalyzePanel.tsx`、`TrackerAnalysisReport.tsx`、`TrackerTrackRecord.tsx`
 - 前端库：`frontend/src/lib/stockTracker.ts`（含 action/status tone 与 label key 助手）、`frontend/src/lib/api.ts`（分析/预测类型）
 - 项目索引：`docs/PROJECT_INDEX.md`

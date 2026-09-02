@@ -5,6 +5,8 @@ from __future__ import annotations
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.models import (
     CrossDayDiff,
+    EventItem,
+    EventSnapshot,
     PeriodMetrics,
     PeriodSignals,
     RiskMetrics,
@@ -39,6 +41,8 @@ from src.stock_tracker.store import TrackerStore
 __all__ = [
     "BreakoutDetector",
     "CrossDayDiff",
+    "EventItem",
+    "EventSnapshot",
     "MaAlignmentDetector",
     "PeriodMetrics",
     "PeriodSignals",

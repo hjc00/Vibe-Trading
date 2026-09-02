@@ -109,6 +109,63 @@ export function getQualityToneClass(value: number | null | undefined): string {
   return "text-danger";
 }
 
+/**
+ * Tone class for an event timeline entry (解禁/业绩预告/龙虎榜/增减持). Danger
+ * events render red, warning yellow, info muted — matching the tracker tone
+ * vocabulary the backend derives from the same 70/40 thresholds.
+ */
+export function getEventRiskToneClass(level: string | null | undefined): string {
+  switch (level) {
+    case "danger":
+      return "text-danger";
+    case "warning":
+      return "text-warning";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
+/** Chip background tone for an event's risk badge. */
+export function getEventRiskChipClass(level: string | null | undefined): string {
+  switch (level) {
+    case "danger":
+      return "bg-danger/10 text-danger";
+    case "warning":
+      return "bg-warning/10 text-warning";
+    default:
+      return "bg-muted/40 text-muted-foreground";
+  }
+}
+
+/**
+ * Format an event date relative to today: "MM-DD · +12天" for upcoming events,
+ * "MM-DD · 8天前" for recent ones. Falls back to the plain date slice.
+ */
+export function formatEventDate(
+  value: string | null | undefined,
+  daysUntil: number | null | undefined,
+): string {
+  if (!value) return "—";
+  const datePart = value.slice(5, 10);
+  if (daysUntil == null) return datePart;
+  if (daysUntil > 0) return `${datePart} · +${daysUntil}天`;
+  if (daysUntil < 0) return `${datePart} · ${Math.abs(daysUntil)}天前`;
+  return datePart;
+}
+
+/** Format the composite event-risk score, or a placeholder when absent. */
+export function formatEventRiskScore(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "—";
+  return value.toFixed(0);
+}
+
+export function getEventRiskScoreTone(value: number | null | undefined): string {
+  if (value === undefined || value === null) return "text-muted-foreground";
+  if (value >= 70) return "text-danger";
+  if (value >= 40) return "text-warning";
+  return "text-muted-foreground";
+}
+
 export function getBetaToneClass(value: number | null | undefined): string {
   if (value === undefined || value === null) return "text-muted-foreground";
   if (value >= 1.3) return "text-warning";
