@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import tempfile
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -134,24 +134,30 @@ def test_quotes_endpoint(client, isolated_tracker_store):
             update={"config": TrackerConfig(watchlist=["600519.SH"])}
         )
     )
-    fake_records = {
-        "600519.SH": [
-            {
-                "code": "600519.SH",
-                "name": "贵州茅台",
-                "close": 1480.0,
-                "volume": 8000,
-            },
-            {
-                "code": "600519.SH",
-                "name": "贵州茅台",
-                "close": 1500.0,
-                "volume": 10000,
-            },
-        ],
-        "_unresolved": [],
-    }
-    with patch("src.api.stock_tracker_routes.fetch_market_data", return_value=fake_records):
+    # Tencent serves today's bar only for a single-day window, so the live
+    # quote arrives without a predecessor; 昨收 must come from the merged
+    # finalized history (the previous session's close).
+    today = date.today().isoformat()
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    def _bar(trade_date, close):
+        return {
+            "code": "600519.SH",
+            "name": "贵州茅台",
+            "trade_date": trade_date,
+            "close": close,
+            "volume": 10000,
+        }
+
+    def fake_fetch_market_data(**kwargs):
+        if kwargs["start_date"] == kwargs["end_date"]:
+            return {"600519.SH": [_bar(today, 1500.0)], "_unresolved": []}
+        return {"600519.SH": [_bar(yesterday, 1480.0)], "_unresolved": []}
+
+    with patch(
+        "src.api.stock_tracker_routes.fetch_market_data",
+        side_effect=fake_fetch_market_data,
+    ):
         response = client.get("/api/stock-tracker/quotes")
     assert response.status_code == 200
     data = response.json()
@@ -161,9 +167,52 @@ def test_quotes_endpoint(client, isolated_tracker_store):
     assert quote["code"] == "600519.SH"
     assert quote["close"] == 1500.0
     assert quote["prev_close"] == 1480.0
+    assert quote["date"] == today
     assert quote["change_amount"] == 20.0
     assert round(quote["daily_return"], 4) == round(20.0 / 1480.0, 4)
     assert quote["error"] is None
+    assert data["data_gaps"] == []
+
+
+def test_quotes_endpoint_history_unavailable_degrades(client, isolated_tracker_store):
+    """When the finalized-history fetch fails, quotes still resolve from the
+    live single-day window (no false data_gaps)."""
+    isolated_tracker_store.save_settings(
+        isolated_tracker_store.get_settings().model_copy(
+            update={"config": TrackerConfig(watchlist=["600519.SH"])}
+        )
+    )
+    today = date.today().isoformat()
+
+    def _bar(close):
+        return {
+            "code": "600519.SH",
+            "name": "贵州茅台",
+            "trade_date": today,
+            "close": close,
+            "volume": 10000,
+        }
+
+    calls = {"n": 0}
+
+    def fake_fetch_market_data(**kwargs):
+        calls["n"] += 1
+        if kwargs["start_date"] == kwargs["end_date"]:
+            return {"600519.SH": [_bar(1500.0)], "_unresolved": []}
+        raise RuntimeError("history unavailable")
+
+    with patch(
+        "src.api.stock_tracker_routes.fetch_market_data",
+        side_effect=fake_fetch_market_data,
+    ):
+        response = client.get("/api/stock-tracker/quotes")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert calls["n"] == 2
+    quote = data["quotes"][0]
+    assert quote["close"] == 1500.0
+    assert quote["prev_close"] is None
     assert data["data_gaps"] == []
 
 

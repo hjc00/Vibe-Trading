@@ -8,7 +8,7 @@ import sys as _sys
 import threading
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -31,6 +31,12 @@ logger = logging.getLogger(__name__)
 AuthDep = Callable[..., Any]
 
 _MAX_ANALYZE_SYMBOLS = 20
+
+# Calendar days of finalized history fetched alongside the live single-day bar so
+# a quote can report the true 昨收. Tencent's daily kline only serves the current
+# day when asked for that exact day, so a bare single-day window never contains
+# the prior session's close.
+_QUOTE_PREV_LOOKBACK_DAYS = 15
 
 _REFRESH_LOCK = threading.Lock()
 _REFRESH_OPERATION_LOCK = threading.Lock()
@@ -286,6 +292,7 @@ class _QuoteItem(BaseModel):
     prev_close: Optional[float] = None
     daily_return: Optional[float] = None
     change_amount: Optional[float] = None
+    date: Optional[str] = None  # bar trading date of ``close`` (YYYY-MM-DD)
     updated_at: Optional[str] = None
     error: Optional[str] = None
 
@@ -298,18 +305,61 @@ class _QuotesResponse(BaseModel):
     data_gaps: List[Dict[str, Any]]
 
 
+def _quote_row_date(row: Dict[str, Any]) -> Optional[str]:
+    """Extract a bar's trading date (``YYYY-MM-DD``) from a fetched row."""
+    value = row.get("trade_date") or row.get("date") or row.get("datetime")
+    if value is None:
+        return None
+    return str(value)[:10]
+
+
+def _merge_quote_rows(
+    history_rows: List[Dict[str, Any]],
+    live_rows: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Merge finalized history with live single-day bars, newest-last.
+
+    The live bar wins when both sources cover the same trading date (it may be a
+    fresher intraday quote). Rows without a parseable date are appended in order
+    so unusual loaders/fixtures still behave like a plain record list.
+    """
+    by_date: Dict[str, Dict[str, Any]] = {}
+    undated: List[Dict[str, Any]] = []
+    for row in history_rows:
+        key = _quote_row_date(row)
+        if key is None:
+            undated.append(row)
+        else:
+            by_date.setdefault(key, row)
+    for row in live_rows:
+        key = _quote_row_date(row)
+        if key is None:
+            undated.append(row)
+        else:
+            by_date[key] = row
+    ordered = [by_date[key] for key in sorted(by_date)]
+    ordered.extend(undated)
+    return ordered
+
+
 def _fetch_quotes(codes: List[str]) -> Dict[str, Any]:
     """Fetch the latest available price for each code via fetch_market_data.
 
-    Uses a single-day window so the loader returns the most recent bar.
-    Per-symbol failures are recorded in ``data_gaps`` rather than raising.
+    A quote must pair ``close`` with the previous session's close (昨收) of the
+    *same* trading date. Tencent's daily kline only serves today's bar when the
+    window is exactly that single day, so the live window alone never contains
+    the prior session. A short finalized window is fetched alongside and the two
+    are merged, letting the last two bars be read as (昨收, close). Per-symbol
+    failures are recorded in ``data_gaps`` rather than raising.
     """
-    today = date.today().isoformat()
+    today = date.today()
+    today_str = today.isoformat()
+    history_start = (today - timedelta(days=_QUOTE_PREV_LOOKBACK_DAYS)).isoformat()
     try:
-        raw = fetch_market_data(
+        live = fetch_market_data(
             codes=codes,
-            start_date=today,
-            end_date=today,
+            start_date=today_str,
+            end_date=today_str,
             interval="1D",
             max_rows=2,
         )
@@ -321,23 +371,43 @@ def _fetch_quotes(codes: List[str]) -> Dict[str, Any]:
             "data_gaps": [{"code": "__batch__", "reason": f"fetch_failed: {exc}"}],
         }
 
+    # Best-effort finalized series for the 昨收 basis; degrades to the live
+    # window alone (the pre-fix behavior) when unavailable.
+    try:
+        history = fetch_market_data(
+            codes=codes,
+            start_date=history_start,
+            end_date=today_str,
+            interval="1D",
+            max_rows=0,
+        )
+    except Exception:  # noqa: BLE001 — a failed history fetch must not drop live quotes
+        logger.exception("Failed to fetch quote history; using live bars only")
+        history = {}
+
     quotes: List[Dict[str, Any]] = []
     data_gaps: List[Dict[str, Any]] = []
-    unresolved = set(raw.get("_unresolved", []))
+    unresolved = set(live.get("_unresolved", [])) | set(history.get("_unresolved", []))
     updated_at = datetime.now().astimezone().isoformat()
 
     for code in codes:
         if code in unresolved:
             data_gaps.append({"code": code, "reason": "unresolved_symbol"})
             continue
-        records = raw.get(code)
-        if not records:
+        live_rows = live.get(code) or []
+        if not isinstance(live_rows, list):
+            live_rows = []
+        history_rows = history.get(code) or []
+        if not isinstance(history_rows, list):
+            history_rows = []
+        rows = _merge_quote_rows(history_rows, live_rows)
+        if not rows:
             data_gaps.append({"code": code, "reason": "no_data"})
             continue
 
         try:
-            latest = records[-1]
-            prev = records[-2] if len(records) > 1 else None
+            latest = rows[-1]
+            prev = rows[-2] if len(rows) > 1 else None
             close = float(latest["close"]) if latest.get("close") is not None else None
             prev_close = float(prev["close"]) if prev and prev.get("close") is not None else None
             daily_return = None
@@ -353,6 +423,7 @@ def _fetch_quotes(codes: List[str]) -> Dict[str, Any]:
                     "prev_close": prev_close,
                     "daily_return": daily_return,
                     "change_amount": change_amount,
+                    "date": _quote_row_date(latest),
                     "updated_at": updated_at,
                     "error": None,
                 }
