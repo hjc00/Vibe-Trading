@@ -228,7 +228,7 @@ def _saved_snapshot(store: TrackerStore) -> None:
 def test_analyze_no_snapshot_returns_404(client):
     response = client.post(
         "/api/stock-tracker/analyze",
-        json={"symbols": ["600519.SH"], "focus": "rank_opportunities"},
+        json={"symbols": ["600519.SH"]},
     )
     assert response.status_code == 404
 
@@ -237,7 +237,7 @@ def test_analyze_invalid_symbol_returns_422(client, isolated_tracker_store):
     _saved_snapshot(isolated_tracker_store)
     response = client.post(
         "/api/stock-tracker/analyze",
-        json={"symbols": ["INVALID"], "focus": "rank_opportunities"},
+        json={"symbols": ["INVALID"]},
     )
     assert response.status_code == 422
 
@@ -253,7 +253,7 @@ def test_analyze_returns_report(client, isolated_tracker_store):
     with patch("src.api.stock_tracker_routes.run_analysis", return_value=fake_report):
         response = client.post(
             "/api/stock-tracker/analyze",
-            json={"symbols": ["600519.SH"], "focus": "rank_opportunities"},
+            json={"symbols": ["600519.SH"]},
         )
     assert response.status_code == 200
     data = response.json()
@@ -280,7 +280,7 @@ def test_analyze_persists_and_get_returns_report(client, isolated_tracker_store)
     with patch("src.api.stock_tracker_routes.run_analysis", return_value=fake_report):
         response = client.post(
             "/api/stock-tracker/analyze",
-            json={"symbols": ["600519.SH"], "focus": "rank_opportunities"},
+            json={"symbols": ["600519.SH"]},
         )
     assert response.status_code == 200
 
@@ -317,6 +317,152 @@ def test_get_analysis_by_id_endpoint(client, isolated_tracker_store):
 def test_get_analysis_by_id_404(client):
     response = client.get("/api/stock-tracker/analyze/nonexistent")
     assert response.status_code == 404
+
+
+def test_delete_analysis_removes_report_and_history(client, isolated_tracker_store):
+    envelope = isolated_tracker_store.save_analysis({"summary": "a"})
+    delete_response = client.delete(f"/api/stock-tracker/analyze/{envelope['id']}")
+    assert delete_response.status_code == 200
+    assert delete_response.json()["deleted"] == envelope["id"]
+
+    history = client.get("/api/stock-tracker/analyze/history").json()
+    assert history["items"] == []
+    by_id = client.get(f"/api/stock-tracker/analyze/{envelope['id']}")
+    assert by_id.status_code == 404
+
+
+def test_delete_analysis_missing_returns_404(client, isolated_tracker_store):
+    response = client.delete("/api/stock-tracker/analyze/nonexistent")
+    assert response.status_code == 404
+
+
+def test_analyze_passes_user_prompt_through(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "user_prompt": "重点看均线多头排列"},
+        )
+    assert response.status_code == 200
+    args, _kwargs = mocked.call_args
+    assert args[2] == "重点看均线多头排列"
+
+
+def test_analyze_ignores_unknown_body_fields(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "focus": "rank_opportunities"},
+        )
+    assert response.status_code == 200
+    args, _kwargs = mocked.call_args
+    assert args[2] is None  # removed focus must not leak into user_prompt
+
+
+def test_analyze_maps_quota_error_to_friendly_502(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis",
+        side_effect=Exception(
+            "OpenAIPermissionDeniedError: Error code: 403 - "
+            "You've reached your weekly (7-day) usage limit."
+        ),
+    ):
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"]},
+        )
+    assert response.status_code == 502
+    assert "配额" in response.json()["detail"]
+
+
+def test_analyze_maps_auth_error_to_friendly_502(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis",
+        side_effect=Exception("Invalid API key provided"),
+    ):
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"]},
+        )
+    assert response.status_code == 502
+    assert "鉴权" in response.json()["detail"]
+
+
+def test_analyze_maps_rate_limit_error_to_friendly_502(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis",
+        side_effect=Exception("Error code: 429 - Rate limit reached"),
+    ):
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"]},
+        )
+    assert response.status_code == 502
+    assert "过于频繁" in response.json()["detail"]
+
+
+def test_track_record_endpoint(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)  # 600519.SH close = 1500.0
+    envelope = isolated_tracker_store.save_analysis(
+        {
+            "summary": "综述",
+            "symbols": [
+                {
+                    "code": "600519.SH",
+                    "action": "buy",
+                    "confidence": 70,
+                    "entry_zone": {"low": 1450.0, "high": 1480.0},
+                    "target_zone": {"low": 1600.0, "high": 1700.0},
+                    "stop_loss": 1420.0,
+                }
+            ],
+            "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+            "caveats": [],
+        }
+    )
+    response = client.get("/api/stock-tracker/analyze/track-record")
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 1
+    item = items[0]
+    assert item["analysis_id"] == envelope["id"]
+    assert item["code"] == "600519.SH"
+    assert item["action"] == "buy"
+    assert item["status"] == "active"  # 1500 below target 1600, above stop 1420
+
+
+def test_track_record_endpoint_ignores_reports_without_price_anchors(client, isolated_tracker_store):
+    isolated_tracker_store.save_analysis(
+        {
+            "summary": "综述",
+            "symbols": [{"code": "600519.SH", "action": "hold", "rationale": "无价位锚点"}],
+            "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+            "caveats": [],
+        }
+    )
+    response = client.get("/api/stock-tracker/analyze/track-record")
+    assert response.status_code == 200
+    assert response.json()["items"] == []
 
 
 def test_config_from_request_coerces_int_threshold_fields(client, isolated_tracker_store):

@@ -180,22 +180,42 @@ class TrackerStore:
     def list_analyses(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Return newest-first analysis summaries for the picker."""
         items: List[Dict[str, Any]] = []
-        for analysis_id in self._list_analysis_ids():
-            envelope = self.get_analysis(analysis_id)
-            if envelope is None:
-                continue
+        for envelope in self.list_analysis_envelopes(limit=limit):
             report = envelope.get("report")
             summary = str(report.get("summary") or "") if isinstance(report, dict) else ""
             items.append(
                 {
-                    "id": analysis_id,
+                    "id": envelope.get("id"),
                     "trading_date": envelope.get("trading_date"),
                     "generated_at": envelope.get("generated_at"),
                     "summary": summary,
                 }
             )
-        items.sort(key=lambda item: item.get("generated_at") or "", reverse=True)
-        return items[: max(1, min(limit, 200))]
+        return items
+
+    def list_analysis_envelopes(self, limit: int = 200) -> List[Dict[str, Any]]:
+        """Return full analysis envelopes, newest first, capped at ``limit``.
+
+        Unlike ``list_analyses`` (summary-only), each envelope keeps its whole
+        ``report`` so callers can replay the stored predictions.
+        """
+        envelopes: List[Dict[str, Any]] = []
+        for analysis_id in self._list_analysis_ids():
+            envelope = self.get_analysis(analysis_id)
+            if envelope is not None:
+                envelopes.append(envelope)
+        envelopes.sort(
+            key=lambda item: item.get("generated_at") or "", reverse=True
+        )
+        return envelopes[: max(1, min(limit, 200))]
+
+    def delete_analysis(self, analysis_id: str) -> bool:
+        """Remove one analysis file. Returns True if the file existed."""
+        path = self._analysis_path(analysis_id)
+        if path.exists():
+            path.unlink()
+            return True
+        return False
 
     def _analysis_path(self, analysis_id: str) -> Path:
         return self.root / _ANALYSES_DIRNAME / f"{analysis_id}.json"

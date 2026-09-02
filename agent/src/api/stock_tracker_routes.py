@@ -9,7 +9,7 @@ import threading
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -17,9 +17,14 @@ from pydantic import BaseModel, Field
 from src.market_data import fetch_market_data
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.engine import StockTrackerEngine
-from src.stock_tracker.models import TrackerConfig, normalize_a_share_code
+from src.stock_tracker.models import (
+    AnalysisReport,
+    TrackerConfig,
+    normalize_a_share_code,
+)
 from src.stock_tracker.signals import list_detector_meta
 from src.stock_tracker.store import TrackerStore
+from src.stock_tracker.track_record import build_track_record
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +50,58 @@ def _get_store() -> TrackerStore:
     if _store is None:
         _store = TrackerStore()
     return _store
+
+
+# (message keywords, friendly hint). Keyword matching is case-insensitive and
+# provider-agnostic so a swap of LANGCHAIN_PROVIDER keeps error mapping working.
+_PROVIDER_ERROR_HINTS: List[tuple[tuple[str, ...], str]] = [
+    (
+        ("usage limit", "weekly", "7-day", "quota", "insufficient_quota", "balance", "余额", "额度"),
+        "模型服务配额已用完：请稍后再试、购买/重置额度，或切换其他模型"
+        "（agent/.env 的 LANGCHAIN_PROVIDER / LANGCHAIN_MODEL_NAME）。",
+    ),
+    (
+        ("rate limit", "too many requests", "请求过于频繁", "429"),
+        "模型服务请求过于频繁，请稍后再试。",
+    ),
+    (
+        ("permission denied", "invalid api key", "unauthorized", "authentication", "鉴权", "密钥", "401", "403"),
+        "模型服务鉴权失败：请检查 agent/.env 中对应模型的 API Key 配置。",
+    ),
+    (
+        ("model not found", "no such model", "does not exist", "invalid model", "模型不存在", "404"),
+        "找不到配置的模型：请检查 agent/.env 的 LANGCHAIN_MODEL_NAME。",
+    ),
+    (
+        ("context length", "maximum context", "too many tokens", "上下文", "输入过长", "超长"),
+        "输入超过模型上下文上限：请减少一次分析的标的数量后重试。",
+    ),
+    (
+        ("connection", "timed out", "timeout", "connect", "网络", "连接失败"),
+        "模型服务网络异常或超时，请稍后再试。",
+    ),
+]
+
+
+def _provider_error_messages(exc: BaseException) -> List[str]:
+    """Collect messages across an exception chain so nested provider errors surface."""
+    messages: List[str] = []
+    seen: set[int] = set()
+    current: Optional[BaseException] = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        messages.append(str(current))
+        current = current.__cause__ or current.__context__
+    return messages
+
+
+def _friendly_provider_error(exc: BaseException) -> Optional[str]:
+    """Map a provider/LLM exception to a friendly Chinese hint, or None."""
+    blob = "\n".join(_provider_error_messages(exc)).lower()
+    for keywords, hint in _PROVIDER_ERROR_HINTS:
+        if any(keyword in blob for keyword in keywords):
+            return hint
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +166,6 @@ class TrackerAnalyzeRequest(BaseModel):
     """Request body for LLM analysis over selected symbols."""
 
     symbols: List[str]
-    focus: Literal["rank_opportunities", "risk_check", "custom"] = "rank_opportunities"
     user_prompt: Optional[str] = None
 
 
@@ -117,7 +173,7 @@ class TrackerAnalyzeResponse(BaseModel):
     """Envelope returned by the analysis endpoint."""
 
     status: str
-    report: Dict[str, Any]
+    report: AnalysisReport
     id: Optional[str] = None
     generated_at: Optional[str] = None
     trading_date: Optional[str] = None
@@ -453,13 +509,25 @@ def register_stock_tracker_routes(
         if not selected.symbols:
             raise HTTPException(status_code=422, detail="No valid symbols selected for analysis.")
 
-        report = await asyncio.to_thread(
-            run_analysis,
-            snapshot,
-            selected.symbols,
-            request.focus,
-            request.user_prompt,
+        logger.info(
+            "Analyze request: %d/%d symbol(s) selected, trading_date=%s",
+            len(selected.symbols),
+            len(request.symbols),
+            snapshot.trading_date,
         )
+        try:
+            report = await asyncio.to_thread(
+                run_analysis,
+                snapshot,
+                selected.symbols,
+                request.user_prompt,
+            )
+        except Exception as exc:  # surface provider/LLM failures as readable errors
+            hint = _friendly_provider_error(exc)
+            if hint is None:
+                raise
+            logger.warning("Analysis failed with provider error: %s", exc)
+            raise HTTPException(status_code=502, detail=hint) from exc
         report["caveats"] = selected.caveats + report.get("caveats", [])
 
         envelope = store.save_analysis(report, trading_date=snapshot.trading_date)
@@ -480,6 +548,22 @@ def register_stock_tracker_routes(
         items = _get_store().list_analyses(limit=limit)
         return {"status": "ok", "items": items}
 
+    @app.get("/api/stock-tracker/analyze/track-record")
+    async def get_track_record(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
+        store = _get_store()
+        analyses = store.list_analysis_envelopes(limit=200)
+        snapshot = store.get_latest_snapshot()
+        close_by_code = (
+            {symbol.code: symbol.close for symbol in snapshot.symbols}
+            if snapshot is not None
+            else {}
+        )
+        items = build_track_record(analyses, close_by_code)
+        return {
+            "status": "ok",
+            "items": [item.model_dump(mode="json") for item in items],
+        }
+
     @app.get("/api/stock-tracker/analyze/{analysis_id}")
     async def get_analysis_by_id(
         analysis_id: str,
@@ -495,6 +579,16 @@ def register_stock_tracker_routes(
             "trading_date": analysis.get("trading_date"),
             "generated_at": analysis.get("generated_at"),
         }
+
+    @app.delete("/api/stock-tracker/analyze/{analysis_id}")
+    async def delete_analysis(
+        analysis_id: str,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        deleted = _get_store().delete_analysis(analysis_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Analysis not found.")
+        return {"status": "ok", "deleted": analysis_id}
 
     @app.get("/api/stock-tracker/analyze")
     async def get_latest_analysis(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001

@@ -1,13 +1,11 @@
 import { useTranslation } from "react-i18next";
 import { Loader2, Sparkles, X } from "lucide-react";
-import type { SymbolSnapshot, TrackerAnalysisFocus } from "@/lib/api";
+import type { SymbolSnapshot } from "@/lib/api";
 
 interface TrackerAnalyzePanelProps {
   symbols: SymbolSnapshot[];
   selectedSymbols: string[];
   onSelectedSymbolsChange: (codes: string[]) => void;
-  focus: TrackerAnalysisFocus;
-  onFocusChange: (focus: TrackerAnalysisFocus) => void;
   userPrompt: string;
   onUserPromptChange: (value: string) => void;
   loading: boolean;
@@ -19,8 +17,6 @@ export function TrackerAnalyzePanel({
   symbols,
   selectedSymbols,
   onSelectedSymbolsChange,
-  focus,
-  onFocusChange,
   userPrompt,
   onUserPromptChange,
   loading,
@@ -104,30 +100,19 @@ export function TrackerAnalyzePanel({
         })}
       </div>
 
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <label className="text-xs text-muted-foreground">{t("stockTracker.analysisFocus")}</label>
-        <select
-          value={focus}
-          onChange={(e) => onFocusChange(e.target.value as TrackerAnalysisFocus)}
-          disabled={loading}
-          className="rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
-        >
-          <option value="rank_opportunities">{t("stockTracker.focusRankOpportunities")}</option>
-          <option value="risk_check">{t("stockTracker.focusRiskCheck")}</option>
-          <option value="custom">{t("stockTracker.focusCustom")}</option>
-        </select>
-      </div>
-
-      {focus === "custom" ? (
+      <div className="mb-3">
+        <label className="mb-1 block text-xs text-muted-foreground">
+          {t("stockTracker.extraPrompt")}
+        </label>
         <textarea
           value={userPrompt}
           onChange={(e) => onUserPromptChange(e.target.value)}
           disabled={loading}
-          rows={3}
+          rows={2}
           placeholder={t("stockTracker.customPromptPlaceholder")}
-          className="mb-3 w-full rounded-md border bg-background px-3 py-2 text-xs outline-none focus:border-primary disabled:opacity-60"
+          className="w-full rounded-md border bg-background px-3 py-2 text-xs outline-none focus:border-primary disabled:opacity-60"
         />
-      ) : null}
+      </div>
 
       <button
         type="button"

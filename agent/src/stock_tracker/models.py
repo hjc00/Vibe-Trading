@@ -403,6 +403,76 @@ class TrackerSnapshot(BaseModel):
         return self.model_dump(mode="json")
 
 
+class AnalysisAction(str, Enum):
+    """Structured analyst action for one symbol recommendation."""
+
+    BUY = "buy"
+    HOLD = "hold"
+    REDUCE = "reduce"
+    AVOID = "avoid"
+
+
+class PriceZone(BaseModel):
+    """A low/high price band used for entry or target recommendations."""
+
+    low: Optional[float] = None
+    high: Optional[float] = None
+
+
+class SymbolRecommendation(BaseModel):
+    """Structured per-symbol recommendation produced by the LLM analyzer."""
+
+    code: str
+    name: Optional[str] = None
+    action: AnalysisAction = AnalysisAction.HOLD
+    confidence: Optional[float] = Field(default=None, ge=0, le=100)  # 0-100
+    rationale: str = ""
+    entry_zone: Optional[PriceZone] = None  # 合理买入区间
+    target_zone: Optional[PriceZone] = None  # 目标价区间
+    stop_loss: Optional[float] = None  # 止损参考价
+    reduce_trigger: Optional[str] = None  # 减仓/止损触发条件（叙述）
+    track_metrics: List[str] = Field(default_factory=list)  # 关键跟踪指标名
+    time_horizon: Optional[str] = None
+    risks: List[str] = Field(default_factory=list)
+    # Snapshot value chips (rsi/volume_ratio/...) preserved for the frontend.
+    key_metrics: Dict[str, Any] = Field(default_factory=dict)
+
+
+class PortfolioInsight(BaseModel):
+    """Portfolio-level view inside an analysis report."""
+
+    theme: str = ""
+    top_pick: Optional[str] = None
+    cautions: List[str] = Field(default_factory=list)
+
+
+class AnalysisReport(BaseModel):
+    """A normalized LLM analysis report over selected symbols."""
+
+    summary: str = ""
+    symbols: List[SymbolRecommendation] = Field(default_factory=list)
+    portfolio: PortfolioInsight = Field(default_factory=PortfolioInsight)
+    caveats: List[str] = Field(default_factory=list)
+
+
+class TrackRecordItem(BaseModel):
+    """A persisted, verifiable prediction for one symbol recommendation."""
+
+    analysis_id: str
+    trading_date: Optional[date] = None
+    code: str
+    name: Optional[str] = None
+    action: str = "hold"
+    confidence: Optional[float] = None
+    entry_zone: Optional[PriceZone] = None
+    target_zone: Optional[PriceZone] = None
+    stop_loss: Optional[float] = None
+    time_horizon: Optional[str] = None
+    current_close: Optional[float] = None
+    # pending / active / hit_target / stopped_out
+    status: str = "active"
+
+
 class TrackerSettings(BaseModel):
     """Persisted tracker settings plus optional metadata."""
 
@@ -491,6 +561,12 @@ __all__ = [
     "CrossDayDiff",
     "SymbolSnapshot",
     "TrackerSnapshot",
+    "AnalysisAction",
+    "PriceZone",
+    "SymbolRecommendation",
+    "PortfolioInsight",
+    "AnalysisReport",
+    "TrackRecordItem",
     "TrackerSettings",
     "normalize_a_share_code",
 ]

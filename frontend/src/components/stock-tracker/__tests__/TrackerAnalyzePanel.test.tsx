@@ -24,8 +24,6 @@ const baseProps = {
   symbols: [symbol("600519.SH", "贵州茅台"), symbol("000001.SZ", "平安银行")],
   selectedSymbols: [],
   onSelectedSymbolsChange: vi.fn(),
-  focus: "rank_opportunities" as const,
-  onFocusChange: vi.fn(),
   userPrompt: "",
   onUserPromptChange: vi.fn(),
   loading: false,
@@ -65,11 +63,17 @@ describe("TrackerAnalyzePanel", () => {
     expect(onSelectedSymbolsChange).toHaveBeenCalledWith(["600519.SH", "000001.SZ"]);
   });
 
-  it("shows the custom prompt textarea only for the custom focus", () => {
-    const { rerender } = render(<TrackerAnalyzePanel {...baseProps} focus="custom" />);
+  it("always shows the optional extra-instruction textarea", () => {
+    render(<TrackerAnalyzePanel {...baseProps} />);
     expect(screen.getByPlaceholderText(/bullish MA alignment/i)).toBeInTheDocument();
+  });
 
-    rerender(<TrackerAnalyzePanel {...baseProps} focus="rank_opportunities" />);
-    expect(screen.queryByPlaceholderText(/bullish MA alignment/i)).not.toBeInTheDocument();
+  it("typing the extra instruction reports the value", () => {
+    const onUserPromptChange = vi.fn();
+    render(<TrackerAnalyzePanel {...baseProps} onUserPromptChange={onUserPromptChange} />);
+    fireEvent.change(screen.getByPlaceholderText(/bullish MA alignment/i), {
+      target: { value: "重点看均线多头排列" },
+    });
+    expect(onUserPromptChange).toHaveBeenCalledWith("重点看均线多头排列");
   });
 });

@@ -7,6 +7,8 @@ const apiMock = vi.hoisted(() => ({
   getStockTrackerAnalysis: vi.fn(),
   getStockTrackerAnalysisHistory: vi.fn(),
   getStockTrackerAnalysisById: vi.fn(),
+  getStockTrackerTrackRecord: vi.fn(),
+  deleteStockTrackerAnalysis: vi.fn(),
 }));
 
 vi.mock("@/lib/api", async () => {
@@ -32,6 +34,10 @@ beforeEach(() => {
   apiMock.getStockTrackerAnalysis.mockReset();
   apiMock.getStockTrackerAnalysisHistory.mockReset();
   apiMock.getStockTrackerAnalysisById.mockReset();
+  apiMock.getStockTrackerTrackRecord.mockReset();
+  apiMock.deleteStockTrackerAnalysis.mockReset();
+  apiMock.getStockTrackerTrackRecord.mockResolvedValue({ status: "ok", items: [] });
+  apiMock.deleteStockTrackerAnalysis.mockResolvedValue({ status: "ok", deleted: "x" });
 });
 
 describe("stockTrackerAnalysis store", () => {
@@ -39,13 +45,13 @@ describe("stockTrackerAnalysis store", () => {
     const s = useStockTrackerAnalysisStore.getState();
     expect(s.open).toBe(false);
     expect(s.selectedSymbols).toEqual([]);
-    expect(s.focus).toBe("rank_opportunities");
     expect(s.userPrompt).toBe("");
     expect(s.loading).toBe(false);
     expect(s.report).toBeNull();
     expect(s.error).toBeNull();
     expect(s.history).toEqual([]);
     expect(s.selectedId).toBeNull();
+    expect(s.trackRecord).toBeNull();
   });
 
   it("run is a no-op when no symbols are selected", async () => {
@@ -63,9 +69,21 @@ describe("stockTrackerAnalysis store", () => {
       status: "ok",
       items: [{ id: "20260831T101500000000", summary: "综述" }],
     });
+    apiMock.getStockTrackerTrackRecord.mockResolvedValue({
+      status: "ok",
+      items: [
+        {
+          analysis_id: "20260831T101500000000",
+          code: "600519.SH",
+          action: "buy",
+          status: "active",
+          target_zone: { low: 1600, high: 1700 },
+          current_close: 1500,
+        },
+      ],
+    });
     const store = useStockTrackerAnalysisStore.getState();
     store.setSelectedSymbols(["600519.SH"]);
-    store.setFocus("risk_check");
 
     const pending = store.run();
     expect(useStockTrackerAnalysisStore.getState().loading).toBe(true);
@@ -76,10 +94,32 @@ describe("stockTrackerAnalysis store", () => {
     expect(s.report?.summary).toBe("综述");
     expect(s.selectedId).toBe("20260831T101500000000");
     expect(s.history).toHaveLength(1);
+    expect(s.trackRecord).toHaveLength(1);
     expect(apiMock.analyzeStockTracker).toHaveBeenCalledWith({
       symbols: ["600519.SH"],
-      focus: "risk_check",
       user_prompt: null,
+    });
+    expect(apiMock.getStockTrackerTrackRecord).toHaveBeenCalled();
+  });
+
+  it("run sends a non-empty extra instruction", async () => {
+    apiMock.analyzeStockTracker.mockResolvedValue({
+      status: "ok",
+      report: report(),
+      id: "20260831T101500000000",
+    });
+    apiMock.getStockTrackerAnalysisHistory.mockResolvedValue({
+      status: "ok",
+      items: [],
+    });
+    const store = useStockTrackerAnalysisStore.getState();
+    store.setSelectedSymbols(["600519.SH"]);
+    store.setUserPrompt("重点看均线多头排列");
+
+    await store.run();
+    expect(apiMock.analyzeStockTracker).toHaveBeenCalledWith({
+      symbols: ["600519.SH"],
+      user_prompt: "重点看均线多头排列",
     });
   });
 
@@ -102,6 +142,25 @@ describe("stockTrackerAnalysis store", () => {
     });
     await useStockTrackerAnalysisStore.getState().loadHistory();
     expect(useStockTrackerAnalysisStore.getState().history).toHaveLength(2);
+  });
+
+  it("loadTrackRecord populates the prediction list", async () => {
+    apiMock.getStockTrackerTrackRecord.mockResolvedValue({
+      status: "ok",
+      items: [
+        {
+          analysis_id: "a",
+          code: "600519.SH",
+          action: "buy",
+          status: "active",
+          target_zone: { low: 1600, high: 1700 },
+          current_close: 1500,
+        },
+      ],
+    });
+    await useStockTrackerAnalysisStore.getState().loadTrackRecord();
+    expect(useStockTrackerAnalysisStore.getState().trackRecord).toHaveLength(1);
+    expect(useStockTrackerAnalysisStore.getState().trackRecord?.[0].status).toBe("active");
   });
 
   it("loadLatest restores the report and selected id", async () => {
@@ -127,5 +186,27 @@ describe("stockTrackerAnalysis store", () => {
     expect(s.report?.summary).toBe("综述");
     expect(s.selectedId).toBe("picked-id");
     expect(apiMock.getStockTrackerAnalysisById).toHaveBeenCalledWith("picked-id");
+  });
+
+  it("deleteAnalysis removes the current report and refreshes history", async () => {
+    apiMock.getStockTrackerAnalysis.mockResolvedValue({
+      status: "ok",
+      report: report(),
+      id: "to-delete",
+    });
+    await useStockTrackerAnalysisStore.getState().loadLatest();
+    expect(useStockTrackerAnalysisStore.getState().selectedId).toBe("to-delete");
+
+    apiMock.getStockTrackerAnalysisHistory.mockResolvedValue({
+      status: "ok",
+      items: [],
+    });
+    await useStockTrackerAnalysisStore.getState().deleteAnalysis("to-delete");
+
+    expect(apiMock.deleteStockTrackerAnalysis).toHaveBeenCalledWith("to-delete");
+    const s = useStockTrackerAnalysisStore.getState();
+    expect(s.selectedId).toBeNull();
+    expect(s.report).toBeNull();
+    expect(s.history).toEqual([]);
   });
 });

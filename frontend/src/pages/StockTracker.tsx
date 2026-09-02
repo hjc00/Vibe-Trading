@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type SignalMeta, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import { computePriceChange, formatQuoteUpdatedAt, formatRps, getQualityToneClass, getRpsToneClass, normalizeAShareCode } from "@/lib/stockTracker";
@@ -18,6 +18,7 @@ import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
 import { SectorStrengthBoard } from "@/components/stock-tracker/SectorStrengthBoard";
+import { TrackerTrackRecord } from "@/components/stock-tracker/TrackerTrackRecord";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -45,23 +46,31 @@ export function StockTracker() {
   const {
     open: analyzeOpen,
     selectedSymbols,
-    focus: analysisFocus,
     userPrompt,
     loading: analysisLoading,
     report: analysisReport,
     error: analysisError,
     history: analysisHistory,
     selectedId,
+    trackRecord,
     setOpen: setAnalyzeOpen,
     setSelectedSymbols,
-    setFocus: setAnalysisFocus,
     setUserPrompt,
     setError: setAnalysisError,
     run: runAnalysis,
     loadLatest,
     loadHistory,
+    loadTrackRecord,
+    deleteAnalysis,
     selectAnalysis,
   } = useStockTrackerAnalysisStore();
+
+  const handleDeleteAnalysis = () => {
+    if (!selectedId) return;
+    if (window.confirm(t("stockTracker.deleteAnalysisConfirm"))) {
+      void deleteAnalysis(selectedId);
+    }
+  };
 
   const loadSnapshot = useCallback(async () => {
     try {
@@ -252,13 +261,13 @@ export function StockTracker() {
     let mounted = true;
     (async () => {
       setLoading(true);
-      await Promise.all([loadSettings(), loadSnapshot(), loadSignals(), loadLatest(), loadHistory()]);
+      await Promise.all([loadSettings(), loadSnapshot(), loadSignals(), loadLatest(), loadHistory(), loadTrackRecord()]);
       if (mounted) setLoading(false);
     })();
     return () => {
       mounted = false;
     };
-  }, [loadSettings, loadSnapshot, loadSignals, loadLatest, loadHistory]);
+  }, [loadSettings, loadSnapshot, loadSignals, loadLatest, loadHistory, loadTrackRecord]);
 
   useEffect(() => {
     if (!config || loading) return undefined;
@@ -392,18 +401,30 @@ export function StockTracker() {
                     {analysisHistory.length === 0 ? (
                       <span className="text-xs text-muted-foreground/70">{t("stockTracker.analysisHistoryEmpty")}</span>
                     ) : (
-                      <select
-                        value={selectedId ?? ""}
-                        onChange={(e) => selectAnalysis(e.target.value)}
-                        disabled={analysisLoading}
-                        className="max-w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
-                      >
-                        {analysisHistory.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {formatAnalysisTimestamp(item.generated_at)} — {item.summary.slice(0, 40)}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={selectedId ?? ""}
+                          onChange={(e) => selectAnalysis(e.target.value)}
+                          disabled={analysisLoading}
+                          className="max-w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
+                        >
+                          {analysisHistory.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {formatAnalysisTimestamp(item.generated_at)} — {(item.summary ?? "").slice(0, 40)}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={handleDeleteAnalysis}
+                          disabled={!selectedId || analysisLoading}
+                          aria-label={t("stockTracker.deleteAnalysis")}
+                          title={t("stockTracker.deleteAnalysis")}
+                          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -413,8 +434,6 @@ export function StockTracker() {
                     symbols={snapshot?.symbols ?? []}
                     selectedSymbols={selectedSymbols}
                     onSelectedSymbolsChange={setSelectedSymbols}
-                    focus={analysisFocus}
-                    onFocusChange={setAnalysisFocus}
                     userPrompt={userPrompt}
                     onUserPromptChange={setUserPrompt}
                     loading={analysisLoading}
@@ -428,6 +447,7 @@ export function StockTracker() {
                 ) : null}
 
                 <TrackerAnalysisReport report={analysisReport} />
+                <TrackerTrackRecord items={trackRecord ?? []} />
               </section>
             ) : null}
 

@@ -612,9 +612,16 @@ export const api = {
     ),
   getStockTrackerAnalysisHistory: () =>
     request<TrackerAnalysisHistoryResponse>("/api/stock-tracker/analyze/history"),
+  getStockTrackerTrackRecord: () =>
+    request<TrackerTrackRecordResponse>("/api/stock-tracker/analyze/track-record"),
   getStockTrackerAnalysisById: (id: string) =>
     request<TrackerAnalyzeResponse>(
       `/api/stock-tracker/analyze/${encodeURIComponent(id)}`,
+    ),
+  deleteStockTrackerAnalysis: (id: string) =>
+    request<{ status: string; deleted: string }>(
+      `/api/stock-tracker/analyze/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
     ),
 };
 
@@ -2020,22 +2027,35 @@ export interface StockTrackerRefreshState {
 
 // --- Stock Tracker LLM analysis ---
 
-export type TrackerAnalysisFocus = "rank_opportunities" | "risk_check" | "custom";
+export type RecommendationAction = "buy" | "hold" | "reduce" | "avoid";
 
 export interface TrackerAnalyzeRequest {
   symbols: string[];
-  focus: TrackerAnalysisFocus;
   user_prompt?: string | null;
+}
+
+export interface PriceZone {
+  low?: number | null;
+  high?: number | null;
 }
 
 export interface SymbolRecommendation {
   code: string;
   name?: string | null;
-  recommendation: string;
-  confidence: "high" | "medium" | "low";
-  rationale: string;
-  key_metrics: Record<string, unknown>;
-  risks: string[];
+  // New reports carry the structured 4-value ``action``. Historical reports
+  // expose the legacy free-text ``recommendation`` instead, so both are
+  // optional and callers resolve ``action ?? mapLegacy(recommendation)``.
+  action?: RecommendationAction | null;
+  recommendation?: string | null;
+  confidence?: number | string | null;
+  rationale?: string;
+  entry_zone?: PriceZone | null;
+  target_zone?: PriceZone | null;
+  stop_loss?: number | null;
+  reduce_trigger?: string | null;
+  track_metrics?: string[];
+  key_metrics?: Record<string, unknown>;
+  risks?: string[];
   time_horizon?: string | null;
 }
 
@@ -2060,11 +2080,31 @@ export interface TrackerAnalyzeResponse {
   trading_date?: string | null;
 }
 
+export interface TrackerTrackRecordItem {
+  analysis_id: string;
+  trading_date?: string | null;
+  code: string;
+  name?: string | null;
+  action: RecommendationAction;
+  confidence?: number | null;
+  entry_zone?: PriceZone | null;
+  target_zone?: PriceZone | null;
+  stop_loss?: number | null;
+  time_horizon?: string | null;
+  current_close?: number | null;
+  status: "pending" | "active" | "hit_target" | "stopped_out";
+}
+
+export interface TrackerTrackRecordResponse {
+  status: string;
+  items: TrackerTrackRecordItem[];
+}
+
 export interface TrackerAnalysisHistoryItem {
   id: string;
   generated_at?: string | null;
   trading_date?: string | null;
-  summary: string;
+  summary?: string;
 }
 
 export interface TrackerAnalysisHistoryResponse {

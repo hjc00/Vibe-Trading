@@ -2,7 +2,7 @@
 
 > 本文档用于跟踪 A 股多周期股票追踪器（`stock_tracker`）的后续优化方向。
 > 创建时间：2026-09-01
-> 最后更新：2026-09-02（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量指标）
+> 最后更新：2026-09-02（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量指标、2.10 AI 分析结构化升级）
 
 ## 一、现状概述
 
@@ -153,10 +153,12 @@
 - **涉及模块**：`agent/src/stock_tracker/analyzer.py`、前端 `TrackerAnalysisReport.tsx`。
 - **大致方案**：
   1. 给 LLM prompt 注入行业景气度、估值分位、基本面质量评分、RPS、资金流、风险指标。
-  2. 新增 focus 模式：`long_term_quality`（长线质量选股）、`sector_rotation`（行业轮动机会）、`dividend_income`（高股息配置）。
+  2. ~~新增 focus 模式…~~（已取消：经评审移除 focus 概念，报告固定全维度输出；面板仅保留可选「补充指令」透传 `user_prompt`）。
   3. 要求输出结构化 action：`BUY`/`HOLD`/`REDUCE` + 合理买入区间/目标价区间 + 止损/减仓触发条件 + 关键跟踪指标 + 时间周期 + 置信度。
   4. 保存预测，后续可验证并生成 track record。
 - **验收标准**：报告包含明确的 action 和关键价位，预测可后续验证。
+
+> 落地注记（2026-09-02）：action 定为 `buy/hold/reduce/avoid` 四值（另含 `avoid`）；置信度 0–100；注入字段新增资金流/风险/行业景气度；**focus（分析重点）概念已移除**——固定全维度分析，前端仅保留可选「补充指令」输入框，后端仍接受可选 `user_prompt`；track record 本轮做「持久化 + 只读清单」（以最新价分类 pending/active/hit_target/stopped_out），胜率/盈亏比留给 2.7 统一统计。
 
 ---
 
@@ -202,7 +204,7 @@
 | 2.7 | 信号历史绩效追踪 | 待开始 | - | - | - | |
 | 2.8 | 组合风险检查 | 待开始 | - | - | - | |
 | 2.9 | 事件与日历集成 | 待开始 | - | - | - | |
-| 2.10 | AI 分析结构化升级 | 待开始 | - | - | - | |
+| 2.10 | AI 分析结构化升级 | 已完成 | jinchu | 2026-09-02 | 2026-09-02 | LLM 输出结构化 `AnalysisReport`：action 四值(buy/hold/reduce/avoid)+置信度 0–100+买入/目标区间+止损+减仓触发+跟踪指标；注入资金流/风险/行业景气度字段；**focus 概念已移除**（固定全维度，前端保留可选「补充指令」透传 user_prompt）；预测持久化 + 只读 track-record 清单（pending/active/hit_target/stopped_out，用最新价比对，暂不算胜率，见 2.7） |
 | 2.11 | 分钟级盘中监控 | 待开始 | - | - | - | |
 | 2.12 | 预警通知系统 | 待开始 | - | - | - | |
 | 2.13 | 多 watchlist / 组合管理 | 待开始 | - | - | - | |
@@ -212,8 +214,9 @@
 
 ## 五、相关文件
 
-- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`
+- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`、`track_record.py`
 - API 路由：`agent/src/api/stock_tracker_routes.py`
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`、`TrackerAnalyzePanel.tsx`、`TrackerAnalysisReport.tsx`、`TrackerTrackRecord.tsx`
+- 前端库：`frontend/src/lib/stockTracker.ts`（含 action/status tone 与 label key 助手）、`frontend/src/lib/api.ts`（分析/预测类型）
 - 项目索引：`docs/PROJECT_INDEX.md`

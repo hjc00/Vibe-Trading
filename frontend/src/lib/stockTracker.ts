@@ -1,4 +1,10 @@
-import type { SignalMeta, SignalType, SymbolSnapshot } from "@/lib/api";
+import type {
+  RecommendationAction,
+  SignalMeta,
+  SignalType,
+  SymbolSnapshot,
+  TrackerTrackRecordItem,
+} from "@/lib/api";
 import type { TFunction } from "i18next";
 
 export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
@@ -219,5 +225,77 @@ export function normalizeAShareCode(code: string): string | null {
   if (suffix) {
     return `${numeric}.${suffix}`;
   }
+  return null;
+}
+
+export type RecommendationTrackStatus = TrackerTrackRecordItem["status"];
+
+const ACTION_LABEL_KEYS = {
+  buy: "stockTracker.actionBuy",
+  hold: "stockTracker.actionHold",
+  reduce: "stockTracker.actionReduce",
+  avoid: "stockTracker.actionAvoid",
+} as const;
+
+const STATUS_LABEL_KEYS = {
+  hit_target: "stockTracker.statusHitTarget",
+  stopped_out: "stockTracker.statusStoppedOut",
+  active: "stockTracker.statusActive",
+  pending: "stockTracker.statusPending",
+} as const;
+
+export function getActionLabelKey(
+  action: RecommendationAction,
+): (typeof ACTION_LABEL_KEYS)[RecommendationAction] {
+  return ACTION_LABEL_KEYS[action];
+}
+
+export function getActionToneClass(action: RecommendationAction): string {
+  switch (action) {
+    case "buy":
+      return "bg-success/10 text-success";
+    case "reduce":
+    case "avoid":
+      return "bg-danger/10 text-danger";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+}
+
+export function getStatusLabelKey(
+  status: RecommendationTrackStatus,
+): (typeof STATUS_LABEL_KEYS)[RecommendationTrackStatus] {
+  return STATUS_LABEL_KEYS[status];
+}
+
+export function getStatusToneClass(status: RecommendationTrackStatus): string {
+  switch (status) {
+    case "hit_target":
+      return "bg-success/10 text-success";
+    case "stopped_out":
+      return "bg-danger/10 text-danger";
+    case "active":
+      return "bg-primary/10 text-primary";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+}
+
+/** Compact price display for analysis price bands (avoids trailing zeros). */
+export function formatTrackPrice(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+}
+
+/** Render a price band as "low – high", "≤ high" or "≥ low"; null when empty. */
+export function formatPriceZoneText(
+  zone: { low?: number | null; high?: number | null } | null | undefined,
+): string | null {
+  if (!zone) return null;
+  const low = zone.low != null ? formatTrackPrice(zone.low) : null;
+  const high = zone.high != null ? formatTrackPrice(zone.high) : null;
+  if (low != null && high != null) return `${low} – ${high}`;
+  if (high != null) return `≤ ${high}`;
+  if (low != null) return `≥ ${low}`;
   return null;
 }
