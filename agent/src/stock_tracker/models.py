@@ -25,6 +25,27 @@ DEFAULT_WATCHLIST: List[str] = [
     "600036.SH",
 ]
 
+# Indicator blocks that may be injected into an LLM analysis prompt. Each key
+# maps 1:1 to a serialization block in the analyzer (symbol-level slices plus
+# the snapshot-level sectors/concepts/market_sentiment context). Order defines
+# both the config canonical order and the prompt directive bullet order.
+ANALYSIS_INDICATORS: List[str] = [
+    "period_signals",
+    "fund_flow",
+    "margin",
+    "risk",
+    "valuation",
+    "events",
+    "concept",
+    "consensus",
+    "chip",
+    "sector",
+    "diff",
+    "market_sentiment",
+    "sectors",
+    "concepts",
+]
+
 
 class TrackerThresholds(BaseModel):
     """User-overridable thresholds for signal detection.
@@ -81,6 +102,13 @@ class TrackerConfig(BaseModel):
         ge=1,
         description="Number of detail cards to show (max three per row; extras wrap).",
     )
+    # Indicator blocks injected into LLM analysis prompts. Defaults to every
+    # known block so existing reports are unchanged; persisted with the rest of
+    # the config so the selection survives restarts.
+    analysis_indicators: List[str] = Field(
+        default_factory=lambda: list(ANALYSIS_INDICATORS),
+        description="Analysis indicator blocks fed to the LLM (subset of ANALYSIS_INDICATORS).",
+    )
 
     @field_validator("watchlist")
     @classmethod
@@ -125,6 +153,23 @@ class TrackerConfig(BaseModel):
                 unique.append(signal)
         if not unique:
             raise ValueError("signals must contain at least one signal type")
+        return unique
+
+    @field_validator("analysis_indicators")
+    @classmethod
+    def _validate_analysis_indicators(cls, value: List[str]) -> List[str]:
+        """Reject unknown analysis indicator keys and keep at least one."""
+        known = set(ANALYSIS_INDICATORS)
+        unique: List[str] = []
+        seen: set[str] = set()
+        for key in value:
+            if key not in known:
+                raise ValueError(f"Unknown analysis indicator: {key}")
+            if key not in seen:
+                seen.add(key)
+                unique.append(key)
+        if not unique:
+            raise ValueError("analysis_indicators must contain at least one indicator")
         return unique
 
     def model_dump_json_safe(self) -> Dict[str, Any]:
@@ -727,6 +772,7 @@ __all__ = [
     "DEFAULT_PERIODS",
     "DEFAULT_SIGNALS",
     "DEFAULT_WATCHLIST",
+    "ANALYSIS_INDICATORS",
     "SignalType",
     "SignalState",
     "SignalValue",

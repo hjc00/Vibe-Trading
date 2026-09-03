@@ -154,6 +154,47 @@ def test_serialize_symbol_with_capital_is_json_safe():
     json.dumps(data, ensure_ascii=False)  # must not raise TypeError
 
 
+def test_serialize_symbol_gates_capital_subblocks_by_enabled():
+    from src.stock_tracker.models import (
+        CapitalMetrics,
+        FundFlowSnapshot,
+        MarginSnapshot,
+    )
+
+    symbol = _snapshot().symbols[0]
+    symbol.capital = CapitalMetrics(
+        fund_flow=FundFlowSnapshot(
+            trade_date=date(2026, 8, 31),
+            main_net=1_000_000.0,
+            main_5d_net=500_000.0,
+        ),
+        margin=MarginSnapshot(
+            trade_date=date(2026, 8, 31),
+            financing_balance=20_000_000.0,
+        ),
+        fund_flow_source="eastmoney",
+        margin_source="eastmoney",
+    )
+    # Margin only (the user's "融资融券传入、主力资金不传入" case): the fund-flow
+    # block and its provenance must not leak into the payload.
+    data = _serialize_symbol(symbol, enabled={"margin"})
+    assert data["capital"]["margin"]["financing_balance"] == 20_000_000.0
+    assert "fund_flow" not in data["capital"]
+    assert "fund_flow_source" not in data["capital"]
+    # Disabled top-level blocks are omitted entirely.
+    assert "period_signals" not in data
+    assert "risk" not in data
+    assert data["code"] == "600519.SH"
+
+
+def test_serialize_symbol_keeps_block_keys_null_when_enabled_but_empty():
+    symbol = _snapshot().symbols[0]
+    data = _serialize_symbol(symbol)
+    # Enabled-but-unavailable blocks keep their key with a null value.
+    assert data["risk"] is None
+    assert data["capital"] is None
+
+
 def test_serialize_symbol_includes_events():
     from src.stock_tracker.models import EventItem, EventSnapshot
 
@@ -188,6 +229,29 @@ def test_build_analysis_prompt_includes_event_risk_directive():
     prompt = build_analysis_prompt(snapshot, snapshot.symbols)
     assert "事件日历" in prompt
     assert "综合事件风险分" in prompt
+
+
+def test_build_analysis_prompt_filters_indicator_blocks():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(
+        snapshot, snapshot.symbols, analysis_indicators=["period_signals"]
+    )
+    assert "600519.SH" in prompt
+    # Disabled dimensions must neither appear in the directive nor the payload.
+    # (Assert on directive-only fragments: the fixed output template mentions
+    # generic terms like 主力资金 in its example reduce_trigger.)
+    assert "融资融券" not in prompt
+    assert "主力净流入" not in prompt
+    assert "事件日历" not in prompt
+
+
+def test_build_analysis_prompt_uses_config_selection_by_default():
+    snapshot = _snapshot()
+    snapshot.config = TrackerConfig(analysis_indicators=["margin"])
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert "融资融券" in prompt
+    assert "主力净流入" not in prompt
+    assert "技术面" not in prompt
 
 
 def test_serialize_sector_is_compact():

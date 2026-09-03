@@ -1767,6 +1767,8 @@ export interface TrackerConfig {
   refresh_interval_seconds: number;
   /** Number of detail cards to render (max three per row; extras wrap). */
   detail_card_count: number;
+  /** Indicator blocks fed to LLM analysis (subset of ANALYSIS_INDICATORS). */
+  analysis_indicators: string[];
 }
 
 export interface StockTrackerQuote {
@@ -2148,6 +2150,8 @@ export interface TrackerAnalyzeRequest {
   symbols: string[];
   user_prompt?: string | null;
   history_limit?: number | null;
+  /** Per-run indicator selection; omitted/undefined falls back to persisted config. */
+  analysis_indicators?: string[] | null;
 }
 
 export interface PriceZone {

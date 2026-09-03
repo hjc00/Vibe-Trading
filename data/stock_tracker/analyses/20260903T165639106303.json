@@ -1,0 +1,130 @@
+{
+  "id": "20260903T165639106303",
+  "trading_date": "2026-09-02",
+  "generated_at": "2026-09-03T16:56:39.106303+08:00",
+  "report": {
+    "summary": "截至2026-09-02，三只标的呈分化：紫光股份5/10日相对强度及融资扩张占优，维持持有；兆易创新基本面质量与PE分位占优但趋势/融资走弱，原买入逻辑降为持有；景旺电子估值高、价格跌破20日线且龙虎榜净卖出，暂不建议新开仓。筹码集中度/北向/公募数据全缺，事件源部分不可用，结论主要基于技术、融资、估值和风险指标。",
+    "symbols": [
+      {
+        "code": "603228.SH",
+        "name": "景旺电子",
+        "action": "avoid",
+        "confidence": 55.0,
+        "rationale": "无历史结论，本次从头看：5日-8.20%、收盘价88.81跌破MA5/10/20，跨日信号1个未新增；20日融资余额+23.96%是主要正向项，但9月1日龙虎榜净卖出3.29亿、PE/PB三年分位97%附近，风险大于机会，暂不新开仓。",
+        "entry_zone": null,
+        "target_zone": null,
+        "stop_loss": null,
+        "reduce_trigger": "若持仓，反抽至93-95元（MA20/MA5）不能收复且放量则减仓；收盘跌破79.66元（MA60）确认中期转弱",
+        "track_metrics": [
+          "rsi",
+          "price_vs_ma20",
+          "volume_ratio",
+          "financing_balance_change",
+          "event_risk_score"
+        ],
+        "time_horizon": "1-2 周观察",
+        "risks": [
+          "龙虎榜净卖出",
+          "PE/PB历史分位高",
+          "Beta 1.75且波动率高"
+        ],
+        "key_metrics": {
+          "rsi": 39.17,
+          "volume_ratio": 0.49,
+          "price_vs_ma20": -0.0476,
+          "pe_percentile_3y": 97.2,
+          "financing_balance_change": 103733969.0,
+          "event_risk_score": 50.0
+        }
+      },
+      {
+        "code": "000938.SZ",
+        "name": "紫光股份",
+        "action": "hold",
+        "confidence": 65.0,
+        "rationale": "相对上次9-1买入结论维持：5日+4.28%、10日+6.53%，价格仍在MA20上方，5日/20日融资余额扩张，跨日信号数2个未变；但现价37.99已高于原入场上沿37.8，改为持有、不追高，原目标/逻辑未证伪。",
+        "entry_zone": null,
+        "target_zone": {
+          "low": 42.0,
+          "high": 44.0
+        },
+        "stop_loss": 33.43,
+        "reduce_trigger": "收盘跌破37.36（MA20）且放量，或融资余额5日变化由正转负",
+        "track_metrics": [
+          "rsi",
+          "volume_ratio",
+          "price_vs_ma20",
+          "margin_expansion_5",
+          "margin_expansion_20",
+          "beta"
+        ],
+        "time_horizon": "2-4 周",
+        "risks": [
+          "PB三年分位92.1偏高",
+          "经营现金流/净利润为负",
+          "Beta 1.63且60日回撤-26.3%"
+        ],
+        "key_metrics": {
+          "rsi": 49.57,
+          "volume_ratio": 0.62,
+          "price_vs_ma20": 0.01674,
+          "pe_percentile_1y": 9.2,
+          "pb_percentile_3y": 92.1,
+          "roe": 13.32,
+          "financing_balance_change": 75617173.0
+        }
+      },
+      {
+        "code": "603986.SH",
+        "name": "兆易创新",
+        "action": "hold",
+        "confidence": 52.0,
+        "rationale": "相对上次9-1买入结论维持但降级为持有：未到目标也未破止损，PE三年分位0.27%、质量评分80.71仍是核心支撑；但5日-5.43%、价格仍低于MA20/MA60，10/60日融资余额收缩，跨日信号仍为0，短期趋势转弱，不宜加仓。",
+        "entry_zone": null,
+        "target_zone": {
+          "low": 430.0,
+          "high": 455.0
+        },
+        "stop_loss": 335.52,
+        "reduce_trigger": "收盘跌破365元（原做多入场区下沿）并放量，或RSI<35且融资余额5日继续下降",
+        "track_metrics": [
+          "rsi",
+          "price_vs_ma20",
+          "volume_ratio",
+          "financing_balance_5d",
+          "beta",
+          "max_drawdown_60d"
+        ],
+        "time_horizon": "2-4 周",
+        "risks": [
+          "60日最大回撤-59.4%",
+          "Beta 2.94高波动",
+          "融资余额持续收缩"
+        ],
+        "key_metrics": {
+          "rsi": 40.67,
+          "volume_ratio": 0.46,
+          "price_vs_ma20": -0.0405,
+          "pe_percentile_3y": 0.27,
+          "fundamental_quality_score": 80.71,
+          "financing_balance_5d": -0.03869,
+          "beta": 2.939
+        }
+      }
+    ],
+    "portfolio": {
+      "theme": "组合内科技标的强弱分化，紫光股份仍是相对更强的跟踪首选；兆易创新低估值但需等高波动企稳，景旺电子暂避。",
+      "top_pick": "000938.SZ",
+      "cautions": [
+        "筹码集中度/北向/公募持仓数据缺失",
+        "紫光股份经营现金流与负债率偏弱",
+        "三只标的Beta均偏高，需注意组合波动"
+      ]
+    },
+    "caveats": [
+      "基于2026-09-02快照，RSI字段存在口径差异，报告采用signal值",
+      "RPS行业分位、部分事件源不可用；景旺电子仅龙虎榜可用",
+      "结论为研究区间，不构成投资建议"
+    ]
+  }
+}

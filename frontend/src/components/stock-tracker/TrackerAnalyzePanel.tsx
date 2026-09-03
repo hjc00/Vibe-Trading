@@ -1,6 +1,12 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Sparkles, X } from "lucide-react";
+import { ChevronDown, Loader2, Sparkles, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { SymbolSnapshot } from "@/lib/api";
+import {
+  ANALYSIS_INDICATORS,
+  ALL_ANALYSIS_INDICATOR_KEYS,
+} from "@/lib/stockTracker";
 
 interface TrackerAnalyzePanelProps {
   symbols: SymbolSnapshot[];
@@ -13,6 +19,9 @@ interface TrackerAnalyzePanelProps {
   onClose: () => void;
   historyLimit?: number;
   onHistoryLimitChange?: (value: number) => void;
+  /** Indicator blocks to feed the LLM; toggling persists via onAnalysisIndicatorsChange. */
+  analysisIndicators?: string[];
+  onAnalysisIndicatorsChange?: (keys: string[]) => void;
 }
 
 export function TrackerAnalyzePanel({
@@ -26,8 +35,11 @@ export function TrackerAnalyzePanel({
   onClose,
   historyLimit = 5,
   onHistoryLimitChange = () => {},
+  analysisIndicators = [...ALL_ANALYSIS_INDICATOR_KEYS],
+  onAnalysisIndicatorsChange = () => {},
 }: TrackerAnalyzePanelProps) {
   const { t } = useTranslation();
+  const [indicatorsOpen, setIndicatorsOpen] = useState(true);
 
   const allCodes = symbols.map((s) => s.code);
   const allSelected = symbols.length > 0 && symbols.every((s) => selectedSymbols.includes(s.code));
@@ -42,6 +54,14 @@ export function TrackerAnalyzePanel({
 
   const selectAll = () => onSelectedSymbolsChange(allCodes);
   const clearAll = () => onSelectedSymbolsChange([]);
+
+  const toggleIndicator = (key: string) => {
+    if (analysisIndicators.includes(key)) {
+      onAnalysisIndicatorsChange(analysisIndicators.filter((k) => k !== key));
+    } else {
+      onAnalysisIndicatorsChange([...analysisIndicators, key]);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
@@ -136,6 +156,52 @@ export function TrackerAnalyzePanel({
           className="w-16 rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary disabled:opacity-60"
         />
         <span className="text-[11px] text-muted-foreground">{t("stockTracker.historyLimitHint")}</span>
+      </div>
+
+      <div className="mb-4 rounded-md border border-border/60 p-3">
+        <button
+          type="button"
+          onClick={() => setIndicatorsOpen((v) => !v)}
+          aria-expanded={indicatorsOpen}
+          className="flex w-full items-center justify-between gap-2 text-left disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={loading}
+        >
+          <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            {t("stockTracker.analysisIndicators")}
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              {analysisIndicators.length}/{ANALYSIS_INDICATORS.length}
+            </span>
+          </span>
+          <ChevronDown
+            className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition", indicatorsOpen && "rotate-180")}
+          />
+        </button>
+
+        {indicatorsOpen && (
+          <div className="mt-2 border-t border-border/60 pt-2">
+            <p className="mb-1.5 text-[10px] text-muted-foreground">{t("stockTracker.analysisIndicatorsHint")}</p>
+            <div className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4">
+              {ANALYSIS_INDICATORS.map((indicator) => {
+                const checked = analysisIndicators.includes(indicator.key);
+                return (
+                  <label
+                    key={indicator.key}
+                    className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={loading}
+                      onChange={() => toggleIndicator(indicator.key)}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    <span className="truncate">{t(indicator.labelKey as never)}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <button

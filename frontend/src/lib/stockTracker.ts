@@ -15,6 +15,32 @@ export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
   margin_expansion: "stockTracker.marginExpansion",
 } as const;
 
+// Analysis indicator blocks that may be injected into an LLM analysis prompt.
+// Order matches the backend canonical order (models.ANALYSIS_INDICATORS).
+export interface AnalysisIndicatorMeta {
+  key: string;
+  labelKey: string;
+}
+
+export const ANALYSIS_INDICATORS: AnalysisIndicatorMeta[] = [
+  { key: "period_signals", labelKey: "stockTracker.indicatorPeriodSignals" },
+  { key: "fund_flow", labelKey: "stockTracker.indicatorFundFlow" },
+  { key: "margin", labelKey: "stockTracker.indicatorMargin" },
+  { key: "risk", labelKey: "stockTracker.indicatorRisk" },
+  { key: "valuation", labelKey: "stockTracker.indicatorValuation" },
+  { key: "events", labelKey: "stockTracker.indicatorEvents" },
+  { key: "concept", labelKey: "stockTracker.indicatorConcept" },
+  { key: "consensus", labelKey: "stockTracker.indicatorConsensus" },
+  { key: "chip", labelKey: "stockTracker.indicatorChip" },
+  { key: "sector", labelKey: "stockTracker.indicatorSector" },
+  { key: "diff", labelKey: "stockTracker.indicatorDiff" },
+  { key: "market_sentiment", labelKey: "stockTracker.indicatorMarketSentiment" },
+  { key: "sectors", labelKey: "stockTracker.indicatorSectors" },
+  { key: "concepts", labelKey: "stockTracker.indicatorConcepts" },
+];
+
+export const ALL_ANALYSIS_INDICATOR_KEYS: string[] = ANALYSIS_INDICATORS.map((i) => i.key);
+
 export function getSignalLabelKey(signal: SignalType): string {
   return SIGNAL_LABEL_KEYS[signal] ?? signal;
 }

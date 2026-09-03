@@ -18,6 +18,7 @@ from src.market_data import fetch_market_data
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.models import (
+    ANALYSIS_INDICATORS,
     AnalysisReport,
     TrackerConfig,
     normalize_a_share_code,
@@ -140,6 +141,10 @@ class TrackerSettingsRequest(BaseModel):
         ge=1,
         description="Number of detail cards to show (max three per row; extras wrap).",
     )
+    analysis_indicators: Optional[List[str]] = Field(
+        default=None,
+        description="Indicator blocks fed to LLM analysis (subset of ANALYSIS_INDICATORS).",
+    )
 
 
 class TrackerConfigResponse(BaseModel):
@@ -151,6 +156,7 @@ class TrackerConfigResponse(BaseModel):
     thresholds: Dict[str, float]
     refresh_interval_seconds: int
     detail_card_count: int
+    analysis_indicators: List[str]
 
 
 class TrackerSettingsResponse(BaseModel):
@@ -184,6 +190,9 @@ class TrackerAnalyzeRequest(BaseModel):
     # How many of the model's most recent per-symbol records to reference;
     # 0 disables history, None keeps the server default (``_DEFAULT_HISTORY_LIMIT``).
     history_limit: Optional[int] = Field(default=None, ge=0, le=30)
+    # Per-run indicator selection; None falls back to the persisted config.
+    # When present it must be a non-empty subset of ANALYSIS_INDICATORS.
+    analysis_indicators: Optional[List[str]] = None
 
 
 class TrackerAnalyzeResponse(BaseModel):
@@ -221,6 +230,8 @@ def _config_from_request(request: TrackerSettingsRequest) -> TrackerConfig:
         kwargs["refresh_interval_seconds"] = request.refresh_interval_seconds
     if request.detail_card_count is not None:
         kwargs["detail_card_count"] = request.detail_card_count
+    if request.analysis_indicators is not None:
+        kwargs["analysis_indicators"] = request.analysis_indicators
 
     # Merge with current config so omitted fields keep their defaults, then
     # reconstruct to re-run Pydantic validators (model_copy skips them).
@@ -621,12 +632,27 @@ def register_stock_tracker_routes(
                 limit=history_limit,
             )
         try:
+            # The indicator selection is prompt organization, not snapshot
+            # computation. Prefer the per-run override; otherwise fall back to
+            # the *current* settings (not the snapshot-embedded config) so a
+            # config change applies without a refresh first.
+            indicator_selection = request.analysis_indicators
+            if indicator_selection is None:
+                indicator_selection = _get_store().get_settings().config.analysis_indicators
+            else:
+                unknown = set(indicator_selection) - set(ANALYSIS_INDICATORS)
+                if unknown or not indicator_selection:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Invalid analysis_indicators: {sorted(unknown) or 'empty'}",
+                    )
             report = await asyncio.to_thread(
                 run_analysis,
                 snapshot,
                 selected.symbols,
                 request.user_prompt,
                 history,
+                analysis_indicators=indicator_selection,
             )
         except Exception as exc:  # surface provider/LLM failures as readable errors
             hint = _friendly_provider_error(exc)

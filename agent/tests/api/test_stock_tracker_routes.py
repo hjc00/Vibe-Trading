@@ -10,7 +10,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 import api_server
-from src.stock_tracker.models import SymbolSnapshot, TrackerConfig, TrackerSnapshot
+from src.stock_tracker.models import (
+    ANALYSIS_INDICATORS,
+    SymbolSnapshot,
+    TrackerConfig,
+    TrackerSnapshot,
+)
 from src.stock_tracker.store import TrackerStore
 
 
@@ -52,7 +57,8 @@ def test_get_settings_default(client):
     assert data["config"]["watchlist"] == TrackerConfig().watchlist
     assert data["config"]["periods"] == [10, 20, 60]
     assert data["config"]["refresh_interval_seconds"] == 10
-    assert data["config"]["detail_card_count"] == 9
+    assert data["config"]["detail_card_count"] == 11
+    assert data["config"]["analysis_indicators"] == ANALYSIS_INDICATORS
 
 
 def test_update_settings_validation(client):
@@ -124,6 +130,24 @@ def test_update_settings_detail_card_count_validation(client):
     response = client.put(
         "/api/stock-tracker/settings",
         json={"detail_card_count": 0},
+    )
+    assert response.status_code == 422
+
+
+def test_update_settings_analysis_indicators(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"analysis_indicators": ["margin", "period_signals"]},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["config"]["analysis_indicators"] == ["margin", "period_signals"]
+
+
+def test_update_settings_rejects_unknown_analysis_indicator(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"analysis_indicators": ["not_a_real_indicator"]},
     )
     assert response.status_code == 422
 
@@ -389,6 +413,73 @@ def test_analyze_returns_report(client, isolated_tracker_store):
     data = response.json()
     assert data["status"] == "ok"
     assert data["report"]["summary"] == "综述"
+
+
+def test_analyze_passes_persisted_analysis_indicators(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    isolated_tracker_store.save_settings(
+        isolated_tracker_store.get_settings().model_copy(
+            update={
+                "config": TrackerConfig(
+                    watchlist=["600519.SH"], analysis_indicators=["margin"]
+                )
+            }
+        )
+    )
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"]},
+        )
+    assert response.status_code == 200
+    _args, kwargs = mocked.call_args
+    assert kwargs["analysis_indicators"] == ["margin"]
+
+
+def test_analyze_prefers_request_indicator_override(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    isolated_tracker_store.save_settings(
+        isolated_tracker_store.get_settings().model_copy(
+            update={
+                "config": TrackerConfig(
+                    watchlist=["600519.SH"], analysis_indicators=["margin"]
+                )
+            }
+        )
+    )
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "analysis_indicators": ["fund_flow", "margin"]},
+        )
+    assert response.status_code == 200
+    _args, kwargs = mocked.call_args
+    assert kwargs["analysis_indicators"] == ["fund_flow", "margin"]
+
+
+def test_analyze_rejects_unknown_request_indicator(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    response = client.post(
+        "/api/stock-tracker/analyze",
+        json={"symbols": ["600519.SH"], "analysis_indicators": ["bogus"]},
+    )
+    assert response.status_code == 422
 
 
 def test_get_analysis_empty(client):

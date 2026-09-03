@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from src.providers.chat import ChatLLM
 from src.stock_tracker.models import (
+    ANALYSIS_INDICATORS,
     AnalysisAction,
     AnalysisReport,
     PortfolioInsight,
@@ -27,6 +28,10 @@ from src.stock_tracker.models import (
 
 logger = logging.getLogger(__name__)
 
+# Every known analysis indicator block; the default enabled set when a config
+# or caller does not restrict the prompt to a subset.
+_ALL_INDICATORS = frozenset(ANALYSIS_INDICATORS)
+
 _SYSTEM_PROMPT = """\
 You are a quantitative analyst reviewing A-share technical, capital-flow, \
 fundamental and risk signals. You work strictly from the tracker data provided \
@@ -37,20 +42,43 @@ support/resistance, ATR stop distance and valuation bands. Write all narrative \
 fields in Chinese.
 """
 
-_ANALYSIS_DIRECTIVE = """\
-对所选标的做一次全维度的定量研究分析，综合权衡：
-- 技术面：各周期信号（放量/突破/均线排列/RSI）、RPS 市场与行业分位、周期间趋势；
-- 资金面：主力资金流向（当日与 5 日累计）、融资融券余额变化；
-- 估值与质量：PE/PB 的 3 年分位（近 1 年分位为辅）、基本面质量评分、ROE 稳定性、现金流质量；
-- 风险：ATR 波动、最大回撤、Beta、距止损参考价的距离；
-- 事件日历：未来 90 天解禁、业绩预告、龙虎榜、股东增减持，及综合事件风险分；
-- 行业背景：所属行业景气度评分、板块强弱排名与资金流；
-- 题材热度与市场情绪：所属概念热度评分、最热概念排名、市场情绪温度（涨停/炸板/连板）；
-- 预期与筹码：一致预期（评级分布、目标价、一致预期 EPS、forward PE）、筹码集中度（股东户数变化、北向/公募持仓）。
+# One prompt directive bullet per analysis indicator block, keyed exactly as in
+# ``ANALYSIS_INDICATORS``. A disabled block is dropped from the directive so the
+# model only weighs the dimensions that are actually present in the JSON.
+_INDICATOR_DIRECTIVES: Dict[str, str] = {
+    "period_signals": "技术面：各周期信号（放量/突破/均线排列/RSI）、周期涨跌与量能、"
+    "RPS 市场与行业分位、均线/RSI/波动率等趋势指标；",
+    "fund_flow": "资金面·主力资金：当日主力净流入及占比、5 日累计净流入、超大单/大单/中单/小单分布；",
+    "margin": "资金面·融资融券：融资余额及日变化、融资融券总余额及变化；",
+    "risk": "风险：ATR 波动、距止损参考价的距离、最大回撤、Beta；",
+    "valuation": "估值与质量：PE/PB/PS 历史分位、基本面质量评分、ROE 稳定性、现金流质量；",
+    "events": "事件日历：未来 90 天解禁、业绩预告、龙虎榜、股东增减持，及综合事件风险分；",
+    "concept": "题材热度：所属概念板块、最热概念排名、概念热度评分、概念内涨停家数；",
+    "consensus": "一致预期：机构评级分布、目标价区间、一致预期 EPS、forward PE；",
+    "chip": "筹码集中度：股东户数变化与趋势、户均持股、北向/公募持仓、集中度评分；",
+    "sector": "行业背景：所属行业板块、板块强弱排名与资金流、行业景气度评分（若有）；",
+    "diff": "跨日变化：相对上一交易日的信号增减、涨幅与排名变化；",
+    "market_sentiment": "市场情绪：全市场涨停/跌停/炸板家数及炸板率、连板高度、昨日涨停溢价；",
+    "sectors": "行业强度榜：全市场行业板块涨跌/资金流/景气度排行与 watchlist 聚合；",
+    "concepts": "概念热度榜：全市场概念板块涨幅/主力净流入/涨停家数排行；",
+}
 
+_ANALYSIS_TAIL = """\
 不要套用一个固定模板，按每个标的实际的数据特点给出差异化判断；用 structured 的
 action 与价位区间把结论表达清楚，让报告可直接被跟踪验证。
 """
+
+
+def _build_analysis_directive(enabled: "set[str]") -> str:
+    """Compose the analysis directive from the enabled indicator blocks."""
+    lines = ["对所选标的做一次定量研究分析，综合权衡："]
+    lines.extend(
+        f"- {_INDICATOR_DIRECTIVES[key]}"
+        for key in ANALYSIS_INDICATORS
+        if key in enabled
+    )
+    lines.append(_ANALYSIS_TAIL)
+    return "\n".join(lines)
 
 _OUTPUT_INSTRUCTIONS = """\
 Return ONLY a single valid JSON object (no markdown fences, no commentary \
@@ -200,61 +228,77 @@ def _coerce_str_list(value: Any) -> List[str]:
     return []
 
 
-def _serialize_symbol(symbol: SymbolSnapshot) -> Dict[str, Any]:
-    """Serialize a single symbol into a compact, JSON-safe context dict."""
-    capital = None
-    if symbol.capital is not None:
-        ff = symbol.capital.fund_flow
-        margin = symbol.capital.margin
-        capital = {
-            "fund_flow": {
-                "trade_date": ff.trade_date.isoformat() if ff.trade_date else None,
-                "main_net": ff.main_net,
-                "main_net_ratio": ff.main_net_ratio,
-                "main_5d_net": ff.main_5d_net,
-                "super_large_net": ff.super_large_net,
-                "large_net": ff.large_net,
-                "medium_net": ff.medium_net,
-                "small_net": ff.small_net,
-            },
-            "margin": {
-                "trade_date": margin.trade_date.isoformat() if margin.trade_date else None,
-                "financing_balance": margin.financing_balance,
-                "financing_balance_change": margin.financing_balance_change,
-                "margin_total_balance": margin.margin_total_balance,
-                "margin_total_change": margin.margin_total_change,
-            },
-            "fund_flow_source": symbol.capital.fund_flow_source,
-            "margin_source": symbol.capital.margin_source,
-            "fund_flow_error": symbol.capital.fund_flow_error,
-            "margin_error": symbol.capital.margin_error,
-        }
+def _serialize_symbol(
+    symbol: SymbolSnapshot, enabled: "set[str]" = _ALL_INDICATORS
+) -> Dict[str, Any]:
+    """Serialize one symbol into a compact, JSON-safe context dict.
 
-    def _dump(obj: Any) -> Any:
-        return obj.model_dump(mode="json") if obj is not None else None
-
-    return {
+    ``enabled`` is the subset of ``ANALYSIS_INDICATORS`` whose blocks are fed to
+    the model. Every symbol carries identity fields regardless; a block that is
+    *enabled* keeps its key even when empty (``None``/``{}``) so downstream shape
+    stays stable, while a block that is *disabled* is omitted entirely so the
+    model never reasons about data it was not asked to weigh.
+    """
+    data: Dict[str, Any] = {
         "code": symbol.code,
         "name": symbol.name,
         "close": symbol.close,
         "daily_return": symbol.daily_return,
         "volume": symbol.volume,
         "avg_volume_20": symbol.avg_volume_20,
-        "period_signals": {
+    }
+
+    if "period_signals" in enabled:
+        data["period_signals"] = {
             period: ps.model_dump(mode="json")
             for period, ps in symbol.period_signals.items()
-        },
-        "capital": capital,
-        "risk": _dump(symbol.risk),
-        "valuation": _dump(symbol.valuation),
-        "events": _dump(symbol.events),
-        "concept": _dump(symbol.concept),
-        "consensus": _dump(symbol.consensus),
-        "chip": _dump(symbol.chip),
-        "sector_board": symbol.sector_board,
-        "sector_strength_rank": symbol.sector_strength_rank,
-        "diff": _dump(symbol.diff),
-    }
+        }
+
+    # ``capital`` is gated by either of its sub-blocks; each sub-block keeps its
+    # own provenance fields so enabling only margin does not leak fund-flow data.
+    if "fund_flow" in enabled or "margin" in enabled:
+        data["capital"] = None
+        if symbol.capital is not None:
+            capital: Dict[str, Any] = {}
+            if "fund_flow" in enabled and symbol.capital.fund_flow is not None:
+                ff = symbol.capital.fund_flow
+                capital["fund_flow"] = {
+                    "trade_date": ff.trade_date.isoformat() if ff.trade_date else None,
+                    "main_net": ff.main_net,
+                    "main_net_ratio": ff.main_net_ratio,
+                    "main_5d_net": ff.main_5d_net,
+                    "super_large_net": ff.super_large_net,
+                    "large_net": ff.large_net,
+                    "medium_net": ff.medium_net,
+                    "small_net": ff.small_net,
+                }
+                capital["fund_flow_source"] = symbol.capital.fund_flow_source
+                capital["fund_flow_error"] = symbol.capital.fund_flow_error
+            if "margin" in enabled and symbol.capital.margin is not None:
+                margin = symbol.capital.margin
+                capital["margin"] = {
+                    "trade_date": margin.trade_date.isoformat() if margin.trade_date else None,
+                    "financing_balance": margin.financing_balance,
+                    "financing_balance_change": margin.financing_balance_change,
+                    "margin_total_balance": margin.margin_total_balance,
+                    "margin_total_change": margin.margin_total_change,
+                }
+                capital["margin_source"] = symbol.capital.margin_source
+                capital["margin_error"] = symbol.capital.margin_error
+            if capital:
+                data["capital"] = capital
+
+    # Single-object blocks share the same symbol attribute name as their key.
+    for key in ("risk", "valuation", "events", "concept", "consensus", "chip", "diff"):
+        if key in enabled:
+            value = getattr(symbol, key)
+            data[key] = value.model_dump(mode="json") if value is not None else None
+
+    if "sector" in enabled:
+        data["sector_board"] = symbol.sector_board
+        data["sector_strength_rank"] = symbol.sector_strength_rank
+
+    return data
 
 
 def _serialize_sector(sector: Any) -> Optional[Dict[str, Any]]:
@@ -323,11 +367,29 @@ def _normalize_symbol(item: Any) -> Optional[SymbolRecommendation]:
     return rec
 
 
+def _resolve_indicator_set(
+    snapshot: TrackerSnapshot,
+    analysis_indicators: Optional[List[str]] = None,
+) -> "set[str]":
+    """Resolve which indicator blocks are enabled for a prompt.
+
+    An explicit ``analysis_indicators`` (the per-run/caller override) wins;
+    otherwise the snapshot config's persisted ``analysis_indicators`` selection
+    applies. Unknown keys are silently dropped so a stale config cannot break
+    prompt building.
+    """
+    if analysis_indicators is None:
+        analysis_indicators = snapshot.config.analysis_indicators
+    # Restrict to known keys so a stale config can never break prompt building.
+    return frozenset(analysis_indicators) & _ALL_INDICATORS
+
+
 def build_analysis_prompt(
     snapshot: TrackerSnapshot,
     symbols: List[SymbolSnapshot],
     user_prompt: Optional[str] = None,
     history: Optional[Dict[str, Any]] = None,
+    analysis_indicators: Optional[List[str]] = None,
 ) -> str:
     """Build the user prompt from a snapshot and the selected symbols.
 
@@ -335,32 +397,41 @@ def build_analysis_prompt(
     recommendations (newest-first, as :func:`select_symbol_history` returns) so
     the model reviews its own previous calls incrementally instead of analysing
     every symbol from scratch.
+
+    ``analysis_indicators`` optionally restricts which indicator blocks are
+    serialized into the context; when omitted the selection persisted on
+    ``snapshot.config`` is used.
     """
-    context = {
+    enabled = _resolve_indicator_set(snapshot, analysis_indicators)
+
+    context: Dict[str, Any] = {
         "trading_date": snapshot.trading_date.isoformat() if snapshot.trading_date else None,
         "periods": snapshot.config.periods,
         "signals": snapshot.config.signals,
         "thresholds": snapshot.config.thresholds.model_dump(mode="json"),
         "rankings": snapshot.rankings,
-        "sectors": [
+        "symbols": [_serialize_symbol(s, enabled) for s in symbols],
+    }
+    if "sectors" in enabled:
+        context["sectors"] = [
             _serialize_sector(s) for s in snapshot.sectors if s is not None
-        ],
-        "concepts": [
+        ]
+    if "concepts" in enabled:
+        context["concepts"] = [
             _serialize_concept(c) for c in snapshot.concepts if c is not None
-        ],
-        "market_sentiment": (
+        ]
+    if "market_sentiment" in enabled:
+        context["market_sentiment"] = (
             snapshot.market_sentiment.model_dump(mode="json")
             if snapshot.market_sentiment is not None
             else None
-        ),
-        "symbols": [_serialize_symbol(s) for s in symbols],
-    }
+        )
     if history:
         context["history"] = history
     extra = f"\n用户补充指令：{user_prompt}" if user_prompt else ""
 
     text = (
-        f"{_ANALYSIS_DIRECTIVE}{extra}\n\n"
+        f"{_build_analysis_directive(enabled)}{extra}\n\n"
         f"追踪快照数据（JSON）：\n"
         f"{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
     )
@@ -421,6 +492,7 @@ def run_analysis(
     symbols: List[SymbolSnapshot],
     user_prompt: Optional[str] = None,
     history: Optional[Dict[str, Any]] = None,
+    analysis_indicators: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Call the configured LLM and return a normalized report dict.
 
@@ -428,7 +500,11 @@ def run_analysis(
     the API route via ``asyncio.to_thread``.
     """
     prompt = build_analysis_prompt(
-        snapshot, symbols, user_prompt=user_prompt, history=history
+        snapshot,
+        symbols,
+        user_prompt=user_prompt,
+        history=history,
+        analysis_indicators=analysis_indicators,
     )
     llm = ChatLLM()
     logger.info(

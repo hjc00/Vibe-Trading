@@ -3,7 +3,15 @@ import { useTranslation } from "react-i18next";
 import { TrendingUp, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type SignalMeta, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
-import { computePriceChange, formatQuoteUpdatedAt, formatRps, getQualityToneClass, getRpsToneClass, normalizeAShareCode } from "@/lib/stockTracker";
+import {
+  ALL_ANALYSIS_INDICATOR_KEYS,
+  computePriceChange,
+  formatQuoteUpdatedAt,
+  formatRps,
+  getQualityToneClass,
+  getRpsToneClass,
+  normalizeAShareCode,
+} from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
 import { TrackerControlBar } from "@/components/stock-tracker/TrackerControlBar";
@@ -222,6 +230,23 @@ export function StockTracker() {
     [refresh],
   );
 
+  // Persist the AI analysis indicator selection without forcing a snapshot
+  // refresh (it only affects prompt composition, not snapshot computation).
+  // Update state optimistically so a run right after a toggle uses the new set.
+  const handleAnalysisIndicatorsChange = useCallback(
+    async (keys: string[]) => {
+      if (!config || keys.length === 0) return;
+      setConfig((prev) => (prev ? { ...prev, analysis_indicators: keys } : prev));
+      setError(null);
+      try {
+        await api.updateStockTrackerSettings({ analysis_indicators: keys });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [config],
+  );
+
   const handleAddSymbol = useCallback(async () => {
     if (!config) return;
     const normalized = normalizeAShareCode(addCode);
@@ -303,6 +328,7 @@ export function StockTracker() {
         thresholds: { volume_spike: 2, rsi_overbought: 70, rsi_oversold: 30, breakout_window: 20 },
         refresh_interval_seconds: 10,
         detail_card_count: 9,
+        analysis_indicators: [...ALL_ANALYSIS_INDICATOR_KEYS],
       },
     [config],
   );
@@ -457,8 +483,10 @@ export function StockTracker() {
                     onUserPromptChange={setUserPrompt}
                     historyLimit={historyLimit}
                     onHistoryLimitChange={setHistoryLimit}
+                    analysisIndicators={config?.analysis_indicators}
+                    onAnalysisIndicatorsChange={handleAnalysisIndicatorsChange}
                     loading={analysisLoading}
-                    onRun={runAnalysis}
+                    onRun={() => runAnalysis(config?.analysis_indicators ?? null)}
                     onClose={() => setAnalyzeOpen(false)}
                   />
                 ) : null}

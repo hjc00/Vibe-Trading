@@ -41,7 +41,7 @@ interface StockTrackerAnalysisState {
   loadTrackRecord: () => Promise<void>;
   selectAnalysis: (id: string) => Promise<void>;
   deleteAnalysis: (id: string) => Promise<void>;
-  run: () => Promise<void>;
+  run: (analysisIndicators?: string[] | null) => Promise<void>;
 }
 
 export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
@@ -128,7 +128,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
       }
     },
 
-    run: async () => {
+    run: async (analysisIndicators?: string[] | null) => {
       const { selectedSymbols, userPrompt, historyLimit } = get();
       if (selectedSymbols.length === 0) return;
       set({ loading: true, error: null, report: null, selectedId: null });
@@ -137,6 +137,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
           symbols: selectedSymbols,
           user_prompt: userPrompt.trim() ? userPrompt.trim() : null,
           history_limit: historyLimit,
+          analysis_indicators: analysisIndicators && analysisIndicators.length > 0 ? analysisIndicators : null,
         });
         set({ report: response.report, selectedId: response.id ?? null });
         await Promise.all([get().loadHistory(), get().loadTrackRecord()]);

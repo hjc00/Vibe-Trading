@@ -53,7 +53,7 @@
 
 **组合与交易**：`portfolio`(只读多券商聚合)、`trading`(连接器 profiles / 操作)、`live`(有界自主实盘)、`shadow_account`(盈利模式 → 回测 → 渲染)
 
-**扩展与技能**：`skills`(90 个打包技能)、`strategy_discovery`(Alpha Zoo + SDM 实证门控 facade)、`strategy_store`(策略开发管理器 + 衰减)、`scheduled_research`(定时研究 + playbooks)、`ui_services.py`(前端 run 分析整形)、`stock_tracker`(A股多周期追踪，活跃功能；已支持资金流信号、个股相对强弱 RPS、风险指标、行业强度看板 `sector_data.py`、估值质量评分、题材/概念热度 `concept_data.py`、市场情绪温度计 `sentiment_data.py`、盈利预期/一致预期 `consensus_data.py`、筹码集中度 `chip_data.py` 与量能对比 `PeriodMetrics` 量能字段 + 前端 `VolumeCard`(量能文本) / `VolumeChartCard`(周期价量K线+量，单/双列宽表头切换))
+**扩展与技能**：`skills`(90 个打包技能)、`strategy_discovery`(Alpha Zoo + SDM 实证门控 facade)、`strategy_store`(策略开发管理器 + 衰减)、`scheduled_research`(定时研究 + playbooks)、`ui_services.py`(前端 run 分析整形)、`stock_tracker`(A股多周期追踪，活跃功能；已支持资金流信号、个股相对强弱 RPS、风险指标、行业强度看板 `sector_data.py`、估值质量评分、题材/概念热度 `concept_data.py`、市场情绪温度计 `sentiment_data.py`、盈利预期/一致预期 `consensus_data.py`、筹码集中度 `chip_data.py` 与量能对比 `PeriodMetrics` 量能字段 + 前端 `VolumeCard`(量能文本) / `VolumeChartCard`(周期价量K线+量，单/双列宽表头切换)；AI 分析注入指标块可配置并持久化（`TrackerConfig.analysis_indicators`，默认全量、每块可关，如融资融券开主力资金关）)
 
 **通道与集成**：`channels`(多 IM 插件适配)、`channelsui`(WebUI 兼容)、`api`(HTTP 路由包)、`utils`(media_decode)
 
