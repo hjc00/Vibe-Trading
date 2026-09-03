@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "snapshot": {
-    "generated_at": "2026-09-03T12:26:21.215276+08:00",
+    "generated_at": "2026-09-03T15:05:40.747307+08:00",
     "trading_date": "2026-09-02",
     "config": {
       "watchlist": [
@@ -665,7 +665,7 @@
               "ma60": 79.6615,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.008273
+              "benchmark_return_pct": -0.01228
             },
             "signals": {
               "volume_spike": {
@@ -739,7 +739,7 @@
               "ma60": 79.6615,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01036
+              "benchmark_return_pct": -0.014358
             },
             "signals": {
               "volume_spike": {
@@ -813,7 +813,7 @@
               "ma60": 79.6615,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.026284
+              "benchmark_return_pct": -0.030219
             },
             "signals": {
               "volume_spike": {
@@ -887,7 +887,7 @@
               "ma60": 79.6615,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.032051
+              "benchmark_return_pct": -0.035963
             },
             "signals": {
               "volume_spike": {
@@ -2043,7 +2043,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.008273
+              "benchmark_return_pct": -0.01228
             },
             "signals": {
               "volume_spike": {
@@ -2117,7 +2117,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01036
+              "benchmark_return_pct": -0.014358
             },
             "signals": {
               "volume_spike": {
@@ -2191,7 +2191,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 33.33,
               "rps_sector": null,
-              "benchmark_return_pct": -0.026284
+              "benchmark_return_pct": -0.030219
             },
             "signals": {
               "volume_spike": {
@@ -2265,7 +2265,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.032051
+              "benchmark_return_pct": -0.035963
             },
             "signals": {
               "volume_spike": {
@@ -3420,7 +3420,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 33.33,
               "rps_sector": null,
-              "benchmark_return_pct": -0.008273
+              "benchmark_return_pct": -0.01228
             },
             "signals": {
               "volume_spike": {
@@ -3494,7 +3494,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.01036
+              "benchmark_return_pct": -0.014358
             },
             "signals": {
               "volume_spike": {
@@ -3568,7 +3568,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.026284
+              "benchmark_return_pct": -0.030219
             },
             "signals": {
               "volume_spike": {
@@ -3642,7 +3642,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.032051
+              "benchmark_return_pct": -0.035963
             },
             "signals": {
               "volume_spike": {
