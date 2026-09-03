@@ -2080,6 +2080,10 @@ export interface EventSnapshot {
 
 export interface VolumePoint {
   trade_date?: string | null;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  close?: number | null;
   volume?: number | null;
   is_burst: boolean;
 }

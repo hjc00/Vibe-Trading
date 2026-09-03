@@ -1,10 +1,12 @@
 import { ChevronDown, CircleHelp } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface ChartCardHeaderProps {
   title: string;
   helpText: string;
   meta?: string;
+  actions?: ReactNode;
   collapsed?: boolean;
   onToggle?: () => void;
 }
@@ -13,6 +15,7 @@ export function ChartCardHeader({
   title,
   helpText,
   meta,
+  actions,
   collapsed = false,
   onToggle,
 }: ChartCardHeaderProps) {
@@ -27,6 +30,7 @@ export function ChartCardHeader({
       <h3 className="text-sm font-semibold">{title}</h3>
       <div className="flex items-center gap-1">
         {meta ? <span className="text-[10px] text-muted-foreground">{meta}</span> : null}
+        {actions}
         <button
           type="button"
           className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"

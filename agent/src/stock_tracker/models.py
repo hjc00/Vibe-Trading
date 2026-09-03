@@ -526,11 +526,20 @@ class ChipSnapshot(BaseModel):
 
 
 class VolumePoint(BaseModel):
-    """One daily volume observation for charting within the tracker."""
+    """One daily OHLCV observation for charting within the tracker.
+
+    ``open/high/low/close`` are the daily candles (available when the upstream
+    source returns full OHLC); ``is_burst`` marks volume >= 1.5x the trailing
+    5-session average.
+    """
 
     trade_date: Optional[date] = None
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
     volume: Optional[float] = None
-    is_burst: bool = False  # volume >= 1.5x the trailing 5-session average
+    is_burst: bool = False
 
 
 class SymbolSnapshot(BaseModel):

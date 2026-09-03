@@ -62,6 +62,17 @@ _VOLUME_EXPANSION_FACTOR = 1.5
 _VOLUME_SERIES_CONTEXT = 6
 
 
+def _as_float(value: Any) -> Optional[float]:
+    """Coerce a scalar to float, mapping missing/NaN to ``None``."""
+    if value is None:
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if pd.isna(result) else result
+
+
 def _volume_burst_series(df: pd.DataFrame) -> pd.Series:
     """Boolean per-session mask: volume >= 1.5x the trailing 5-session average.
 
@@ -700,12 +711,13 @@ class StockTrackerEngine:
         df: pd.DataFrame,
         burst: Optional[pd.Series] = None,
     ) -> List[VolumePoint]:
-        """Daily volume tail for the volume card's bar chart.
+        """Daily OHLCV tail for the volume card's price + volume chart.
 
         Keeps the longest configured period plus a small context window so the
         earliest visible bar can still be classified as a burst (a 5-session
         trailing baseline). ``burst`` is the shared mask from
         ``_volume_burst_series``; computed here when the caller did not supply it.
+        OHLC is carried when the upstream records include those columns.
         """
         if "volume" not in df.columns or df.empty:
             return []
@@ -718,7 +730,11 @@ class StockTrackerEngine:
             points.append(
                 VolumePoint(
                     trade_date=idx.date(),
-                    volume=float(row["volume"]),
+                    open=_as_float(row.get("open")),
+                    high=_as_float(row.get("high")),
+                    low=_as_float(row.get("low")),
+                    close=_as_float(row.get("close")),
+                    volume=_as_float(row.get("volume")),
                     is_burst=bool(burst.get(idx, False)),
                 )
             )

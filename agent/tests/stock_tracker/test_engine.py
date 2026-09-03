@@ -1034,5 +1034,26 @@ def test_volume_series_quiet_has_no_bursts():
     assert all(p.is_burst is False for p in snapshot.volume_series)
 
 
+def test_volume_series_carries_ohlc_candles():
+    df = _make_df(rows=80)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[5, 20])
+    engine = StockTrackerEngine(config)
+    snapshot = engine._analyze_symbol("000001.SZ", df)
+
+    series = snapshot.volume_series
+    assert len(series) == 26
+    # Every visible point carries the daily candle so the frontend can render
+    # a price + volume composite without a separate fetch.
+    assert all(p.close is not None and p.open is not None for p in series)
+    last = df.iloc[-1]
+    assert series[-1].close == pytest.approx(float(last["close"]))
+    assert series[-1].open == pytest.approx(float(last["open"]))
+    assert series[-1].high == pytest.approx(float(last["high"]))
+    assert series[-1].low == pytest.approx(float(last["low"]))
+    assert series[-1].volume == pytest.approx(float(last["volume"]))
+    # Dates line up with the source frame (longest period + context tail).
+    assert series[0].trade_date == df.index[-len(series)].date()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -26,4 +26,18 @@ describe("ChartCardHeader", () => {
     // No <span> is rendered in the header when meta is absent.
     expect(container.querySelector("span")).toBeNull();
   });
+
+  it("renders custom actions next to the help button", () => {
+    render(
+      <ChartCardHeader
+        title="Fund flow"
+        helpText="Help."
+        actions={<button type="button">Wide</button>}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Wide" })).toBeInTheDocument();
+    // The help button still renders alongside.
+    expect(screen.getByRole("button", { name: "Help." })).toBeInTheDocument();
+  });
 });
