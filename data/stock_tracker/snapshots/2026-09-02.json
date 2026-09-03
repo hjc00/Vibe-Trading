@@ -1,8 +1,9 @@
 {
   "schema_version": 1,
   "snapshot": {
-    "generated_at": "2026-09-03T15:05:40.747307+08:00",
+    "generated_at": "2026-09-03T18:05:39.892203+08:00",
     "trading_date": "2026-09-02",
+    "as_of_date": "2026-09-03",
     "config": {
       "watchlist": [
         "603228.SH",
@@ -35,7 +36,16 @@
         "stop_loss_atr_multiple": 2.0
       },
       "refresh_interval_seconds": 600,
-      "detail_card_count": 10
+      "detail_card_count": 10,
+      "analysis_indicators": [
+        "period_signals",
+        "margin",
+        "events",
+        "chip",
+        "diff",
+        "risk",
+        "valuation"
+      ]
     },
     "symbols": [
       {
@@ -1284,18 +1294,18 @@
           "stop_loss_atr_multiple": 2.0
         },
         "valuation": {
-          "trade_date": "2026-09-02",
-          "pe_ttm": 75.16666408,
-          "pb": 6.74127609,
-          "ps_ttm": 5.28548672,
-          "pcf_ocf_ttm": 54.7988299,
-          "peg": 13.975525132073,
+          "trade_date": "2026-09-03",
+          "pe_ttm": 74.83657739,
+          "pb": 6.71167247,
+          "ps_ttm": 5.26227605,
+          "pcf_ocf_ttm": 54.55818646,
+          "peg": 13.914153047941,
           "dividend_yield": null,
-          "total_market_cap": 88924850601.77,
-          "pe_percentile_3y": 97.2,
-          "pe_percentile_1y": 91.6,
-          "pb_percentile_3y": 97.73,
-          "pb_percentile_1y": 93.2,
+          "total_market_cap": 88534346247.14,
+          "pe_percentile_3y": 97.07,
+          "pe_percentile_1y": 91.2,
+          "pb_percentile_3y": 97.6,
+          "pb_percentile_1y": 92.8,
           "roe": 4.55,
           "roe_mean_5y": 7.43,
           "roe_std_5y": 3.73,
@@ -2662,18 +2672,18 @@
           "stop_loss_atr_multiple": 2.0
         },
         "valuation": {
-          "trade_date": "2026-09-02",
-          "pe_ttm": 38.64534081,
-          "pb": 6.08020898,
-          "ps_ttm": 0.96291233,
-          "pcf_ocf_ttm": 51.88821877,
-          "peg": 4.446232469826,
+          "trade_date": "2026-09-03",
+          "pe_ttm": 38.78775586,
+          "pb": 6.10261564,
+          "ps_ttm": 0.96646083,
+          "pcf_ocf_ttm": 52.07943621,
+          "peg": 4.46261763829,
           "dividend_yield": null,
-          "total_market_cap": 108654434413.26,
-          "pe_percentile_3y": 55.73,
-          "pe_percentile_1y": 9.2,
-          "pb_percentile_3y": 92.13,
-          "pb_percentile_1y": 90.4,
+          "total_market_cap": 109054845595.62,
+          "pe_percentile_3y": 55.87,
+          "pe_percentile_1y": 9.6,
+          "pb_percentile_3y": 92.4,
+          "pb_percentile_1y": 90.8,
           "roe": 13.32,
           "roe_mean_5y": 5.54,
           "roe_std_5y": 3.29,
@@ -4039,18 +4049,18 @@
           "stop_loss_atr_multiple": 2.0
         },
         "valuation": {
-          "trade_date": "2026-09-02",
-          "pe_ttm": 34.52324593,
-          "pb": 7.34231076,
-          "ps_ttm": 16.47197367,
-          "pcf_ocf_ttm": 37.9201283,
-          "peg": 0.573157784122,
+          "trade_date": "2026-09-03",
+          "pe_ttm": 34.02074742,
+          "pb": 7.23544074,
+          "ps_ttm": 16.23221805,
+          "pcf_ocf_ttm": 37.36818692,
+          "peg": 0.564815262301,
           "dividend_yield": null,
-          "total_market_cap": 273746329103.22,
+          "total_market_cap": 269761850826.4,
           "pe_percentile_3y": 0.27,
           "pe_percentile_1y": 0.8,
-          "pb_percentile_3y": 72.27,
-          "pb_percentile_1y": 16.8,
+          "pb_percentile_3y": 71.33,
+          "pb_percentile_1y": 14.0,
           "roe": 23.13,
           "roe_mean_5y": 7.58,
           "roe_std_5y": 6.31,
@@ -4185,7 +4195,7 @@
         "603228.SH",
         "603986.SH"
       ],
-      "main_force_inflow": [
+      "margin_expansion": [
         "603228.SH",
         "000938.SZ",
         "603986.SH"
@@ -4195,25 +4205,25 @@
         "603228.SH",
         "603986.SH"
       ],
+      "rsi": [
+        "603228.SH",
+        "603986.SH",
+        "000938.SZ"
+      ],
+      "main_force_inflow": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
       "breakout": [
         "000938.SZ",
         "603228.SH",
-        "603986.SH"
-      ],
-      "margin_expansion": [
-        "603228.SH",
-        "000938.SZ",
         "603986.SH"
       ],
       "net_inflow_spike": [
         "603228.SH",
         "000938.SZ",
         "603986.SH"
-      ],
-      "rsi": [
-        "603228.SH",
-        "603986.SH",
-        "000938.SZ"
       ],
       "signal_count": [
         "000938.SZ",
