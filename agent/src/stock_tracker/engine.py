@@ -173,6 +173,12 @@ class StockTrackerEngine:
         except Exception:  # noqa: BLE001
             logger.exception("Capital data fetch failed")
 
+        # A throttled/blocked source must not clobber an earlier successful
+        # fetch: when a symbol's capital block errored this refresh but the
+        # prior snapshot still holds good data, keep the good data instead of
+        # blanking the card.
+        capital_data = self._retain_last_good_capital(capital_data, previous)
+
         # Fetch valuation + quality data with daily caching; tolerate failure.
         valuation_data: Dict[str, ValuationSnapshot] = {}
         try:
@@ -312,6 +318,7 @@ class StockTrackerEngine:
         return TrackerSnapshot(
             generated_at=datetime.now().astimezone(),
             trading_date=trading_date,
+            as_of_date=end_date,
             config=self.config,
             symbols=symbol_snapshots,
             rankings=rankings,
@@ -405,12 +412,20 @@ class StockTrackerEngine:
     ) -> None:
         """Seed capital/valuation/event caches from the prior snapshot.
 
-        Reuses only data from the *same* trading date; a new trading date still
-        refetches. Seeding lets the loaders hit their TTL cache and skip
-        re-requesting the throttled/blocked Eastmoney endpoints on every refresh
-        within one trading day.
+        Reuses only data from a snapshot generated for the *same refresh base
+        date* (``trading_date`` here is the refresh's ``end_date``); a refresh
+        targeting a newer day still refetches. Seeding lets the loaders hit
+        their TTL cache and skip re-requesting the throttled/blocked Eastmoney
+        endpoints on every refresh within one refresh day.
         """
-        if previous is None or previous.trading_date != trading_date:
+        if previous is None:
+            return
+        prev_as_of = (
+            previous.as_of_date
+            if previous.as_of_date is not None
+            else previous.trading_date
+        )
+        if prev_as_of != trading_date:
             return
         for symbol in previous.symbols:
             code = symbol.code
@@ -432,6 +447,53 @@ class StockTrackerEngine:
             consensus = symbol.consensus
             if consensus is not None and consensus.error is None:
                 self._consensus_cache.set(code, trading_date, consensus)
+
+    def _retain_last_good_capital(
+        self,
+        capital_data: Dict[str, CapitalMetrics],
+        previous: TrackerSnapshot | None,
+    ) -> Dict[str, CapitalMetrics]:
+        """Keep an earlier good capital block when this refresh's fetch failed.
+
+        A per-symbol fund-flow/margin error this refresh (throttled/blocked
+        Eastmoney) is replaced by the same symbol's data from the prior snapshot
+        when that data is error-free and non-empty, so a repeat refresh never
+        blanks a card that already had values. Symbols with no prior data are
+        left untouched (nothing good exists to retain).
+        """
+        if previous is None:
+            return capital_data
+        prev_capital = {
+            s.code: s.capital for s in previous.symbols if s.capital is not None
+        }
+        for code, metrics in capital_data.items():
+            prev = prev_capital.get(code)
+            if prev is None:
+                continue
+            updates: Dict[str, Any] = {}
+            if (
+                metrics.fund_flow_error is not None
+                and prev.fund_flow_error is None
+                and prev.fund_flow.history
+            ):
+                updates.update(
+                    fund_flow=prev.fund_flow,
+                    fund_flow_source=prev.fund_flow_source,
+                    fund_flow_error=None,
+                )
+            if (
+                metrics.margin_error is not None
+                and prev.margin_error is None
+                and prev.margin.history
+            ):
+                updates.update(
+                    margin=prev.margin,
+                    margin_source=prev.margin_source,
+                    margin_error=None,
+                )
+            if updates:
+                capital_data[code] = metrics.model_copy(update=updates)
+        return capital_data
 
     def _resolve_sector_boards(
         self,

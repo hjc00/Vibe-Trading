@@ -620,6 +620,10 @@ class TrackerSnapshot(BaseModel):
 
     generated_at: datetime
     trading_date: Optional[date] = None
+    # Refresh base date (the engine's ``end_date``); ``trading_date`` may lag it
+    # when data vendors have not finalized the latest session. Same-day refresh
+    # reuse and last-good retention key off this field, not ``trading_date``.
+    as_of_date: Optional[date] = None
     config: TrackerConfig
     symbols: List[SymbolSnapshot] = Field(default_factory=list)
     rankings: Dict[str, List[str]] = Field(default_factory=dict)
