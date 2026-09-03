@@ -13,6 +13,7 @@ import type { EventItem, SymbolSnapshot } from "@/lib/api";
 
 interface EventTimelineCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
 const EVENT_TYPE_LABEL_KEY: Record<string, string> = {
@@ -27,7 +28,7 @@ const EVENT_TYPE_LABEL_KEY: Record<string, string> = {
  * lockup unlocks, earnings forecasts, dragon-tiger appearances, shareholder
  * trades) plus the composite event-risk score. High-risk entries render red.
  */
-export function EventTimelineCard({ symbol }: EventTimelineCardProps) {
+export function EventTimelineCard({ symbol, onHide }: EventTimelineCardProps) {
   const { t } = useTranslation();
   const events = symbol?.events;
   const items = events?.items ?? [];
@@ -40,6 +41,7 @@ export function EventTimelineCard({ symbol }: EventTimelineCardProps) {
       <ChartCardHeader
         title={t("stockTracker.eventTitle")}
         helpText={t("stockTracker.eventExplanation")}
+        onHide={onHide}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(events?.as_of ?? symbol?.valuation?.trade_date),
         })}

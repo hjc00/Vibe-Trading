@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
-import { TrendingUp, Trash2 } from "lucide-react";
+import { Eye, TrendingUp, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, type SignalMeta, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
+import { api, type SignalMeta, type SymbolSnapshot, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import {
   ALL_ANALYSIS_INDICATOR_KEYS,
+  CARD_TITLE_LABEL_KEYS,
   computePriceChange,
   formatQuoteUpdatedAt,
   formatRps,
   getQualityToneClass,
   getRpsToneClass,
+  hiddenCardIds,
+  isCardVisible,
   normalizeAShareCode,
+  type HideableCardId,
 } from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
@@ -40,19 +44,24 @@ const POLL_INTERVAL_MS = 2000;
 
 // Fixed render order for the middle detail cards; the first
 // `detail_card_count` are shown, at most three per row.
-const DETAIL_CARD_COMPONENTS = [
-  VolumeCard,
-  VolumeChartCard,
-  MarginChartCard,
-  FundFlowChartCard,
-  RpsChartCard,
-  RiskMetricsCard,
-  ValuationCard,
-  EventTimelineCard,
-  ConceptHeatCard,
-  ConsensusCard,
-  ChipCard,
-] as const;
+type DetailCardComponent = ComponentType<{
+  symbol: SymbolSnapshot | null;
+  onHide?: () => void;
+}>;
+
+const DETAIL_CARDS: { id: HideableCardId; Component: DetailCardComponent }[] = [
+  { id: "volume", Component: VolumeCard },
+  { id: "volume_chart", Component: VolumeChartCard },
+  { id: "margin", Component: MarginChartCard },
+  { id: "fund_flow", Component: FundFlowChartCard },
+  { id: "rps", Component: RpsChartCard },
+  { id: "risk", Component: RiskMetricsCard },
+  { id: "valuation", Component: ValuationCard },
+  { id: "events", Component: EventTimelineCard },
+  { id: "concept", Component: ConceptHeatCard },
+  { id: "consensus", Component: ConsensusCard },
+  { id: "chip", Component: ChipCard },
+];
 
 export function StockTracker() {
   const { t } = useTranslation();
@@ -248,6 +257,24 @@ export function StockTracker() {
     [config],
   );
 
+  // Hide/show a dashboard data card. Hiding persists to the backend config so
+  // the card stays hidden across reloads and the next refresh skips its fetch.
+  const handleToggleCard = useCallback(
+    async (id: HideableCardId) => {
+      if (!config) return;
+      const visibility = { ...(config.card_visibility ?? {}) };
+      visibility[id] = !isCardVisible(id, visibility);
+      setConfig((prev) => (prev ? { ...prev, card_visibility: visibility } : prev));
+      setError(null);
+      try {
+        await api.updateStockTrackerSettings({ card_visibility: visibility });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [config],
+  );
+
   const handleAddSymbol = useCallback(async () => {
     if (!config) return;
     const normalized = normalizeAShareCode(addCode);
@@ -330,6 +357,7 @@ export function StockTracker() {
         refresh_interval_seconds: 10,
         detail_card_count: 9,
         analysis_indicators: [...ALL_ANALYSIS_INDICATOR_KEYS],
+        card_visibility: {},
       },
     [config],
   );
@@ -337,10 +365,16 @@ export function StockTracker() {
   const detailCards = useMemo(() => {
     const count = Math.max(
       1,
-      Math.min(config?.detail_card_count ?? DETAIL_CARD_COMPONENTS.length, DETAIL_CARD_COMPONENTS.length),
+      Math.min(config?.detail_card_count ?? DETAIL_CARDS.length, DETAIL_CARDS.length),
     );
-    return DETAIL_CARD_COMPONENTS.slice(0, count);
-  }, [config?.detail_card_count]);
+    const visibility = config?.card_visibility;
+    return DETAIL_CARDS.slice(0, count).filter((card) => isCardVisible(card.id, visibility));
+  }, [config?.detail_card_count, config?.card_visibility]);
+
+  const hiddenIds = useMemo(
+    () => hiddenCardIds(config?.card_visibility),
+    [config?.card_visibility],
+  );
 
   return (
     <div className="min-h-screen p-6 lg:p-8">
@@ -400,7 +434,30 @@ export function StockTracker() {
               </section>
             ) : (
               <section className="flex flex-col gap-4">
-                <MarketSentimentBar sentiment={snapshot.market_sentiment} />
+                {isCardVisible("market_sentiment", config?.card_visibility) ? (
+                  <MarketSentimentBar
+                    sentiment={snapshot.market_sentiment}
+                    onHide={() => handleToggleCard("market_sentiment")}
+                  />
+                ) : null}
+
+                {hiddenIds.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-xs">
+                    <span className="text-muted-foreground">{t("stockTracker.hiddenCards")}</span>
+                    {hiddenIds.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => handleToggleCard(id)}
+                        title={t("stockTracker.showCard")}
+                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                      >
+                        <Eye className="h-3 w-3" />
+                        {t(CARD_TITLE_LABEL_KEYS[id] as never)}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
                 <TrackerTable
                   symbols={snapshot.symbols}
@@ -413,18 +470,30 @@ export function StockTracker() {
                 />
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {detailCards.map((Card) => (
-                    <Card key={Card.name} symbol={selectedSymbol} />
+                  {detailCards.map(({ id, Component }) => (
+                    <Component
+                      key={id}
+                      symbol={selectedSymbol}
+                      onHide={() => handleToggleCard(id)}
+                    />
                   ))}
                 </div>
 
-                <FinancialReportCard symbol={selectedSymbol} />
+                {isCardVisible("financial_report", config?.card_visibility) ? (
+                  <FinancialReportCard
+                    symbol={selectedSymbol}
+                    onHide={() => handleToggleCard("financial_report")}
+                  />
+                ) : null}
 
-                <SectorStrengthBoard
-                  sectors={snapshot.sectors}
-                  concepts={snapshot.concepts}
-                  tradingDate={snapshot.trading_date}
-                />
+                {isCardVisible("sector", config?.card_visibility) ? (
+                  <SectorStrengthBoard
+                    sectors={snapshot.sectors}
+                    concepts={snapshot.concepts}
+                    tradingDate={snapshot.trading_date}
+                    onHide={() => handleToggleCard("sector")}
+                  />
+                ) : null}
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
                   <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />

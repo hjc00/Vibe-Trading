@@ -10,6 +10,7 @@ import { ChartCardHeader } from "./ChartCardHeader";
 
 interface VolumeChartCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
 const WIDTH_KEY = "stockTracker.volumeChart.wide";
@@ -49,7 +50,7 @@ function fmtPrice(value: number | null | undefined): string {
  * volume-only bar chart. The card can be widened to two grid columns from a
  * header toggle (preference persisted).
  */
-export function VolumeChartCard({ symbol }: VolumeChartCardProps) {
+export function VolumeChartCard({ symbol, onHide }: VolumeChartCardProps) {
   const { t } = useTranslation();
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -329,6 +330,7 @@ export function VolumeChartCard({ symbol }: VolumeChartCardProps) {
       <ChartCardHeader
         title={t("stockTracker.volumeChartTitle")}
         helpText={t("stockTracker.volumeChartExplanation")}
+        onHide={onHide}
         actions={
           <button
             type="button"

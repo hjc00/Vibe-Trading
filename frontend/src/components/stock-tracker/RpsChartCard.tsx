@@ -9,9 +9,10 @@ import type { SymbolSnapshot } from "@/lib/api";
 
 interface RpsChartCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
-export function RpsChartCard({ symbol }: RpsChartCardProps) {
+export function RpsChartCard({ symbol, onHide }: RpsChartCardProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -163,6 +164,7 @@ export function RpsChartCard({ symbol }: RpsChartCardProps) {
       <ChartCardHeader
         title={t("stockTracker.rpsChartTitle")}
         helpText={t("stockTracker.rpsExplanation")}
+        onHide={onHide}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(latestPeriodEndDate(symbol)),
         })}

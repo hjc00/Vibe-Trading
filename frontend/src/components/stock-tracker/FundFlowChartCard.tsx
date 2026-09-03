@@ -9,9 +9,10 @@ import type { SymbolSnapshot } from "@/lib/api";
 
 interface FundFlowChartCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
-export function FundFlowChartCard({ symbol }: FundFlowChartCardProps) {
+export function FundFlowChartCard({ symbol, onHide }: FundFlowChartCardProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -125,6 +126,7 @@ export function FundFlowChartCard({ symbol }: FundFlowChartCardProps) {
       <ChartCardHeader
         title={t("stockTracker.fundFlowChartTitle")}
         helpText={t("stockTracker.fundFlowExplanation")}
+        onHide={onHide}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(symbol?.capital?.fund_flow?.trade_date),
         })}

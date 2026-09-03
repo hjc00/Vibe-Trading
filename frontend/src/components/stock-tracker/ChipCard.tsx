@@ -12,6 +12,7 @@ import type { ChipHolderItem, SymbolSnapshot } from "@/lib/api";
 
 interface ChipCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
 const TREND_LABEL_KEY: Record<string, string> = {
@@ -24,7 +25,7 @@ const TREND_LABEL_KEY: Record<string, string> = {
  * shareholder-count trend, average holding value, northbound / fund holdings,
  * and a composite concentration score, with a lightweight holder-count line.
  */
-export function ChipCard({ symbol }: ChipCardProps) {
+export function ChipCard({ symbol, onHide }: ChipCardProps) {
   const { t } = useTranslation();
   const chip = symbol?.chip;
   const hasData =
@@ -36,6 +37,7 @@ export function ChipCard({ symbol }: ChipCardProps) {
       <ChartCardHeader
         title={t("stockTracker.chipTitle")}
         helpText={t("stockTracker.chipExplanation")}
+        onHide={onHide}
         meta={
           chip?.source && chip.source !== "unavailable"
             ? t("stockTracker.dataSource", { source: chip.source })

@@ -46,6 +46,50 @@ ANALYSIS_INDICATORS: List[str] = [
     "concepts",
 ]
 
+# Cards on the stock-tracker dashboard that can be hidden via the card's hide
+# button. ``TrackerConfig.card_visibility`` stores the visible/hidden state; a
+# missing key means visible. Order mirrors the dashboard's top-to-bottom
+# reading order and doubles as the canonical order for validation.
+HIDEABLE_CARDS: List[str] = [
+    "market_sentiment",
+    "volume",
+    "volume_chart",
+    "margin",
+    "fund_flow",
+    "rps",
+    "risk",
+    "valuation",
+    "events",
+    "concept",
+    "consensus",
+    "chip",
+    "financial_report",
+    "sector",
+]
+
+# Which refresh-time data dimensions each card consumes. The engine unions the
+# dimensions of the currently visible cards and only fetches those; a card whose
+# data comes from the core OHLCV fetch or an on-demand route consumes nothing
+# here (hiding it only hides the UI). ``industry_ranking`` feeds only the sector
+# board; ``concept`` feeds the per-symbol concept card AND the sector board's
+# concept tab, so either card alone keeps that dimension alive.
+CARD_DATA_DIMENSIONS: Dict[str, frozenset[str]] = {
+    "market_sentiment": frozenset({"market_sentiment"}),
+    "volume": frozenset(),
+    "volume_chart": frozenset(),
+    "margin": frozenset({"margin"}),
+    "fund_flow": frozenset({"fund_flow"}),
+    "rps": frozenset(),
+    "risk": frozenset(),
+    "valuation": frozenset({"valuation"}),
+    "events": frozenset({"events"}),
+    "concept": frozenset({"concept"}),
+    "consensus": frozenset({"consensus"}),
+    "chip": frozenset({"chip"}),
+    "financial_report": frozenset(),
+    "sector": frozenset({"industry_ranking", "concept"}),
+}
+
 
 class TrackerThresholds(BaseModel):
     """User-overridable thresholds for signal detection.
@@ -109,6 +153,13 @@ class TrackerConfig(BaseModel):
         default_factory=lambda: list(ANALYSIS_INDICATORS),
         description="Analysis indicator blocks fed to the LLM (subset of ANALYSIS_INDICATORS).",
     )
+    # Per-card visibility for the dashboard cards listed in HIDEABLE_CARDS. A
+    # missing key means the card is visible; ``{id: false}`` hides it from the
+    # UI and stops a refresh from fetching its data dimensions.
+    card_visibility: Dict[str, bool] = Field(
+        default_factory=dict,
+        description="Per-card visibility map (key: HIDEABLE_CARDS id, value: visible).",
+    )
 
     @field_validator("watchlist")
     @classmethod
@@ -171,6 +222,16 @@ class TrackerConfig(BaseModel):
         if not unique:
             raise ValueError("analysis_indicators must contain at least one indicator")
         return unique
+
+    @field_validator("card_visibility")
+    @classmethod
+    def _validate_card_visibility(cls, value: Dict[str, bool]) -> Dict[str, bool]:
+        """Reject unknown card ids and coerce values to strict booleans."""
+        known = set(HIDEABLE_CARDS)
+        for key in value:
+            if key not in known:
+                raise ValueError(f"Unknown hideable card: {key}")
+        return {key: bool(visible) for key, visible in value.items()}
 
     def model_dump_json_safe(self) -> Dict[str, Any]:
         """Return a plain JSON-serializable dict."""
@@ -819,6 +880,8 @@ __all__ = [
     "DEFAULT_SIGNALS",
     "DEFAULT_WATCHLIST",
     "ANALYSIS_INDICATORS",
+    "HIDEABLE_CARDS",
+    "CARD_DATA_DIMENSIONS",
     "SignalType",
     "SignalState",
     "SignalValue",

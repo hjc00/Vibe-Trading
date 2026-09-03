@@ -1,5 +1,6 @@
-import { ChevronDown, CircleHelp } from "lucide-react";
+import { ChevronDown, CircleHelp, EyeOff } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 interface ChartCardHeaderProps {
@@ -9,6 +10,10 @@ interface ChartCardHeaderProps {
   actions?: ReactNode;
   collapsed?: boolean;
   onToggle?: () => void;
+  /** When set, renders a hide button (EyeOff) in the header actions. */
+  onHide?: () => void;
+  /** Accessible label for the hide button; defaults to the translated text. */
+  hideLabel?: string;
 }
 
 export function ChartCardHeader({
@@ -18,8 +23,12 @@ export function ChartCardHeader({
   actions,
   collapsed = false,
   onToggle,
+  onHide,
+  hideLabel,
 }: ChartCardHeaderProps) {
+  const { t } = useTranslation();
   const togglable = onToggle != null;
+  const hideText = hideLabel ?? t("stockTracker.hideCard");
   return (
     <div
       className={cn(
@@ -31,6 +40,17 @@ export function ChartCardHeader({
       <div className="flex items-center gap-1">
         {meta ? <span className="text-[10px] text-muted-foreground">{meta}</span> : null}
         {actions}
+        {onHide ? (
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label={hideText}
+            title={hideText}
+            className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <EyeOff className="h-4 w-4" />
+          </button>
+        ) : null}
         <button
           type="button"
           className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"

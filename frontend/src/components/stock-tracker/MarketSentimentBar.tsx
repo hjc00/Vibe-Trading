@@ -1,4 +1,4 @@
-import { Thermometer } from "lucide-react";
+import { EyeOff, Thermometer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { getSentimentBandClass, getSentimentBandLabelKey } from "@/lib/stockTracker";
@@ -6,6 +6,7 @@ import type { MarketSentimentSnapshot } from "@/lib/api";
 
 interface MarketSentimentBarProps {
   sentiment: MarketSentimentSnapshot | null | undefined;
+  onHide?: () => void;
 }
 
 function formatRatioPct(value: number | null | undefined): string {
@@ -18,8 +19,9 @@ function formatRatioPct(value: number | null | undefined): string {
  * blue→gray→red temperature bar with the composite score plus the key breadth
  * sub-metrics (limit-up / limit-down / broken-board / ladder / advance-decline).
  */
-export function MarketSentimentBar({ sentiment }: MarketSentimentBarProps) {
+export function MarketSentimentBar({ sentiment, onHide }: MarketSentimentBarProps) {
   const { t } = useTranslation();
+  const hideCard = t("stockTracker.hideCard");
 
   if (!sentiment || sentiment.source === "unavailable") {
     return (
@@ -28,6 +30,17 @@ export function MarketSentimentBar({ sentiment }: MarketSentimentBarProps) {
           <Thermometer className="h-4 w-4 opacity-60" />
           <span className="text-xs">{t("stockTracker.sentimentNoData")}</span>
         </div>
+        {onHide ? (
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label={hideCard}
+            title={hideCard}
+            className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <EyeOff className="h-4 w-4" />
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -55,6 +68,17 @@ export function MarketSentimentBar({ sentiment }: MarketSentimentBarProps) {
             <span className={cn("text-xs font-medium", getSentimentBandClass(score))}>
               {t(bandKey as never)}
             </span>
+          ) : null}
+          {onHide ? (
+            <button
+              type="button"
+              onClick={onHide}
+              aria-label={hideCard}
+              title={hideCard}
+              className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <EyeOff className="h-4 w-4" />
+            </button>
           ) : null}
         </div>
       </div>

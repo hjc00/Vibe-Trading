@@ -15,9 +15,10 @@ import type { SymbolSnapshot } from "@/lib/api";
 
 interface ValuationCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
-export function ValuationCard({ symbol }: ValuationCardProps) {
+export function ValuationCard({ symbol, onHide }: ValuationCardProps) {
   const { t } = useTranslation();
   const valuation = symbol?.valuation;
   const hasData =
@@ -32,6 +33,7 @@ export function ValuationCard({ symbol }: ValuationCardProps) {
       <ChartCardHeader
         title={t("stockTracker.valuationTitle")}
         helpText={t("stockTracker.valuationExplanation")}
+        onHide={onHide}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(symbol?.valuation?.trade_date),
         })}

@@ -15,6 +15,7 @@ interface SectorStrengthBoardProps {
   sectors: SectorStrength[] | undefined;
   concepts?: ConceptStrength[] | undefined;
   tradingDate?: string | null;
+  onHide?: () => void;
 }
 
 type BoardTab = "industry" | "concept";
@@ -80,7 +81,7 @@ function PeriodTrendCell({ metrics }: { metrics: SectorPeriodMetric[] | undefine
   );
 }
 
-export function SectorStrengthBoard({ sectors, concepts, tradingDate }: SectorStrengthBoardProps) {
+export function SectorStrengthBoard({ sectors, concepts, tradingDate, onHide }: SectorStrengthBoardProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     try {
@@ -170,6 +171,7 @@ export function SectorStrengthBoard({ sectors, concepts, tradingDate }: SectorSt
           isIndustry ? "stockTracker.sectorStrengthExplanation" : "stockTracker.conceptStrengthExplanation",
         )}
         meta={t("stockTracker.dataDate", { date: formatDataDate(tradingDate) })}
+        onHide={onHide}
         collapsed={collapsed}
         onToggle={toggleCollapsed}
       />

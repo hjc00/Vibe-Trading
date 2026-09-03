@@ -146,6 +146,10 @@ class TrackerSettingsRequest(BaseModel):
         default=None,
         description="Indicator blocks fed to LLM analysis (subset of ANALYSIS_INDICATORS).",
     )
+    card_visibility: Optional[Dict[str, bool]] = Field(
+        default=None,
+        description="Per-card visibility map (key: HIDEABLE_CARDS id, value: visible).",
+    )
 
 
 class TrackerConfigResponse(BaseModel):
@@ -158,6 +162,7 @@ class TrackerConfigResponse(BaseModel):
     refresh_interval_seconds: int
     detail_card_count: int
     analysis_indicators: List[str]
+    card_visibility: Dict[str, bool]
 
 
 class TrackerSettingsResponse(BaseModel):
@@ -233,6 +238,9 @@ def _config_from_request(request: TrackerSettingsRequest) -> TrackerConfig:
         kwargs["detail_card_count"] = request.detail_card_count
     if request.analysis_indicators is not None:
         kwargs["analysis_indicators"] = request.analysis_indicators
+    if request.card_visibility is not None:
+        # Replace the whole map (the frontend sends the full visibility state).
+        kwargs["card_visibility"] = request.card_visibility
 
     # Merge with current config so omitted fields keep their defaults, then
     # reconstruct to re-run Pydantic validators (model_copy skips them).

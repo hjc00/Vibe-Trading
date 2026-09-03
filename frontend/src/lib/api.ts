@@ -1773,6 +1773,12 @@ export interface TrackerConfig {
   detail_card_count: number;
   /** Indicator blocks fed to LLM analysis (subset of ANALYSIS_INDICATORS). */
   analysis_indicators: string[];
+  /**
+   * Per-card visibility. Keys are HIDEABLE_CARD_IDS; a missing key means the
+   * card is visible (so `{}` shows every card). `{ id: false }` hides the card
+   * and stops a refresh from fetching its data.
+   */
+  card_visibility: Record<string, boolean>;
 }
 
 export interface StockTrackerQuote {

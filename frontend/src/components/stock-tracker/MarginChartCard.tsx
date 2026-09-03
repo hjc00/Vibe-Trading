@@ -9,9 +9,10 @@ import type { SymbolSnapshot } from "@/lib/api";
 
 interface MarginChartCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
-export function MarginChartCard({ symbol }: MarginChartCardProps) {
+export function MarginChartCard({ symbol, onHide }: MarginChartCardProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -134,6 +135,7 @@ export function MarginChartCard({ symbol }: MarginChartCardProps) {
       <ChartCardHeader
         title={t("stockTracker.marginChartTitle")}
         helpText={t("stockTracker.marginExplanation")}
+        onHide={onHide}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(symbol?.capital?.margin?.trade_date),
         })}

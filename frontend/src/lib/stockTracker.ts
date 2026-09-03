@@ -15,6 +15,61 @@ export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
   margin_expansion: "stockTracker.marginExpansion",
 } as const;
 
+// Dashboard data cards that can be hidden via the card's hide button. Order
+// mirrors the backend HIDEABLE_CARDS and the dashboard's reading order.
+export const HIDEABLE_CARD_IDS = [
+  "market_sentiment",
+  "volume",
+  "volume_chart",
+  "margin",
+  "fund_flow",
+  "rps",
+  "risk",
+  "valuation",
+  "events",
+  "concept",
+  "consensus",
+  "chip",
+  "financial_report",
+  "sector",
+] as const;
+
+export type HideableCardId = (typeof HIDEABLE_CARD_IDS)[number];
+
+/** i18n key for each hideable card's title, used by the restore chip row. */
+export const CARD_TITLE_LABEL_KEYS: Record<HideableCardId, string> = {
+  market_sentiment: "stockTracker.sentimentTitle",
+  volume: "stockTracker.volumeTitle",
+  volume_chart: "stockTracker.volumeChartTitle",
+  margin: "stockTracker.marginChartTitle",
+  fund_flow: "stockTracker.fundFlowChartTitle",
+  rps: "stockTracker.rpsChartTitle",
+  risk: "stockTracker.riskTitle",
+  valuation: "stockTracker.valuationTitle",
+  events: "stockTracker.eventTitle",
+  concept: "stockTracker.conceptTitle",
+  consensus: "stockTracker.consensusTitle",
+  chip: "stockTracker.chipTitle",
+  financial_report: "stockTracker.financialReportTitle",
+  sector: "stockTracker.sectorStrengthTitle",
+};
+
+/**
+ * Whether a card is currently visible. A missing visibility key means visible,
+ * so an empty map (or an unknown id) never hides anything.
+ */
+export function isCardVisible(
+  id: HideableCardId,
+  visibility?: Record<string, boolean> | null,
+): boolean {
+  return visibility?.[id] !== false;
+}
+
+/** Ids of the currently hidden cards, in HIDEABLE_CARD_IDS order. */
+export function hiddenCardIds(visibility?: Record<string, boolean> | null): HideableCardId[] {
+  return HIDEABLE_CARD_IDS.filter((id) => !isCardVisible(id, visibility));
+}
+
 // Analysis indicator blocks that may be injected into an LLM analysis prompt.
 // Order matches the backend canonical order (models.ANALYSIS_INDICATORS).
 export interface AnalysisIndicatorMeta {

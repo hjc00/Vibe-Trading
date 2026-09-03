@@ -7,6 +7,7 @@ import type { SymbolSnapshot } from "@/lib/api";
 
 interface ConceptHeatCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
 /**
@@ -14,7 +15,7 @@ interface ConceptHeatCardProps {
  * boards it belongs to, its hottest board on the whole-market ranking, and the
  * composite heat score (0-100) plus that concept's limit-up count.
  */
-export function ConceptHeatCard({ symbol }: ConceptHeatCardProps) {
+export function ConceptHeatCard({ symbol, onHide }: ConceptHeatCardProps) {
   const { t } = useTranslation();
   const concept = symbol?.concept;
   const hasData =
@@ -26,6 +27,7 @@ export function ConceptHeatCard({ symbol }: ConceptHeatCardProps) {
       <ChartCardHeader
         title={t("stockTracker.conceptTitle")}
         helpText={t("stockTracker.conceptExplanation")}
+        onHide={onHide}
         meta={
           concept?.source && concept.source !== "unavailable"
             ? t("stockTracker.dataSource", { source: concept.source })

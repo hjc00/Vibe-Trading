@@ -59,6 +59,7 @@ def test_get_settings_default(client):
     assert data["config"]["refresh_interval_seconds"] == 10
     assert data["config"]["detail_card_count"] == 11
     assert data["config"]["analysis_indicators"] == ANALYSIS_INDICATORS
+    assert data["config"]["card_visibility"] == {}
 
 
 def test_update_settings_validation(client):
@@ -148,6 +149,47 @@ def test_update_settings_rejects_unknown_analysis_indicator(client):
     response = client.put(
         "/api/stock-tracker/settings",
         json={"analysis_indicators": ["not_a_real_indicator"]},
+    )
+    assert response.status_code == 422
+
+
+def test_update_settings_card_visibility(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"card_visibility": {"margin": False, "fund_flow": False}},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["config"]["card_visibility"] == {"margin": False, "fund_flow": False}
+
+
+def test_update_settings_card_visibility_can_reopen(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"card_visibility": {"margin": False}},
+    )
+    assert response.status_code == 200
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"card_visibility": {"margin": True}},
+    )
+    assert response.status_code == 200
+    assert response.json()["config"]["card_visibility"] == {"margin": True}
+
+
+def test_update_settings_card_visibility_accepts_empty(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"card_visibility": {}},
+    )
+    assert response.status_code == 200
+    assert response.json()["config"]["card_visibility"] == {}
+
+
+def test_update_settings_rejects_unknown_card_visibility(client):
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={"card_visibility": {"not_a_card": False}},
     )
     assert response.status_code == 422
 

@@ -19,6 +19,7 @@ from src.stock_tracker.consensus_data import (
 )
 from src.stock_tracker.events_data import EventsDataCache, load_events_data
 from src.stock_tracker.models import (
+    CARD_DATA_DIMENSIONS,
     CapitalMetrics,
     ChipSnapshot,
     ConceptSnapshot,
@@ -26,6 +27,7 @@ from src.stock_tracker.models import (
     ConsensusSnapshot,
     CrossDayDiff,
     EventSnapshot,
+    HIDEABLE_CARDS,
     PeriodMetrics,
     PeriodSignals,
     RiskMetrics,
@@ -132,6 +134,10 @@ class StockTrackerEngine:
         self._seed_caches_from_previous(previous, trading_date)
         start_date = end_date - timedelta(days=max(self.config.periods) + _BUFFER_DAYS)
 
+        # Only fetch the data dimensions the currently visible cards consume;
+        # a hidden card no longer drives its network fetch on refresh.
+        needed = self._needed_data_dimensions()
+
         raw_data = self._fetch_data(
             self.config.watchlist,
             start_date.isoformat(),
@@ -163,94 +169,116 @@ class StockTrackerEngine:
         # Fetch margin-trading data with daily caching. Request enough history
         # to cover the longest configured period so the margin-expansion signal
         # can be computed per period; fund flow keeps its own 30-day lookback.
+        # Each side is skipped when its card is hidden.
+        need_fund_flow = "fund_flow" in needed
+        need_margin = "margin" in needed
         capital_data: Dict[str, CapitalMetrics] = {}
-        try:
-            capital_data = self._fetch_capital_data(
-                self.config.watchlist,
-                trading_date=trading_date,
-                days=max(_CAPITAL_DATA_DAYS, max(self.config.periods) + 1),
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("Capital data fetch failed")
+        if need_fund_flow or need_margin:
+            try:
+                capital_data = self._fetch_capital_data(
+                    self.config.watchlist,
+                    trading_date=trading_date,
+                    days=max(_CAPITAL_DATA_DAYS, max(self.config.periods) + 1),
+                    include_fund_flow=need_fund_flow,
+                    include_margin=need_margin,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Capital data fetch failed")
 
-        # A throttled/blocked source must not clobber an earlier successful
-        # fetch: when a symbol's capital block errored this refresh but the
-        # prior snapshot still holds good data, keep the good data instead of
-        # blanking the card.
-        capital_data = self._retain_last_good_capital(capital_data, previous)
+            # A throttled/blocked source must not clobber an earlier successful
+            # fetch: when a symbol's capital block errored this refresh but the
+            # prior snapshot still holds good data, keep the good data instead of
+            # blanking the card. Disabled dimensions are never restored.
+            capital_data = self._retain_last_good_capital(
+                capital_data,
+                previous,
+                restore_fund_flow=need_fund_flow,
+                restore_margin=need_margin,
+            )
 
         # Fetch valuation + quality data with daily caching; tolerate failure.
         valuation_data: Dict[str, ValuationSnapshot] = {}
-        try:
-            valuation_data = load_valuation_data(
-                self.config.watchlist,
-                end_date=trading_date,
-                cache=self._valuation_cache,
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("Valuation data fetch failed")
+        if "valuation" in needed:
+            try:
+                valuation_data = load_valuation_data(
+                    self.config.watchlist,
+                    end_date=trading_date,
+                    cache=self._valuation_cache,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Valuation data fetch failed")
 
         # Fetch event-calendar data (解禁/龙虎榜/业绩预告/增减持) with daily
         # caching; tolerate failure so a blocked source never breaks the refresh.
         events_data: Dict[str, EventSnapshot] = {}
-        try:
-            events_data = load_events_data(
-                self.config.watchlist,
-                end_date=trading_date,
-                cache=self._events_cache,
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("Event data fetch failed")
+        if "events" in needed:
+            try:
+                events_data = load_events_data(
+                    self.config.watchlist,
+                    end_date=trading_date,
+                    cache=self._events_cache,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Event data fetch failed")
 
         # Fetch chip-concentration data (股东户数/北向/公募) with low-frequency
         # caching; tolerate failure so a blocked source never breaks the refresh.
         chip_data: Dict[str, ChipSnapshot] = {}
-        try:
-            chip_data = load_chip_data(
-                self.config.watchlist,
-                end_date=trading_date,
-                cache=self._chip_cache,
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("Chip data fetch failed")
+        if "chip" in needed:
+            try:
+                chip_data = load_chip_data(
+                    self.config.watchlist,
+                    end_date=trading_date,
+                    cache=self._chip_cache,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Chip data fetch failed")
 
         # Fetch consensus estimates (研报评级/一致预期 EPS/目标价) with
         # low-frequency caching; tolerate failure.
         consensus_data: Dict[str, ConsensusSnapshot] = {}
-        try:
-            consensus_data = load_consensus_data(
-                self.config.watchlist,
-                end_date=trading_date,
-                cache=self._consensus_cache,
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("Consensus data fetch failed")
+        if "consensus" in needed:
+            try:
+                consensus_data = load_consensus_data(
+                    self.config.watchlist,
+                    end_date=trading_date,
+                    cache=self._consensus_cache,
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception("Consensus data fetch failed")
 
-        # Resolve concept boards, reusing the prior same-trading-day mapping so a
-        # repeat refresh skips the throttled Eastmoney membership calls.
-        concept_boards = self._resolve_concept_boards(previous, trading_date)
-
-        # Fetch the whole-market limit-up pool once and share it across market
-        # sentiment and concept heat (2.16 -> 2.15 zero extra requests).
-        try:
-            market_breadth = fetch_market_breadth()
-        except Exception:  # noqa: BLE001
-            logger.exception("Market breadth fetch failed")
-            market_breadth = {"source": "unavailable", "limit_up_rows": []}
-        market_sentiment = load_market_sentiment(market_breadth)
+        # The whole-market limit-up pool is fetched once and shared across
+        # market sentiment and concept heat (2.16 -> 2.15 zero extra requests);
+        # it is only needed when either is enabled.
+        need_market_sentiment = "market_sentiment" in needed
+        need_concept = "concept" in needed
+        market_breadth: Dict[str, Any] = {"source": "unavailable", "limit_up_rows": []}
+        if need_market_sentiment or need_concept:
+            try:
+                market_breadth = fetch_market_breadth()
+            except Exception:  # noqa: BLE001
+                logger.exception("Market breadth fetch failed")
+        market_sentiment = (
+            load_market_sentiment(market_breadth) if need_market_sentiment else None
+        )
 
         # Concept heat: reuse the prior same-day concept ranking, and the shared
         # market breadth, so a repeat refresh skips both network fetches.
+        # Skipped entirely when neither the concept card nor the sector board's
+        # concept tab is enabled.
         concepts: List[ConceptStrength] = []
         concept_snapshots: Dict[str, ConceptSnapshot] = {}
-        try:
-            concepts, concept_snapshots = load_concept_data(
-                concept_boards,
-                ranking=self._cached_concept_ranking(previous, trading_date),
-                breadth=market_breadth,
-            )
-        except Exception:  # noqa: BLE001 - concept view must not break refresh
-            logger.exception("Concept data computation failed")
+        concept_boards: Dict[str, List[str]] = {}
+        if need_concept:
+            concept_boards = self._resolve_concept_boards(previous, trading_date)
+            try:
+                concepts, concept_snapshots = load_concept_data(
+                    concept_boards,
+                    ranking=self._cached_concept_ranking(previous, trading_date),
+                    breadth=market_breadth,
+                )
+            except Exception:  # noqa: BLE001 - concept view must not break refresh
+                logger.exception("Concept data computation failed")
 
         symbol_snapshots: List[SymbolSnapshot] = []
         unresolved: List[str] = []
@@ -301,9 +329,12 @@ class StockTrackerEngine:
         # Compute cross-sectional RPS after all symbols have their period metrics.
         self._compute_and_attach_rps(symbol_snapshots, benchmark_df)
 
-        sectors = self._compute_sector_strength(
-            symbol_snapshots, previous=previous, trading_date=trading_date
-        )
+        if "industry_ranking" in needed:
+            sectors = self._compute_sector_strength(
+                symbol_snapshots, previous=previous, trading_date=trading_date
+            )
+        else:
+            sectors: List[SectorStrength] = []
 
         rankings = self._compute_rankings(symbol_snapshots)
         diff_map = self._compute_diff_map(symbol_snapshots, previous)
@@ -328,6 +359,22 @@ class StockTrackerEngine:
             unresolved=unresolved,
             data_gaps=data_gaps,
         )
+
+    def _needed_data_dimensions(self) -> frozenset[str]:
+        """Union of refresh-time data dimensions the currently visible cards need.
+
+        A missing ``card_visibility`` key means the card is visible; only cards
+        whose stored value is False are excluded. The engine fetches a dimension
+        iff at least one visible card consumes it, so hiding a card stops its
+        network fetch on the next refresh.
+        """
+        hidden = {
+            card_id
+            for card_id, visible in (self.config.card_visibility or {}).items()
+            if not visible
+        }
+        visible = [card_id for card_id in HIDEABLE_CARDS if card_id not in hidden]
+        return frozenset().union(*(CARD_DATA_DIMENSIONS[card_id] for card_id in visible))
 
     def _fetch_data(
         self,
@@ -452,6 +499,9 @@ class StockTrackerEngine:
         self,
         capital_data: Dict[str, CapitalMetrics],
         previous: TrackerSnapshot | None,
+        *,
+        restore_fund_flow: bool = True,
+        restore_margin: bool = True,
     ) -> Dict[str, CapitalMetrics]:
         """Keep an earlier good capital block when this refresh's fetch failed.
 
@@ -459,7 +509,8 @@ class StockTrackerEngine:
         Eastmoney) is replaced by the same symbol's data from the prior snapshot
         when that data is error-free and non-empty, so a repeat refresh never
         blanks a card that already had values. Symbols with no prior data are
-        left untouched (nothing good exists to retain).
+        left untouched (nothing good exists to retain). A dimension whose card
+        is hidden is never restored (its fetch was intentionally skipped).
         """
         if previous is None:
             return capital_data
@@ -472,7 +523,8 @@ class StockTrackerEngine:
                 continue
             updates: Dict[str, Any] = {}
             if (
-                metrics.fund_flow_error is not None
+                restore_fund_flow
+                and metrics.fund_flow_error is not None
                 and prev.fund_flow_error is None
                 and prev.fund_flow.history
             ):
@@ -482,7 +534,8 @@ class StockTrackerEngine:
                     fund_flow_error=None,
                 )
             if (
-                metrics.margin_error is not None
+                restore_margin
+                and metrics.margin_error is not None
                 and prev.margin_error is None
                 and prev.margin.history
             ):
@@ -555,6 +608,9 @@ class StockTrackerEngine:
         codes: List[str],
         trading_date: date,
         days: int,
+        *,
+        include_fund_flow: bool = True,
+        include_margin: bool = True,
     ) -> Dict[str, CapitalMetrics]:
         """Fetch margin-trading data for all configured symbols."""
         return load_capital_data(
@@ -562,6 +618,8 @@ class StockTrackerEngine:
             end_date=trading_date,
             days=days,
             cache=self._capital_cache,
+            include_fund_flow=include_fund_flow,
+            include_margin=include_margin,
         )
 
     def _fetch_benchmark_data(

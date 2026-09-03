@@ -13,6 +13,7 @@ import { ChartCardHeader } from "./ChartCardHeader";
 
 interface FinancialReportCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
 const PERIOD_OPTIONS = [1, 4, 8];
@@ -112,7 +113,7 @@ const METRICS: MetricDef[] = [
  * reported periods and compare them in a multi-period table with a 1/4/8
  * period switch. Not part of the daily snapshot — data is fetched per click.
  */
-export function FinancialReportCard({ symbol }: FinancialReportCardProps) {
+export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps) {
   const { t } = useTranslation();
   const code = symbol?.code;
   const [report, setReport] = useState<FinancialReportSnapshot | null>(null);
@@ -151,6 +152,7 @@ export function FinancialReportCard({ symbol }: FinancialReportCardProps) {
       <ChartCardHeader
         title={t("stockTracker.financialReportTitle")}
         helpText={t("stockTracker.financialReportExplanation")}
+        onHide={onHide}
         meta={
           report && latest
             ? `${latest.report_type} · ${latest.end_date}`

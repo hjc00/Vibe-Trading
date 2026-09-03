@@ -1055,5 +1055,89 @@ def test_volume_series_carries_ohlc_candles():
     assert series[0].trade_date == df.index[-len(series)].date()
 
 
+def test_needed_dimensions_all_cards_visible():
+    config = TrackerConfig(watchlist=["000001.SZ"])
+    needed = StockTrackerEngine(config)._needed_data_dimensions()
+    for dim in (
+        "fund_flow",
+        "margin",
+        "valuation",
+        "events",
+        "consensus",
+        "chip",
+        "concept",
+        "industry_ranking",
+        "market_sentiment",
+    ):
+        assert dim in needed
+
+
+def test_needed_dimensions_excludes_hidden_cards():
+    config = TrackerConfig(
+        watchlist=["000001.SZ"],
+        card_visibility={
+            "margin": False,
+            "fund_flow": False,
+            "valuation": False,
+            "market_sentiment": False,
+        },
+    )
+    needed = StockTrackerEngine(config)._needed_data_dimensions()
+    assert "margin" not in needed
+    assert "fund_flow" not in needed
+    assert "valuation" not in needed
+    assert "market_sentiment" not in needed
+    assert "events" in needed
+    assert "chip" in needed
+    assert "consensus" in needed
+    assert "concept" in needed
+    assert "industry_ranking" in needed
+
+
+def test_needed_dimensions_sector_keeps_concept_alive():
+    # Hiding only the concept card keeps the sector board's concept tab alive.
+    config = TrackerConfig(watchlist=["000001.SZ"], card_visibility={"concept": False})
+    needed = StockTrackerEngine(config)._needed_data_dimensions()
+    assert "concept" in needed
+    assert "industry_ranking" in needed
+
+
+def test_needed_dimensions_hide_sector_keeps_concept_card_alive():
+    config = TrackerConfig(watchlist=["000001.SZ"], card_visibility={"sector": False})
+    needed = StockTrackerEngine(config)._needed_data_dimensions()
+    assert "concept" in needed
+    assert "industry_ranking" not in needed
+
+
+def test_needed_dimensions_hide_both_concept_and_sector():
+    config = TrackerConfig(
+        watchlist=["000001.SZ"],
+        card_visibility={"concept": False, "sector": False},
+    )
+    needed = StockTrackerEngine(config)._needed_data_dimensions()
+    assert "concept" not in needed
+    assert "industry_ranking" not in needed
+
+
+def test_fetch_capital_data_forwards_include_flags(monkeypatch):
+    seen: dict = {}
+
+    def fake_load(codes, *, end_date, days, cache, include_fund_flow, include_margin):
+        seen["include_fund_flow"] = include_fund_flow
+        seen["include_margin"] = include_margin
+        return {}
+
+    monkeypatch.setattr("src.stock_tracker.engine.load_capital_data", fake_load)
+    engine = StockTrackerEngine(TrackerConfig(watchlist=["000001.SZ"]))
+    engine._fetch_capital_data(
+        ["000001.SZ"],
+        trading_date=date(2026, 8, 31),
+        days=5,
+        include_fund_flow=False,
+        include_margin=True,
+    )
+    assert seen == {"include_fund_flow": False, "include_margin": True}
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

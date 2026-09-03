@@ -370,6 +370,8 @@ def load_capital_data(
     end_date: Optional[date] = None,
     days: int = _DEFAULT_DAYS,
     cache: Optional[CapitalDataCache] = None,
+    include_fund_flow: bool = True,
+    include_margin: bool = True,
 ) -> Dict[str, CapitalMetrics]:
     """Load fund-flow and margin-trading metrics for ``codes``.
 
@@ -379,6 +381,12 @@ def load_capital_data(
         days: Number of historical days to fetch for margin data. Fund flow
             always uses its own lookback to satisfy the 20-day spike detector.
         cache: Shared cache instance; a fresh one is created if omitted.
+        include_fund_flow: When False the fund-flow side is skipped entirely
+            and reported as ``fund_flow_error="disabled"`` (used when the
+            fund-flow card is hidden). Defaults to True.
+        include_margin: When False the margin-trading side is skipped entirely
+            and reported as ``margin_error="disabled"`` (used when the margin
+            card is hidden). Defaults to True.
 
     Returns:
         Dict mapping symbol to ``CapitalMetrics``. Missing or failed symbols
@@ -388,27 +396,37 @@ def load_capital_data(
         end_date = date.today()
     cache = cache or CapitalDataCache()
 
-    fund_results = fetch_fund_flow_batch(
-        codes,
-        days=max(_FUND_FLOW_LOOKBACK, 2),
-        cache=cache,
-        trading_date=end_date,
-    )
-    margin_results = fetch_margin_trading_batch(
-        codes,
-        days=max(days, 2),
-        cache=cache,
-        trading_date=end_date,
-    )
+    fund_results: Dict[str, CapitalMetrics] = {}
+    if include_fund_flow:
+        fund_results = fetch_fund_flow_batch(
+            codes,
+            days=max(_FUND_FLOW_LOOKBACK, 2),
+            cache=cache,
+            trading_date=end_date,
+        )
+    margin_results: Dict[str, CapitalMetrics] = {}
+    if include_margin:
+        margin_results = fetch_margin_trading_batch(
+            codes,
+            days=max(days, 2),
+            cache=cache,
+            trading_date=end_date,
+        )
 
     merged: Dict[str, CapitalMetrics] = {}
     for code in codes:
         fund_metrics = fund_results.get(code)
         if fund_metrics is None:
-            fund_metrics = CapitalMetrics(fund_flow_error="missing from batch")
+            fund_metrics = CapitalMetrics(
+                fund_flow_error="missing from batch"
+                if include_fund_flow
+                else "disabled"
+            )
         margin_metrics = margin_results.get(code)
         if margin_metrics is None:
-            margin_metrics = CapitalMetrics(margin_error="missing from batch")
+            margin_metrics = CapitalMetrics(
+                margin_error="missing from batch" if include_margin else "disabled"
+            )
         merged[code] = _merge_capital_metrics(fund_metrics, margin_metrics)
 
     return merged

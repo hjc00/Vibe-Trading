@@ -11,6 +11,7 @@ import type { SymbolSnapshot } from "@/lib/api";
 
 interface ConsensusCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
 /** Format a fraction (e.g. 0.128) as a signed percent. */
@@ -28,7 +29,7 @@ function formatPriceOrDash(value: number | null | undefined): string {
  * Sell-side consensus for one symbol (盈利预期/一致预期): coverage, rating mix,
  * consensus EPS, forward PE, target-price range and upside vs the latest close.
  */
-export function ConsensusCard({ symbol }: ConsensusCardProps) {
+export function ConsensusCard({ symbol, onHide }: ConsensusCardProps) {
   const { t } = useTranslation();
   const consensus = symbol?.consensus;
   const hasData =
@@ -43,6 +44,7 @@ export function ConsensusCard({ symbol }: ConsensusCardProps) {
       <ChartCardHeader
         title={t("stockTracker.consensusTitle")}
         helpText={t("stockTracker.consensusExplanation")}
+        onHide={onHide}
         meta={
           consensus?.source && consensus.source !== "unavailable"
             ? t("stockTracker.dataSource", { source: consensus.source })

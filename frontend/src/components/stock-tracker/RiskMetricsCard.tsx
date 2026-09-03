@@ -15,9 +15,10 @@ import type { SymbolSnapshot } from "@/lib/api";
 
 interface RiskMetricsCardProps {
   symbol: SymbolSnapshot | null;
+  onHide?: () => void;
 }
 
-export function RiskMetricsCard({ symbol }: RiskMetricsCardProps) {
+export function RiskMetricsCard({ symbol, onHide }: RiskMetricsCardProps) {
   const { t } = useTranslation();
 
   const risk = symbol?.risk;
@@ -32,6 +33,7 @@ export function RiskMetricsCard({ symbol }: RiskMetricsCardProps) {
       <ChartCardHeader
         title={t("stockTracker.riskTitle")}
         helpText={t("stockTracker.riskExplanation")}
+        onHide={onHide}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(latestPeriodEndDate(symbol)),
         })}
