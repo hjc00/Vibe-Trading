@@ -81,7 +81,7 @@ resolve_secid("AAPL.US")     # -> "105.AAPL"（经 suggest 端点解析并进程
 
 | 工具 | 标题(详细文档) | 市场 | 描述 |
 | ---- | -------------- | ---- | ---- |
-| `get_research_reports` | [券商研报](eastmoney/references/研报舆情/券商研报.md) | A股 | 券商研报列表（标题/机构/分析师/评级/EPS·PE 预测）+ 同花顺一致预期 EPS |
+| `get_research_reports` | [券商研报](eastmoney/references/研报舆情/券商研报.md) | A股 | 券商研报列表（标题/机构/分析师/评级/EPS·PE 预测）+ 东财 datacenter 一致预期 EPS |
 | `get_stock_news` | [财经新闻](eastmoney/references/研报舆情/财经新闻.md) | A股/港股/美股 | 个股新闻或全市场财经快讯（A 股走东财，美/港走 Yahoo） |
 
 ### 财务报表（A 股 / 港股；美股走 SEC）

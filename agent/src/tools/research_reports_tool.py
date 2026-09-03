@@ -6,12 +6,11 @@ Two free, no-auth disclosure feeds are stitched into one envelope:
   for a mainland A-share: report title, issuing brokerage, analyst, publish
   date, the broker's rating label, and that broker's per-year EPS / PE
   forecasts. This is the primary feed and drives the ``reports`` block.
-* **THS** (同花顺, ``basic.10jqka.com.cn``) publishes a market *consensus* EPS
-  forecast (the mean of analyst estimates) per forward fiscal year. THS rejects
-  the bare requests User-Agent, so the call carries a desktop UA and a Referer
-  and routes through the frozen IP-throttled HTTP layer under its own ``ths``
-  host bucket. The consensus feed is best-effort: a THS failure degrades the
-  ``consensus_eps`` block to an empty list and never aborts the report fetch.
+* **Eastmoney datacenter** (``datacenter-web``) publishes a market *consensus*
+  EPS forecast (the mean of analyst estimates) per forward fiscal year via the
+  ``RPT_WEB_RESPREDICT`` report. The consensus feed is best-effort: a datacenter
+  failure degrades the ``consensus_eps`` block to an empty list and never
+  aborts the report fetch.
 
 Both feeds cover mainland A-shares only (``.SH`` / ``.SZ`` / ``.BJ``); any other
 market returns an error envelope. Every outbound GET goes through the project's
@@ -26,11 +25,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any
 
-from backtest.loaders._http import (
-    DEFAULT_USER_AGENT,
-    resolve_min_interval,
-    throttled_get,
-)
 from backtest.loaders.eastmoney_client import get_json, resolve_secid
 from src.agent.tools import BaseTool
 
@@ -40,12 +34,11 @@ logger = logging.getLogger(__name__)
 # reports; the response carries a ``data`` array of one row per report.
 _REPORT_LIST_URL = "https://reportapi.eastmoney.com/report/list"
 
-# THS consensus-forecast endpoint. Returns per-forward-year mean analyst EPS.
-_THS_CONSENSUS_URL = "https://basic.10jqka.com.cn/api/stock/profit_forecast/"
-_THS_HOST_KEY = "ths"
-_THS_MIN_INTERVAL_ENV = "VIBE_TRADING_THS_MIN_INTERVAL"
-_THS_DEFAULT_MIN_INTERVAL = 1.0
-_THS_TIMEOUT_S = 15.0
+# Eastmoney datacenter consensus report. RPT_WEB_RESPREDICT serves one row per
+# symbol carrying up to four fiscal years of mean analyst EPS (YEARn/EPSn), each
+# marked actual (A) or estimate (E).
+_EM_DATACENTER_URL = "https://datacenter-web.eastmoney.com/api/data/v1/get"
+_EM_CONSENSUS_REPORT = "RPT_WEB_RESPREDICT"
 
 # A-share exchange suffixes these disclosures cover.
 _A_SHARE_SUFFIXES = ("SH", "SZ", "BJ")
@@ -63,8 +56,9 @@ class ResearchReportsTool(BaseTool):
         "Fetch mainland A-share sell-side research coverage: recent broker "
         "research reports (title, brokerage, analyst, publish date, rating) with "
         "each broker's per-year EPS and PE forecasts from Eastmoney, plus the "
-        "market consensus (mean) EPS forecast per forward fiscal year from THS "
-        "(同花顺). Markets: China A-shares only (.SH / .SZ / .BJ). "
+        "market consensus (mean) EPS forecast per forward fiscal year from "
+        "Eastmoney's datacenter. "
+        "Markets: China A-shares only (.SH / .SZ / .BJ). "
         "Reports are filtered to the [beginTime, endTime] window (both optional, "
         "defaulting to the trailing two years). "
         'Example: {"code": "600519.SH", "limit": 10, '
@@ -119,7 +113,7 @@ class ResearchReportsTool(BaseTool):
 
         Returns:
             A JSON string envelope. On success:
-            ``{"ok": true, "market": "CN", "source": "eastmoney+ths",
+            ``{"ok": true, "market": "CN", "source": "eastmoney",
             "data": {"code", "reports": [...], "consensus_eps": [...]}}``.
             On failure: ``{"ok": false, "error": str}``.
         """
@@ -173,7 +167,7 @@ class ResearchReportsTool(BaseTool):
             {
                 "ok": True,
                 "market": "CN",
-                "source": "eastmoney+ths",
+                "source": "eastmoney",
                 "data": {
                     "code": code,
                     "reports": reports[:limit],
@@ -231,7 +225,7 @@ def fetch_research_reports_data(
     consumers (e.g. the stock-tracker consensus loader). Assumes a valid A-share
     symbol and returns ``{"reports": [...], "consensus_eps": [...]}`` (empty
     lists, never raises) on any failure. The Eastmoney report list is the
-    primary feed; THS consensus EPS is best-effort.
+    primary feed; the Eastmoney datacenter consensus EPS is best-effort.
 
     Args:
         code: A-share symbol (e.g. ``"600519.SH"``).
@@ -273,7 +267,7 @@ def fetch_research_reports_data(
             },
         )
     except Exception as exc:  # noqa: BLE001 - degraded to empty lists
-        logger.warning("eastmoney report list fetch failed for %s: %s", code, exc)
+        logger.warning("东财研报列表抓取失败 %s: %s", code, exc)
         return {"reports": [], "consensus_eps": []}
 
     reports = _parse_reports(payload)
@@ -342,79 +336,76 @@ def _normalize_report(row: Any) -> dict | None:
 
 
 def _fetch_consensus_eps(code: str) -> list[dict]:
-    """Fetch THS consensus (mean) EPS forecast per forward fiscal year.
+    """Fetch Eastmoney consensus (mean) EPS forecast per forward fiscal year.
 
     Best-effort: any network/parse failure is logged and degraded to an empty
-    list so the primary report fetch is never aborted by a THS outage. THS
-    rejects the bare requests UA, so the call presents a desktop browser UA and
-    a Referer and is spaced under its own ``ths`` host bucket.
+    list so the primary report fetch is never aborted by a datacenter outage.
+    Reads the Eastmoney datacenter ``RPT_WEB_RESPREDICT`` report, which serves
+    one row per symbol carrying up to four fiscal years of mean analyst EPS.
 
     Args:
         code: A-share symbol such as ``"600519.SH"``.
 
     Returns:
-        A list of ``{fiscal_year, consensus_eps}`` dicts ordered as served,
-        empty when THS returns nothing usable or the request fails.
+        A list of ``{fiscal_year, consensus_eps}`` dicts for the estimate
+        (forward) years, empty when Eastmoney returns nothing usable or the
+        request fails.
     """
     try:
-        response = throttled_get(
-            _THS_CONSENSUS_URL,
-            host_key=_THS_HOST_KEY,
-            min_interval=resolve_min_interval(
-                _THS_MIN_INTERVAL_ENV, _THS_DEFAULT_MIN_INTERVAL
-            ),
-            params={"code": _bare_code(code)},
-            headers={
-                "User-Agent": DEFAULT_USER_AGENT,
-                "Referer": "https://basic.10jqka.com.cn/",
+        payload = get_json(
+            _EM_DATACENTER_URL,
+            params={
+                "reportName": _EM_CONSENSUS_REPORT,
+                "columns": "ALL",
+                "filter": f'(SECURITY_CODE="{_bare_code(code)}")',
+                "pageNumber": "1",
+                "pageSize": "1",
+                "source": "WEB",
+                "client": "WEB",
             },
-            timeout=_THS_TIMEOUT_S,
         )
-        response.raise_for_status()
-        payload = response.json()
     except Exception as exc:  # noqa: BLE001 - consensus is best-effort
-        logger.warning("ths consensus eps fetch failed for %s: %s", code, exc)
+        logger.warning("东财一致预期 EPS 抓取失败 %s: %s", code, exc)
         return []
     return _parse_consensus_eps(payload)
 
 
 def _parse_consensus_eps(payload: Any) -> list[dict]:
-    """Extract per-year consensus EPS rows from a THS forecast payload.
+    """Extract per-year consensus EPS rows from an Eastmoney datacenter payload.
 
-    THS wraps its rows under ``data`` (a list of per-forward-year records, each
-    carrying a fiscal year and a mean EPS estimate). Field naming varies, so we
-    probe a small set of known key aliases for each value.
+    The ``RPT_WEB_RESPREDICT`` payload wraps its single per-symbol row under
+    ``result.data``. Each row carries up to four ``YEARn`` / ``EPSn`` pairs with
+    a matching ``YEAR_MARKn`` (``A`` = reported actual, ``E`` = analyst
+    estimate); only the estimate years are forward-looking consensus.
 
     Args:
-        payload: Decoded THS JSON.
+        payload: Decoded Eastmoney datacenter JSON.
 
     Returns:
         A list of ``{fiscal_year, consensus_eps}`` dicts, empty when no usable
         row is present.
     """
-    rows = payload.get("data") if isinstance(payload, dict) else None
-    if not isinstance(rows, list):
+    if not isinstance(payload, dict):
+        return []
+    result = payload.get("result")
+    data = result.get("data") if isinstance(result, dict) else None
+    if not isinstance(data, list) or not data:
+        return []
+    row = data[0]
+    if not isinstance(row, dict):
         return []
 
     out: list[dict] = []
-    for row in rows:
-        if not isinstance(row, dict):
+    for index in range(1, 5):
+        year_raw = row.get(f"YEAR{index}")
+        eps = _to_number(row.get(f"EPS{index}"))
+        mark = row.get(f"YEAR_MARK{index}")
+        if year_raw is None or eps is None:
             continue
-        year = _clean_text(_first(row, ("year", "fiscal_year", "report_year")))
-        eps = _to_number(_first(row, ("eps", "avg_eps", "predict_eps", "forecast_eps")))
-        if year is None and eps is None:
+        if not isinstance(mark, str) or mark.strip().upper() != "E":
             continue
-        out.append({"fiscal_year": year, "consensus_eps": eps})
+        out.append({"fiscal_year": str(year_raw).strip(), "consensus_eps": eps})
     return out
-
-
-def _first(row: dict, keys: tuple[str, ...]) -> Any:
-    """Return the first present, non-empty value among ``keys`` in ``row``."""
-    for key in keys:
-        value = row.get(key)
-        if value is not None and value != "":
-            return value
-    return None
 
 
 def _clean_text(value: Any) -> str | None:

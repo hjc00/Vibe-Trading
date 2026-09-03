@@ -2048,7 +2048,7 @@ def get_research_reports(
     Returns recent broker research reports (title, brokerage, analyst, publish
     date, rating) with each broker's per-year EPS and PE forecasts from
     Eastmoney, plus the market consensus (mean) EPS forecast per forward fiscal
-    year from THS (同花顺). Markets: China A-shares only (.SH/.SZ/.BJ).
+    year from Eastmoney's datacenter. Markets: China A-shares only (.SH/.SZ/.BJ).
 
     Args:
         code: A-share symbol in <code>.<exchange> form (SH/SZ/BJ).

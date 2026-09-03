@@ -96,7 +96,7 @@ def test_eps_revision_needs_two_forecasts():
 class TestConsensusDataCache:
     def test_cache_returns_value_within_ttl(self):
         cache = ConsensusDataCache(ttl_seconds=60)
-        snapshot = ConsensusSnapshot(analyst_count=5, source="eastmoney+ths")
+        snapshot = ConsensusSnapshot(analyst_count=5, source="eastmoney")
         cache.set("600519.SH", date.today(), snapshot)
         assert cache.get("600519.SH", date.today()) is snapshot
 
@@ -123,7 +123,7 @@ class TestLoadConsensusData:
     def test_isolates_symbol_errors(self):
         def _fake(code):
             if code == "600519.SH":
-                return ConsensusSnapshot(analyst_count=5, source="eastmoney+ths")
+                return ConsensusSnapshot(analyst_count=5, source="eastmoney")
             return ConsensusSnapshot(error="no analyst coverage")
 
         with patch("src.stock_tracker.consensus_data._fetch_one_consensus", side_effect=_fake):
@@ -134,7 +134,7 @@ class TestLoadConsensusData:
 
     def test_caches_successes_only(self):
         cache = ConsensusDataCache(ttl_seconds=60)
-        snapshot = ConsensusSnapshot(analyst_count=5, source="eastmoney+ths")
+        snapshot = ConsensusSnapshot(analyst_count=5, source="eastmoney")
 
         with patch("src.stock_tracker.consensus_data._fetch_one_consensus", return_value=snapshot) as mock:
             load_consensus_data(["600519.SH"], end_date=date(2026, 8, 31), cache=cache)

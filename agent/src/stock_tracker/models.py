@@ -516,11 +516,11 @@ class ConsensusSnapshot(BaseModel):
     """Sell-side consensus estimates for one symbol (盈利预期/一致预期).
 
     Populated by :mod:`src.stock_tracker.consensus_data` from the Eastmoney
-    research-report feed (``reportapi``) and THS consensus EPS, with a Tushare
-    ``report_rc`` fallback for target prices and EPS revision. ``forward_pe`` is
-    derived from the next-year consensus EPS and the latest close. Degrades with
-    ``error``; the fallback feeds may be ``None`` when no token / insufficient
-    Tushare points.
+    research-report feed (``reportapi``) and the Eastmoney datacenter
+    per-year consensus EPS, with a Tushare ``report_rc`` fallback for target
+    prices and EPS revision. ``forward_pe`` is derived from the next-year
+    consensus EPS and the latest close. Degrades with ``error``; the fallback
+    feeds may be ``None`` when no token / insufficient Tushare points.
     """
 
     analyst_count: Optional[int] = None

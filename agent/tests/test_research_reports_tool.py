@@ -1,15 +1,16 @@
 """Tests for get_research_reports: success + error envelopes, HTTP mocked.
 
-Eastmoney is mocked at ``get_json`` (imported into the tool module) and THS at
-``throttled_get`` (imported as ``research_reports_tool.throttled_get``), so no
-test reaches a live endpoint.
+Both the report list and the consensus EPS come from Eastmoney now: reportapi
+drives ``get_json`` for the reports block, and the datacenter consensus report
+(``RPT_WEB_RESPREDICT``) is read through the same ``get_json``. Tests mock
+``get_json`` with a two-call side effect (report payload first, consensus
+payload second), so no test reaches a live endpoint.
 """
 
 from __future__ import annotations
 
 import json
 from datetime import datetime
-from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.tools import research_reports_tool as rrt
@@ -42,12 +43,30 @@ _REPORT_PAYLOAD = {
     ]
 }
 
-_THS_PAYLOAD = {
-    "data": [
-        {"year": "2024", "eps": "12.10"},
-        {"year": "2025", "eps": "14.50"},
-    ]
+# One RPT_WEB_RESPREDICT row: actual (A) for 2024, estimates (E) for 2025/2026.
+_CONSENSUS_PAYLOAD = {
+    "result": {
+        "data": [
+            {
+                "SECURITY_CODE": "600519",
+                "YEAR1": 2024,
+                "YEAR_MARK1": "A",
+                "EPS1": 12.1,
+                "YEAR2": 2025,
+                "YEAR_MARK2": "E",
+                "EPS2": 14.5,
+                "YEAR3": 2026,
+                "YEAR_MARK3": "E",
+                "EPS3": 16.9,
+            }
+        ]
+    }
 }
+
+_CONSENSUS_ROWS = [
+    {"fiscal_year": "2025", "consensus_eps": 14.5},
+    {"fiscal_year": "2026", "consensus_eps": 16.9},
+]
 
 
 class _FrozenDatetime(datetime):
@@ -61,24 +80,19 @@ class _FrozenDatetime(datetime):
         return datetime(2026, 8, 13, 12, 0, 0)
 
 
-def _fake_response(payload: dict, status_ok: bool = True):
-    def raise_for_status() -> None:
-        if not status_ok:
-            raise RuntimeError("HTTP error")
-
-    return SimpleNamespace(json=lambda: payload, raise_for_status=raise_for_status)
+def _patch_payloads(*payloads):
+    """Return a context manager patching ``get_json`` with a two-call side effect."""
+    return patch.object(rrt, "get_json", side_effect=list(payloads))
 
 
 def test_success_envelope_merges_reports_and_consensus():
-    with patch.object(rrt, "get_json", return_value=_REPORT_PAYLOAD) as mock_em, patch.object(
-        rrt, "throttled_get", return_value=_fake_response(_THS_PAYLOAD)
-    ) as mock_ths:
+    with _patch_payloads(_REPORT_PAYLOAD, _CONSENSUS_PAYLOAD) as mock_get_json:
         out = ResearchReportsTool().execute(code="600519.SH", limit=10)
 
     payload = json.loads(out)
     assert payload["ok"] is True
     assert payload["market"] == "CN"
-    assert payload["source"] == "eastmoney+ths"
+    assert payload["source"] == "eastmoney"
     assert payload["data"]["code"] == "600519.SH"
 
     reports = payload["data"]["reports"]
@@ -93,31 +107,27 @@ def test_success_envelope_merges_reports_and_consensus():
         "pe_forecast": {"this_year": 20.1, "next_year": 16.5},
     }
 
-    consensus = payload["data"]["consensus_eps"]
-    assert consensus == [
-        {"fiscal_year": "2024", "consensus_eps": 12.1},
-        {"fiscal_year": "2025", "consensus_eps": 14.5},
-    ]
+    assert payload["data"]["consensus_eps"] == _CONSENSUS_ROWS
 
-    # Eastmoney called with the bare numeric code; THS routed to the ths bucket.
-    assert mock_em.call_args.kwargs["params"]["code"] == "600519"
-    assert mock_ths.call_args.kwargs["host_key"] == "ths"
-    assert mock_ths.call_args.kwargs["params"]["code"] == "600519"
+    # Report call first, consensus datacenter call second; both on Eastmoney.
+    calls = mock_get_json.call_args_list
+    report_params = calls[0].kwargs["params"]
+    consensus_params = calls[1].kwargs["params"]
+    assert report_params["code"] == "600519"
+    assert consensus_params["reportName"] == "RPT_WEB_RESPREDICT"
+    assert consensus_params["filter"] == '(SECURITY_CODE="600519")'
+    assert consensus_params["pageSize"] == "1"
 
 
 def test_limit_caps_returned_reports():
-    with patch.object(rrt, "get_json", return_value=_REPORT_PAYLOAD), patch.object(
-        rrt, "throttled_get", return_value=_fake_response(_THS_PAYLOAD)
-    ):
+    with _patch_payloads(_REPORT_PAYLOAD, _CONSENSUS_PAYLOAD):
         out = ResearchReportsTool().execute(code="600519.SH", limit=1)
     payload = json.loads(out)
     assert len(payload["data"]["reports"]) == 1
 
 
-def test_ths_failure_degrades_consensus_but_keeps_reports():
-    with patch.object(rrt, "get_json", return_value=_REPORT_PAYLOAD), patch.object(
-        rrt, "throttled_get", side_effect=RuntimeError("ths 503")
-    ):
+def test_consensus_failure_degrades_consensus_but_keeps_reports():
+    with _patch_payloads(_REPORT_PAYLOAD, RuntimeError("eastmoney datacenter 503")):
         out = ResearchReportsTool().execute(code="600519.SH")
     payload = json.loads(out)
     assert payload["ok"] is True
@@ -125,24 +135,46 @@ def test_ths_failure_degrades_consensus_but_keeps_reports():
     assert payload["data"]["consensus_eps"] == []
 
 
-def test_ths_non_2xx_degrades_consensus():
-    with patch.object(rrt, "get_json", return_value=_REPORT_PAYLOAD), patch.object(
-        rrt, "throttled_get", return_value=_fake_response(_THS_PAYLOAD, status_ok=False)
-    ):
+def test_consensus_bad_payload_degrades_consensus():
+    with _patch_payloads(_REPORT_PAYLOAD, {"result": {}}):
         out = ResearchReportsTool().execute(code="600519.SH")
     payload = json.loads(out)
     assert payload["ok"] is True
     assert payload["data"]["consensus_eps"] == []
 
 
+def test_consensus_actual_years_are_not_reported_as_forecasts():
+    # Only mark-E (estimate) years are forward-looking consensus; the reported
+    # actual (mark A) year must not be served as a consensus forecast.
+    payload = {
+        "result": {
+            "data": [
+                {
+                    "YEAR1": 2024,
+                    "YEAR_MARK1": "A",
+                    "EPS1": 12.1,
+                    "YEAR2": 2025,
+                    "YEAR_MARK2": "E",
+                    "EPS2": 14.5,
+                }
+            ]
+        }
+    }
+    with _patch_payloads(_REPORT_PAYLOAD, payload):
+        out = ResearchReportsTool().execute(code="600519.SH")
+    payload = json.loads(out)
+    assert payload["data"]["consensus_eps"] == [
+        {"fiscal_year": "2025", "consensus_eps": 14.5}
+    ]
+
+
 def test_non_a_share_returns_error_without_http():
-    with patch.object(rrt, "get_json") as mock_em, patch.object(rrt, "throttled_get") as mock_ths:
+    with patch.object(rrt, "get_json") as mock_get_json:
         out = ResearchReportsTool().execute(code="AAPL.US")
     payload = json.loads(out)
     assert payload["ok"] is False
     assert "A-share" in payload["error"]
-    mock_em.assert_not_called()
-    mock_ths.assert_not_called()
+    mock_get_json.assert_not_called()
 
 
 def test_missing_code_returns_error_envelope():
@@ -153,19 +185,17 @@ def test_missing_code_returns_error_envelope():
 
 
 def test_report_request_failure_is_caught_as_error_envelope():
-    with patch.object(rrt, "get_json", side_effect=RuntimeError("HTTP 429")), patch.object(
-        rrt, "throttled_get", return_value=_fake_response(_THS_PAYLOAD)
-    ):
+    # The report-list fetch owns the try/except: an outage is degraded to empty
+    # lists, so the tool answers an error envelope rather than raising.
+    with patch.object(rrt, "get_json", side_effect=RuntimeError("HTTP 429")):
         out = ResearchReportsTool().execute(code="600519.SH")
     payload = json.loads(out)
     assert payload["ok"] is False
-    assert "429" in payload["error"]
+    assert "no research coverage" in payload["error"]
 
 
 def test_empty_coverage_returns_error_envelope():
-    with patch.object(rrt, "get_json", return_value={"data": []}), patch.object(
-        rrt, "throttled_get", return_value=_fake_response({"data": []})
-    ):
+    with _patch_payloads({"data": []}, {"result": {"data": []}}):
         out = ResearchReportsTool().execute(code="600519.SH")
     payload = json.loads(out)
     assert payload["ok"] is False
@@ -175,48 +205,43 @@ def test_empty_coverage_returns_error_envelope():
 def test_default_window_is_the_trailing_two_years():
     # Eastmoney rejects a request with no window (HTTP 400), so both bounds must
     # always be sent even when the caller supplies neither.
-    with patch.object(rrt, "datetime", _FrozenDatetime), patch.object(
-        rrt, "get_json", return_value=_REPORT_PAYLOAD
-    ) as mock_em, patch.object(
-        rrt, "throttled_get", return_value=_fake_response(_THS_PAYLOAD)
-    ):
+    with patch.object(rrt, "datetime", _FrozenDatetime), _patch_payloads(
+        _REPORT_PAYLOAD, _CONSENSUS_PAYLOAD
+    ) as mock_get_json:
         out = ResearchReportsTool().execute(code="600519.SH")
 
     assert json.loads(out)["ok"] is True
-    params = mock_em.call_args.kwargs["params"]
+    params = mock_get_json.call_args_list[0].kwargs["params"]
     assert params["beginTime"] == "20240813"
     assert params["endTime"] == "20260813"
 
 
 def test_explicit_window_is_forwarded_verbatim():
-    with patch.object(rrt, "get_json", return_value=_REPORT_PAYLOAD) as mock_em, patch.object(
-        rrt, "throttled_get", return_value=_fake_response(_THS_PAYLOAD)
-    ):
+    with _patch_payloads(_REPORT_PAYLOAD, _CONSENSUS_PAYLOAD) as mock_get_json:
         out = ResearchReportsTool().execute(
             code="600519.SH", beginTime="20240101", endTime="20261231"
         )
 
     assert json.loads(out)["ok"] is True
-    params = mock_em.call_args.kwargs["params"]
+    params = mock_get_json.call_args_list[0].kwargs["params"]
     assert params["beginTime"] == "20240101"
     assert params["endTime"] == "20261231"
 
 
 def test_malformed_date_returns_error_without_http():
-    with patch.object(rrt, "get_json") as mock_em, patch.object(rrt, "throttled_get") as mock_ths:
+    with patch.object(rrt, "get_json") as mock_get_json:
         out = ResearchReportsTool().execute(code="600519.SH", beginTime="2024-01-01")
     payload = json.loads(out)
     assert payload["ok"] is False
     assert "YYYYMMDD" in payload["error"]
-    mock_em.assert_not_called()
-    mock_ths.assert_not_called()
+    mock_get_json.assert_not_called()
 
 
 def test_reversed_window_is_rejected_not_reported_as_missing_coverage():
     # Eastmoney answers a reversed window with HTTP 200 and zero hits. Without
     # this guard the empty result becomes "no research coverage found", which is
     # a false claim about the company instead of an error about the request.
-    with patch.object(rrt, "get_json") as mock_em, patch.object(rrt, "throttled_get") as mock_ths:
+    with patch.object(rrt, "get_json") as mock_get_json:
         out = ResearchReportsTool().execute(
             code="600519.SH", beginTime="20261231", endTime="20240101"
         )
@@ -224,5 +249,4 @@ def test_reversed_window_is_rejected_not_reported_as_missing_coverage():
     assert payload["ok"] is False
     assert "must not be later than" in payload["error"]
     assert "no research coverage" not in payload["error"]
-    mock_em.assert_not_called()
-    mock_ths.assert_not_called()
+    mock_get_json.assert_not_called()

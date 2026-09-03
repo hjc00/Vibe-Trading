@@ -1,6 +1,6 @@
 """Sell-side consensus / earnings-expectation loader (盈利预期/一致预期).
 
-聚合东财研报（``reportapi``，零 token）与 THS 一致预期 EPS，产出
+聚合东财研报（``reportapi``，零 token）与东财 datacenter 一致预期 EPS，产出
 ``ConsensusSnapshot``，供「盈利预期/一致预期」卡片使用。目标价与 EPS 上/下修
 走 Tushare ``report_rc`` 兜底（120 积分试用、每天 10 次），token 缺失或积分不足
 时静默降级。
@@ -235,7 +235,8 @@ def _fetch_one_consensus(code: str) -> ConsensusSnapshot:
     snapshot.rating_score = compute_rating_score(rating_dist)
     snapshot.analyst_count = len(reports) or None
 
-    # Consensus EPS: prefer the brokers' own this/next-year forecasts, then THS.
+    # Consensus EPS: prefer the brokers' own this/next-year forecasts, then the
+    # Eastmoney datacenter per-year consensus fallback.
     this_year = _mean_non_none(
         [report.get("eps_forecast", {}).get("this_year") for report in reports]
     )
@@ -249,14 +250,14 @@ def _fetch_one_consensus(code: str) -> ConsensusSnapshot:
             if _to_float(e.get("consensus_eps")) is not None
         ]
         eps_by_year.sort(key=lambda item: str(item[0]) or "")
-        ths_values = [e[1] for e in eps_by_year]
-        if this_year is None and ths_values:
-            this_year = ths_values[0]
-        if next_year is None and len(ths_values) >= 2:
-            next_year = ths_values[1]
+        em_values = [e[1] for e in eps_by_year]
+        if this_year is None and em_values:
+            this_year = em_values[0]
+        if next_year is None and len(em_values) >= 2:
+            next_year = em_values[1]
     snapshot.consensus_eps_cur = this_year
     snapshot.consensus_eps_next = next_year
-    snapshot.source = "eastmoney+ths"
+    snapshot.source = "eastmoney"
 
     # Optional Tushare report_rc fallback for target prices / EPS revision.
     rc_rows = _fetch_report_rc(code)

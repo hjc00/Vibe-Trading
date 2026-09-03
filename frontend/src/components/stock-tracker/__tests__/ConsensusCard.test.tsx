@@ -30,7 +30,7 @@ describe("ConsensusCard", () => {
           target_price_high: 180,
           upside_pct: 0.5,
           rating_distribution: { 买入: 8, 中性: 2 },
-          source: "eastmoney+ths",
+          source: "eastmoney",
         })}
       />,
     );
