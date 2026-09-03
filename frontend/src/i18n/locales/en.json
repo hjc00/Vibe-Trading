@@ -1716,6 +1716,8 @@
     "clear": "Clear",
     "extraPrompt": "Extra instructions (optional)",
     "customPromptPlaceholder": "e.g. Focus on symbols with bullish MA alignment",
+    "historyLimitLabel": "Recent analyses to reference",
+    "historyLimitHint": "(0 = none, default 5)",
     "runAnalysis": "Run analysis",
     "analyzing": "Analyzing...",
     "analysisReport": "Analysis report",

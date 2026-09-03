@@ -486,6 +486,118 @@ def test_analyze_passes_user_prompt_through(client, isolated_tracker_store):
     assert args[2] == "重点看均线多头排列"
 
 
+def test_analyze_feeds_recent_history_to_llm(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)  # 600519.SH close = 1500.0
+    # Persist three past analyses (oldest first); the newest is saved last.
+    for day, stop in [(26, 1400.0), (27, 1410.0), (28, 1420.0)]:
+        isolated_tracker_store.save_analysis(
+            {
+                "summary": "综述",
+                "symbols": [
+                    {
+                        "code": "600519.SH",
+                        "action": "buy",
+                        "confidence": 70,
+                        "entry_zone": {"low": 1450.0, "high": 1480.0},
+                        "target_zone": {"low": 1600.0, "high": 1700.0},
+                        "stop_loss": stop,
+                    }
+                ],
+                "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+                "caveats": [],
+            },
+            trading_date=date(2026, 8, day),
+            generated_at=datetime(2026, 8, day, 9, 0, tzinfo=timezone.utc),
+        )
+
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"]},
+        )
+    assert response.status_code == 200
+    args, _kwargs = mocked.call_args
+    history = args[3]
+    assert set(history) == {"600519.SH"}
+    assert [r["stop_loss"] for r in history["600519.SH"]] == [1420.0, 1410.0, 1400.0]
+    assert all("code" not in r for r in history["600519.SH"])
+
+
+def _save_history_batch(store: TrackerStore, stops: list[float]) -> None:
+    """Persist one past analysis per stop value, oldest first."""
+    for day, stop in enumerate(stops, start=24):
+        store.save_analysis(
+            {
+                "summary": "综述",
+                "symbols": [
+                    {
+                        "code": "600519.SH",
+                        "action": "buy",
+                        "confidence": 70,
+                        "entry_zone": {"low": 1450.0, "high": 1480.0},
+                        "target_zone": {"low": 1600.0, "high": 1700.0},
+                        "stop_loss": stop,
+                    }
+                ],
+                "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+                "caveats": [],
+            },
+            trading_date=date(2026, 8, day),
+            generated_at=datetime(2026, 8, day, 9, 0, tzinfo=timezone.utc),
+        )
+
+
+def test_analyze_honours_custom_history_limit(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    _save_history_batch(isolated_tracker_store, [1400.0, 1410.0, 1420.0, 1430.0, 1440.0, 1450.0, 1460.0])
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "history_limit": 2},
+        )
+    assert response.status_code == 200
+    args, _kwargs = mocked.call_args
+    history = args[3]
+    assert [r["stop_loss"] for r in history["600519.SH"]] == [1460.0, 1450.0]
+
+
+def test_analyze_history_limit_zero_disables_history(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    _save_history_batch(isolated_tracker_store, [1400.0, 1410.0])
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "history_limit": 0},
+        )
+    assert response.status_code == 200
+    args, _kwargs = mocked.call_args
+    assert args[3] == {}
+
+
 def test_analyze_ignores_unknown_body_fields(client, isolated_tracker_store):
     _saved_snapshot(isolated_tracker_store)
     fake_report = {

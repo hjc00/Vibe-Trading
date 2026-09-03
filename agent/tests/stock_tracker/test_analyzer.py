@@ -73,6 +73,35 @@ def test_build_analysis_prompt_omits_user_prompt_when_empty():
     assert "用户补充指令" not in prompt
 
 
+def test_build_analysis_prompt_includes_history_context():
+    snapshot = _snapshot()
+    history = {
+        "600519.SH": [
+            {
+                "trading_date": "2026-08-28",
+                "action": "buy",
+                "confidence": 75,
+                "entry_zone": {"low": 1400.0, "high": 1450.0},
+                "target_zone": {"low": 1600.0, "high": 1700.0},
+                "stop_loss": 1380.0,
+                "current_close": 1500.0,
+                "status": "active",
+            }
+        ]
+    }
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols, history=history)
+    assert "current_close" in prompt  # history records are embedded
+    assert "2026-08-28" in prompt
+    assert "增量研判" in prompt  # history directive instructs incremental review
+
+
+def test_build_analysis_prompt_omits_history_when_absent():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert "current_close" not in prompt
+    assert "增量研判" not in prompt
+
+
 def test_serialize_symbol_carries_capital_risk_and_sector():
     symbol = _snapshot().symbols[0]
     symbol.risk = RiskMetrics(atr_14=8.0, stop_loss_price=1490.0)

@@ -60,6 +60,7 @@ export function StockTracker() {
     open: analyzeOpen,
     selectedSymbols,
     userPrompt,
+    historyLimit,
     loading: analysisLoading,
     report: analysisReport,
     error: analysisError,
@@ -69,6 +70,7 @@ export function StockTracker() {
     setOpen: setAnalyzeOpen,
     setSelectedSymbols,
     setUserPrompt,
+    setHistoryLimit,
     setError: setAnalysisError,
     run: runAnalysis,
     loadLatest,
@@ -453,6 +455,8 @@ export function StockTracker() {
                     onSelectedSymbolsChange={setSelectedSymbols}
                     userPrompt={userPrompt}
                     onUserPromptChange={setUserPrompt}
+                    historyLimit={historyLimit}
+                    onHistoryLimitChange={setHistoryLimit}
                     loading={analysisLoading}
                     onRun={runAnalysis}
                     onClose={() => setAnalyzeOpen(false)}

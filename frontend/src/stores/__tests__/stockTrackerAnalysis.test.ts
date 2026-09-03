@@ -52,6 +52,7 @@ describe("stockTrackerAnalysis store", () => {
     expect(s.history).toEqual([]);
     expect(s.selectedId).toBeNull();
     expect(s.trackRecord).toBeNull();
+    expect(s.historyLimit).toBe(5);
   });
 
   it("run is a no-op when no symbols are selected", async () => {
@@ -98,6 +99,7 @@ describe("stockTrackerAnalysis store", () => {
     expect(apiMock.analyzeStockTracker).toHaveBeenCalledWith({
       symbols: ["600519.SH"],
       user_prompt: null,
+      history_limit: 5,
     });
     expect(apiMock.getStockTrackerTrackRecord).toHaveBeenCalled();
   });
@@ -120,6 +122,29 @@ describe("stockTrackerAnalysis store", () => {
     expect(apiMock.analyzeStockTracker).toHaveBeenCalledWith({
       symbols: ["600519.SH"],
       user_prompt: "重点看均线多头排列",
+      history_limit: 5,
+    });
+  });
+
+  it("run sends a custom history limit", async () => {
+    apiMock.analyzeStockTracker.mockResolvedValue({
+      status: "ok",
+      report: report(),
+      id: "20260831T101500000000",
+    });
+    apiMock.getStockTrackerAnalysisHistory.mockResolvedValue({
+      status: "ok",
+      items: [],
+    });
+    const store = useStockTrackerAnalysisStore.getState();
+    store.setSelectedSymbols(["600519.SH"]);
+    store.setHistoryLimit(0);
+
+    await store.run();
+    expect(apiMock.analyzeStockTracker).toHaveBeenCalledWith({
+      symbols: ["600519.SH"],
+      user_prompt: null,
+      history_limit: 0,
     });
   });
 

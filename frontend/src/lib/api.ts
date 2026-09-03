@@ -2147,6 +2147,7 @@ export type RecommendationAction = "buy" | "hold" | "reduce" | "avoid";
 export interface TrackerAnalyzeRequest {
   symbols: string[];
   user_prompt?: string | null;
+  history_limit?: number | null;
 }
 
 export interface PriceZone {

@@ -19,6 +19,8 @@ interface StockTrackerAnalysisState {
   open: boolean;
   selectedSymbols: string[];
   userPrompt: string;
+  // How many of the model's most recent per-symbol records to reference (0 = none).
+  historyLimit: number;
   loading: boolean;
   report: TrackerAnalyzeReport | null;
   error: string | null;
@@ -29,6 +31,7 @@ interface StockTrackerAnalysisState {
   setOpen: (open: boolean) => void;
   setSelectedSymbols: (codes: string[]) => void;
   setUserPrompt: (value: string) => void;
+  setHistoryLimit: (value: number) => void;
   setReport: (report: TrackerAnalyzeReport | null) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -46,6 +49,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
     open: false,
     selectedSymbols: [],
     userPrompt: "",
+    historyLimit: 5,
     loading: false,
     report: null,
     error: null,
@@ -56,6 +60,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
     setOpen: (open) => set({ open }),
     setSelectedSymbols: (selectedSymbols) => set({ selectedSymbols }),
     setUserPrompt: (userPrompt) => set({ userPrompt }),
+    setHistoryLimit: (historyLimit) => set({ historyLimit }),
     setReport: (report) => set({ report }),
     setError: (error) => set({ error }),
     reset: () =>
@@ -63,6 +68,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
         open: false,
         selectedSymbols: [],
         userPrompt: "",
+        historyLimit: 5,
         loading: false,
         report: null,
         error: null,
@@ -123,13 +129,14 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
     },
 
     run: async () => {
-      const { selectedSymbols, userPrompt } = get();
+      const { selectedSymbols, userPrompt, historyLimit } = get();
       if (selectedSymbols.length === 0) return;
       set({ loading: true, error: null, report: null, selectedId: null });
       try {
         const response = await api.analyzeStockTracker({
           symbols: selectedSymbols,
           user_prompt: userPrompt.trim() ? userPrompt.trim() : null,
+          history_limit: historyLimit,
         });
         set({ report: response.report, selectedId: response.id ?? null });
         await Promise.all([get().loadHistory(), get().loadTrackRecord()]);

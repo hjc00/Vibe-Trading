@@ -1716,6 +1716,8 @@
     "clear": "清空",
     "extraPrompt": "补充指令（可选）",
     "customPromptPlaceholder": "例如：重点看均线多头排列的标的",
+    "historyLimitLabel": "参考最近分析条数",
+    "historyLimitHint": "（0 表示不参考历史，默认 5）",
     "runAnalysis": "运行分析",
     "analyzing": "分析中...",
     "analysisReport": "分析结论",

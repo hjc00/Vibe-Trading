@@ -11,6 +11,8 @@ interface TrackerAnalyzePanelProps {
   loading: boolean;
   onRun: () => void;
   onClose: () => void;
+  historyLimit?: number;
+  onHistoryLimitChange?: (value: number) => void;
 }
 
 export function TrackerAnalyzePanel({
@@ -22,6 +24,8 @@ export function TrackerAnalyzePanel({
   loading,
   onRun,
   onClose,
+  historyLimit = 5,
+  onHistoryLimitChange = () => {},
 }: TrackerAnalyzePanelProps) {
   const { t } = useTranslation();
 
@@ -112,6 +116,26 @@ export function TrackerAnalyzePanel({
           placeholder={t("stockTracker.customPromptPlaceholder")}
           className="w-full rounded-md border bg-background px-3 py-2 text-xs outline-none focus:border-primary disabled:opacity-60"
         />
+      </div>
+
+      <div className="mb-4 flex items-center gap-2">
+        <label className="shrink-0 text-xs text-muted-foreground" htmlFor="tracker-history-limit">
+          {t("stockTracker.historyLimitLabel")}
+        </label>
+        <input
+          id="tracker-history-limit"
+          type="number"
+          min={0}
+          max={30}
+          value={historyLimit}
+          onChange={(e) => {
+            const next = Math.max(0, Math.min(30, Math.floor(Number(e.target.value) || 0)));
+            onHistoryLimitChange(next);
+          }}
+          disabled={loading}
+          className="w-16 rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary disabled:opacity-60"
+        />
+        <span className="text-[11px] text-muted-foreground">{t("stockTracker.historyLimitHint")}</span>
       </div>
 
       <button

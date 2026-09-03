@@ -24,13 +24,17 @@ from src.stock_tracker.models import (
 )
 from src.stock_tracker.signals import list_detector_meta
 from src.stock_tracker.store import TrackerStore
-from src.stock_tracker.track_record import build_track_record
+from src.stock_tracker.track_record import build_track_record, select_symbol_history
 
 logger = logging.getLogger(__name__)
 
 AuthDep = Callable[..., Any]
 
 _MAX_ANALYZE_SYMBOLS = 20
+
+# How many of the model's most recent per-symbol analysis records are fed back
+# by default when the analyze request does not specify ``history_limit``.
+_DEFAULT_HISTORY_LIMIT = 5
 
 # Calendar days of finalized history fetched alongside the live single-day bar so
 # a quote can report the true 昨收. Tencent's daily kline only serves the current
@@ -177,6 +181,9 @@ class TrackerAnalyzeRequest(BaseModel):
 
     symbols: List[str]
     user_prompt: Optional[str] = None
+    # How many of the model's most recent per-symbol records to reference;
+    # 0 disables history, None keeps the server default (``_DEFAULT_HISTORY_LIMIT``).
+    history_limit: Optional[int] = Field(default=None, ge=0, le=30)
 
 
 class TrackerAnalyzeResponse(BaseModel):
@@ -599,12 +606,27 @@ def register_stock_tracker_routes(
             len(request.symbols),
             snapshot.trading_date,
         )
+        # Feed the model its recent conclusions per symbol (count is
+        # user-configurable via history_limit; 0 opts out) so each run is an
+        # incremental review, not a memory-less from-scratch re-analysis.
+        history_limit = request.history_limit
+        if history_limit is None:
+            history_limit = _DEFAULT_HISTORY_LIMIT
+        history = {}
+        if history_limit > 0:
+            history = select_symbol_history(
+                store.list_analysis_envelopes(limit=200),
+                {symbol.code: symbol.close for symbol in snapshot.symbols},
+                codes=[symbol.code for symbol in selected.symbols],
+                limit=history_limit,
+            )
         try:
             report = await asyncio.to_thread(
                 run_analysis,
                 snapshot,
                 selected.symbols,
                 request.user_prompt,
+                history,
             )
         except Exception as exc:  # surface provider/LLM failures as readable errors
             hint = _friendly_provider_error(exc)

@@ -76,4 +76,19 @@ describe("TrackerAnalyzePanel", () => {
     });
     expect(onUserPromptChange).toHaveBeenCalledWith("重点看均线多头排列");
   });
+
+  it("shows and edits the history-limit input", () => {
+    const onHistoryLimitChange = vi.fn();
+    render(
+      <TrackerAnalyzePanel
+        {...baseProps}
+        historyLimit={8}
+        onHistoryLimitChange={onHistoryLimitChange}
+      />,
+    );
+    const input = screen.getByLabelText(/recent analyses to reference/i);
+    expect((input as HTMLInputElement).value).toBe("8");
+    fireEvent.change(input, { target: { value: "3" } });
+    expect(onHistoryLimitChange).toHaveBeenCalledWith(3);
+  });
 });

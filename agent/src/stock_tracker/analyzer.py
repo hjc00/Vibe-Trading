@@ -92,6 +92,20 @@ Rules:
 - Include one entry in "symbols" for every input symbol.
 """
 
+_HISTORY_DIRECTIVE = """\
+上面 JSON 的 history 字段按代码分组，是本模型历史分析该标的时的最近几条结论及对照：
+- action/confidence/entry_zone/target_zone/stop_loss/time_horizon 是当时给出的判断；
+- status 是相对当前价（current_close）的验证结果：active=仍在区间/未到目标，
+  hit_target=已到目标价上沿，stopped_out=已跌破止损价，pending=暂无当前价无法验证。
+
+请基于这些历史结论做增量研判，不要把这批标的当成全新对象重新推一遍：
+- 若上次判断未被价格证伪 → 说明维持/微调的原因；
+- 若价格已到目标区间/逻辑被破坏 → 给出止盈、减仓或新的目标区间；
+- 若已破止损或明确证伪 → 明确反转，不再重复给同一结论。
+在每只标的的 rationale 中，用一句话点明本次相对其最近一次历史结论的变化
+（维持 / 修正 / 反转 及核心理由）。若 history 为空或缺失，表示无历史，正常从头分析。
+"""
+
 # Legacy/loose action vocabularies mapped onto the structured 4-value action.
 _ACTION_SYNONYMS: Dict[str, AnalysisAction] = {
     "buy": AnalysisAction.BUY,
@@ -313,8 +327,15 @@ def build_analysis_prompt(
     snapshot: TrackerSnapshot,
     symbols: List[SymbolSnapshot],
     user_prompt: Optional[str] = None,
+    history: Optional[Dict[str, Any]] = None,
 ) -> str:
-    """Build the user prompt from a snapshot and the selected symbols."""
+    """Build the user prompt from a snapshot and the selected symbols.
+
+    ``history`` optionally maps each symbol code to its most recent prior
+    recommendations (newest-first, as :func:`select_symbol_history` returns) so
+    the model reviews its own previous calls incrementally instead of analysing
+    every symbol from scratch.
+    """
     context = {
         "trading_date": snapshot.trading_date.isoformat() if snapshot.trading_date else None,
         "periods": snapshot.config.periods,
@@ -334,14 +355,19 @@ def build_analysis_prompt(
         ),
         "symbols": [_serialize_symbol(s) for s in symbols],
     }
+    if history:
+        context["history"] = history
     extra = f"\n用户补充指令：{user_prompt}" if user_prompt else ""
 
-    return (
+    text = (
         f"{_ANALYSIS_DIRECTIVE}{extra}\n\n"
         f"追踪快照数据（JSON）：\n"
         f"{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
-        f"{_OUTPUT_INSTRUCTIONS}"
     )
+    if history:
+        text += _HISTORY_DIRECTIVE + "\n\n"
+    text += _OUTPUT_INSTRUCTIONS
+    return text
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
@@ -394,13 +420,16 @@ def run_analysis(
     snapshot: TrackerSnapshot,
     symbols: List[SymbolSnapshot],
     user_prompt: Optional[str] = None,
+    history: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Call the configured LLM and return a normalized report dict.
 
     This is synchronous by design so it can be offloaded to a worker thread by
     the API route via ``asyncio.to_thread``.
     """
-    prompt = build_analysis_prompt(snapshot, symbols, user_prompt=user_prompt)
+    prompt = build_analysis_prompt(
+        snapshot, symbols, user_prompt=user_prompt, history=history
+    )
     llm = ChatLLM()
     logger.info(
         "Stock-tracker LLM analysis start: %d symbol(s), provider=%s, model=%s",
