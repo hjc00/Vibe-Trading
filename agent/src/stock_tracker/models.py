@@ -570,6 +570,48 @@ class ChipSnapshot(BaseModel):
     error: Optional[str] = None
 
 
+class FinancialPeriod(BaseModel):
+    """One report period's key indicators (报告期, 年报/中报/季报).
+
+    ``report_type`` is derived from the report end date (年报 / 中报 / 一季报 /
+    三季报). The YoY fields (``revenue_yoy`` / ``net_profit_yoy``) are already
+    cumulative-period comparisons; level fields such as ``roe`` / ``eps`` are the
+    reported cumulative figures for that period (interim vs annual are not
+    directly comparable). Populated by
+    :func:`src.tools.financial_statements_tool.fetch_financial_indicators`.
+    """
+
+    end_date: str  # REPORT_DATE[:10]，如 "2026-06-30"
+    report_type: str  # 年报 | 中报 | 一季报 | 三季报 | 报告
+    roe: Optional[float] = None
+    gross_margin: Optional[float] = None
+    net_margin: Optional[float] = None
+    net_profit_yoy: Optional[float] = None
+    revenue_yoy: Optional[float] = None
+    debt_to_assets: Optional[float] = None
+    eps: Optional[float] = None
+    operating_cashflow_to_net_profit: Optional[float] = None
+
+
+class FinancialReportSnapshot(BaseModel):
+    """Financial-report reading for one symbol (财报速读, on-demand).
+
+    Produced on demand (not part of the daily refresh) by
+    :mod:`src.stock_tracker.financial_reports_data` and the
+    ``financial-report`` route. ``periods`` are newest-first; ``red_flags`` and
+    ``beat_miss`` are derived from the latest period. Standalone (not attached to
+    ``SymbolSnapshot``) because it is a per-click fetch, not a refresh dimension.
+    """
+
+    code: str
+    periods: List[FinancialPeriod] = Field(default_factory=list)  # 倒序，最新在前
+    red_flags: List[str] = Field(default_factory=list)  # 基于 periods[0]
+    beat_miss: Optional[str] = None  # beat | miss | inline（缺一致预期则为 None）
+    consensus_eps: Optional[float] = None
+    source: str = "unavailable"
+    error: Optional[str] = None
+
+
 class VolumePoint(BaseModel):
     """One daily OHLCV observation for charting within the tracker.
 

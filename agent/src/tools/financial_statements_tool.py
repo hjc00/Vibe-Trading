@@ -290,6 +290,92 @@ def _fetch_eastmoney_statement(
     return {"periods": _cap_periods(periods)}
 
 
+# --- A-share main-indicator code-level loader -----------------------------
+
+# Report-period end dates map to the four disclosure cadences. Eastmoney has no
+# stable numeric REPORT_TYPE (it is locale text such as 年报 / 一季报), so the
+# label is derived from the month/day of REPORT_DATE (see _eastmoney_filter).
+_REPORT_TYPE_BY_SUFFIX = {
+    "-12-31": "年报",
+    "-06-30": "中报",
+    "-03-31": "一季报",
+    "-09-30": "三季报",
+}
+
+
+def _indicator_report_type(end_date: str) -> str:
+    """Label a report-period end date as 年报 / 中报 / 一季报 / 三季报."""
+    return _REPORT_TYPE_BY_SUFFIX.get(end_date[4:10], "报告")
+
+
+def _to_num(value: Any) -> float | None:
+    """Coerce a provider cell to ``float``, or ``None`` when absent/non-numeric."""
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def fetch_financial_indicators(code: str, max_periods: int = 12) -> list[dict]:
+    """Fetch a single A-share's per-report-period key indicators as clean dicts.
+
+    Code-level counterpart to the ``indicators`` view of
+    :class:`FinancialStatementsTool`, shaped for programmatic consumers (e.g. the
+    stock-tracker financial-report loader). Returns one dict per report period
+    (年报 / 中报 / 季报), newest-first, sourced from the Eastmoney main-indicator
+    dataset ``RPT_F10_FINANCE_MAINFINADATA``.
+
+    The field names mirror the normalization in
+    :func:`src.stock_tracker.valuation_data._parse_fundamental_rows` (same raw
+    ``ROEJQ``/``XSMLL``/... columns). Keep the two in step, or consolidate the
+    mapping here when valuation adopts this loader.
+
+    Args:
+        code: A-share symbol (e.g. ``"600519.SH"``).
+        max_periods: Most recent report periods to keep (<=0 keeps all).
+
+    Returns:
+        Newest-first list of clean period dicts (``end_date``, ``report_type``,
+        ``roe``, ``gross_margin``, ``net_margin``, ``net_profit_yoy``,
+        ``revenue_yoy``, ``debt_to_assets``, ``eps``,
+        ``operating_cashflow_to_net_profit``). Empty when the symbol is not a
+        mainland A-share or the request fails; never raises.
+    """
+    secid = resolve_secid(code)
+    if secid is None or _eastmoney_market_group(secid) != "a":
+        return []
+    raw = _fetch_eastmoney_statement(code, statement="indicators", period="quarter")
+    periods: list[dict] = []
+    for row in raw.get("periods", []):
+        end_date = str(row.get("REPORT_DATE", ""))[:10]
+        if len(end_date) != 10:
+            continue
+        eps = _to_num(row.get("EPSJB"))
+        per_share_ocf = _to_num(row.get("MGJYXJJE"))
+        ocf_to_net_profit: float | None = None
+        if eps is not None and eps > 0 and per_share_ocf is not None:
+            ocf_to_net_profit = round(per_share_ocf / eps, 3)
+        periods.append(
+            {
+                "end_date": end_date,
+                "report_type": _indicator_report_type(end_date),
+                "roe": _to_num(row.get("ROEJQ")),
+                "gross_margin": _to_num(row.get("XSMLL")),
+                "net_margin": _to_num(row.get("XSJLL")),
+                "net_profit_yoy": _to_num(row.get("PARENTNETPROFITTZ")),
+                "revenue_yoy": _to_num(row.get("TOTALOPERATEREVETZ")),
+                "debt_to_assets": _to_num(row.get("ZCFZL")),
+                "eps": eps,
+                "operating_cashflow_to_net_profit": ocf_to_net_profit,
+            }
+        )
+    if max_periods and max_periods > 0:
+        periods = periods[:max_periods]
+    return periods
+
+
 # Yahoo quoteSummary module + result-key per (statement, cadence). UK
 # (.L) names have no Eastmoney or SEC filing pipeline; Yahoo's
 # crumb-gated quoteSummary serves annual and quarterly histories for

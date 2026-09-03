@@ -2,7 +2,7 @@
 
 > 本文档用于跟踪 A 股多周期股票追踪器（`stock_tracker`）的后续优化方向。
 > 创建时间：2026-09-01
-> 最后更新：2026-09-03（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.9 事件日历、2.10 AI 分析结构化升级、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度）
+> 最后更新：2026-09-03（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.9 事件日历、2.10 AI 分析结构化升级、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度；2.19 财报速读进行中）
 
 ## 一、现状概述
 
@@ -278,14 +278,15 @@
 | 2.16 | 市场情绪温度计 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `sentiment_data.py`（东财 `push2ex getTopicZTPool` 主源 + tushare `limit_list_d`/`limit_step` 兜底，token 缺失静默降级）；温度分 0–100（涨停家数/炸板率/连板高度/昨日涨停溢价 0.30/0.25/0.25/0.20，固定参考刻度近似近 20 日分位）；前端 `MarketSentimentBar` 全宽温度条 |
 | 2.17 | 盈利预期/一致预期 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `consensus_data.py`（东财研报主源 + THS 一致预期 + tushare `report_rc` 目标价/EPS 修正兜底）；`ConsensusDataCache` TTL 1 天；forward PE/上行空间由 engine 拿 close 后回填；前端 `ConsensusCard` |
 | 2.18 | 筹码集中度/机构动向 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `chip_data.py`（东财股东户数主源 + 北向 `hk_hold`/公募 `fund_portfolio` tushare 兜底）；`ChipDataCache` TTL 7 天；集中度分 0–100（户数下降/户均上升/机构增持 0.40/0.30/0.30）；前端 `ChipCard` |
+| 2.19 | 财报速读（Phase 1 数据卡） | 进行中 | jinchu | 2026-09-03 | - | 手动按需单标的「阅读财报」：新 `financial_reports_data.py` + `src.tools.financial_statements_tool.fetch_financial_indicators`（东财 `RPT_F10_FINANCE_MAINFINADATA` 多期倒序）；新模型 `FinancialPeriod`/`FinancialReportSnapshot`（不挂 `SymbolSnapshot`）；GET `/api/stock-tracker/symbols/{code}/financial-report`；红旗 + beat/miss（对比一致预期 EPS）；前端 `FinancialReportCard`（多期指标表，1/4/8 期切换，默认 4）；Phase A（LLM 速读点评）未做 |
 
 ---
 
 ## 五、相关文件
 
-- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`events_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`、`track_record.py`（规划中：`concept_data.py`、`sentiment_data.py`、`consensus_data.py`、`chip_data.py`）
-- API 路由：`agent/src/api/stock_tracker_routes.py`
+- 后端核心：`agent/src/stock_tracker/engine.py`、`signals.py`、`capital_data.py`、`valuation_data.py`、`sector_data.py`、`events_data.py`、`_convert.py`、`risk.py`、`models.py`、`analyzer.py`、`track_record.py`、`financial_reports_data.py`（2.19）
+- API 路由：`agent/src/api/stock_tracker_routes.py`（含 2.19 `GET /symbols/{code}/financial-report`）
 - 前端页面：`frontend/src/pages/StockTracker.tsx`
-- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`EventTimelineCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`、`TrackerAnalyzePanel.tsx`、`TrackerAnalysisReport.tsx`、`TrackerTrackRecord.tsx`（规划中：`ConceptHeatCard.tsx`、`MarketSentimentBar.tsx`、`ConsensusCard.tsx`、`ChipCard.tsx`）
+- 前端组件：`frontend/src/components/stock-tracker/TrackerTable.tsx`、`TrackerCharts.tsx`、`MarginChartCard.tsx`、`FundFlowChartCard.tsx`、`RpsChartCard.tsx`、`RiskMetricsCard.tsx`、`ValuationCard.tsx`、`EventTimelineCard.tsx`、`SectorStrengthBoard.tsx`、`TrackerConfigPanel.tsx`、`TrackerAnalyzePanel.tsx`、`TrackerAnalysisReport.tsx`、`TrackerTrackRecord.tsx`、`FinancialReportCard.tsx`（2.19）
 - 前端库：`frontend/src/lib/stockTracker.ts`（含 action/status tone 与 label key 助手）、`frontend/src/lib/api.ts`（分析/预测类型）
 - 项目索引：`docs/PROJECT_INDEX.md`

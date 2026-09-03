@@ -623,6 +623,10 @@ export const api = {
       `/api/stock-tracker/analyze/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     ),
+  getStockTrackerFinancialReport: (code: string) =>
+    request<FinancialReportResponse>(
+      `/api/stock-tracker/symbols/${encodeURIComponent(code)}/financial-report`,
+    ),
 };
 
 // --- Scheduled research types ---
@@ -2053,6 +2057,36 @@ export interface ChipSnapshot {
   holder_history: ChipHolderItem[];
   source?: string;
   error?: string | null;
+}
+
+/** One report period of key indicators (财报速读). Report types: 年报/中报/一季报/三季报. */
+export interface FinancialPeriod {
+  end_date: string;
+  report_type: string;
+  roe?: number | null;
+  gross_margin?: number | null;
+  net_margin?: number | null;
+  net_profit_yoy?: number | null;
+  revenue_yoy?: number | null;
+  debt_to_assets?: number | null;
+  eps?: number | null;
+  operating_cashflow_to_net_profit?: number | null;
+}
+
+/** Financial-report reading for one symbol (on-demand, multi-period). */
+export interface FinancialReportSnapshot {
+  code: string;
+  periods: FinancialPeriod[];
+  red_flags: string[];
+  beat_miss?: "beat" | "miss" | "inline" | null;
+  consensus_eps?: number | null;
+  source?: string;
+  error?: string | null;
+}
+
+export interface FinancialReportResponse {
+  status: string;
+  report: FinancialReportSnapshot;
 }
 
 export type EventRiskLevel = "info" | "warning" | "danger";

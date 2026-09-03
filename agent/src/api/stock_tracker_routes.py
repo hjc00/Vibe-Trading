@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from src.market_data import fetch_market_data
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.engine import StockTrackerEngine
+from src.stock_tracker.financial_reports_data import load_financial_report
 from src.stock_tracker.models import (
     ANALYSIS_INDICATORS,
     AnalysisReport,
@@ -671,6 +672,35 @@ def register_stock_tracker_routes(
             generated_at=envelope.get("generated_at"),
             trading_date=envelope.get("trading_date"),
         )
+
+    @app.get("/api/stock-tracker/symbols/{code}/financial-report")
+    async def get_symbol_financial_report(
+        code: str,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        """Return an on-demand multi-period financial report for one symbol.
+
+        Fetches the symbol's most recent report periods (年报/中报/季报, mixed)
+        and derives red flags plus a beat/miss vs the latest consensus EPS held
+        in the current snapshot. Runs in a worker thread (same as quotes/analyze)
+        because it hits the Eastmoney datacenter.
+        """
+        normalized = normalize_a_share_code(code)
+        if normalized is None:
+            raise HTTPException(status_code=422, detail=f"Invalid A-share code: {code}")
+
+        consensus_eps: Optional[float] = None
+        snapshot = _get_store().get_latest_snapshot()
+        if snapshot is not None:
+            for symbol in snapshot.symbols:
+                if symbol.code == normalized and symbol.consensus is not None:
+                    consensus_eps = symbol.consensus.consensus_eps_cur
+                    break
+
+        report = await asyncio.to_thread(
+            load_financial_report, normalized, consensus_eps=consensus_eps
+        )
+        return {"status": "ok", "report": report.model_dump(mode="json")}
 
     @app.get("/api/stock-tracker/analyze/history")
     async def get_analysis_history(

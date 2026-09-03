@@ -31,6 +31,7 @@ import { VolumeChartCard } from "@/components/stock-tracker/VolumeChartCard";
 import { ConceptHeatCard } from "@/components/stock-tracker/ConceptHeatCard";
 import { ConsensusCard } from "@/components/stock-tracker/ConsensusCard";
 import { ChipCard } from "@/components/stock-tracker/ChipCard";
+import { FinancialReportCard } from "@/components/stock-tracker/FinancialReportCard";
 import { MarketSentimentBar } from "@/components/stock-tracker/MarketSentimentBar";
 import { SectorStrengthBoard } from "@/components/stock-tracker/SectorStrengthBoard";
 import { TrackerTrackRecord } from "@/components/stock-tracker/TrackerTrackRecord";
@@ -416,6 +417,8 @@ export function StockTracker() {
                     <Card key={Card.name} symbol={selectedSymbol} />
                   ))}
                 </div>
+
+                <FinancialReportCard symbol={selectedSymbol} />
 
                 <SectorStrengthBoard
                   sectors={snapshot.sectors}
