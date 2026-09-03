@@ -623,10 +623,11 @@ export const api = {
       `/api/stock-tracker/analyze/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     ),
-  getStockTrackerFinancialReport: (code: string) =>
-    request<FinancialReportResponse>(
-      `/api/stock-tracker/symbols/${encodeURIComponent(code)}/financial-report`,
-    ),
+  getStockTrackerFinancialReport: (code: string, refresh = false) => {
+    const base = `/api/stock-tracker/symbols/${encodeURIComponent(code)}/financial-report`;
+    const url = refresh ? appendQueryParam(base, "refresh", "true") : base;
+    return request<FinancialReportResponse>(url);
+  },
 };
 
 // --- Scheduled research types ---

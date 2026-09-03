@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import pytest
 
+from src.stock_tracker import financial_reports_data as frd
 from src.stock_tracker.financial_reports_data import (
+    FinancialReportCache,
     _beat_miss,
     _flag,
     build_financial_report,
+    load_financial_report,
 )
 from src.stock_tracker.models import FinancialPeriod, FinancialReportSnapshot
 
@@ -135,6 +138,161 @@ class TestRedFlags:
         # No KeyError; only structural flags (e.g. margin decline needs a prior
         # period, which is absent) may fire.
         assert isinstance(report.red_flags, list)
+
+
+class TestFinancialReportCache:
+    def test_miss_then_hit_roundtrip(self, tmp_path):
+        cache = FinancialReportCache(ttl_seconds=60, root_dir=tmp_path)
+        assert cache.get("600519.SH") is None
+        indicators = [_indicator(eps=32.1)]
+        cache.set("600519.SH", indicators)
+        assert cache.get("600519.SH") == indicators
+
+    def test_expired_entry_is_a_miss_but_stale_readable(self, tmp_path):
+        cache = FinancialReportCache(ttl_seconds=-1.0, root_dir=tmp_path)
+        cache.set("600519.SH", [_indicator(eps=32.1)])
+        # Expired: normal get is a miss, but the persisted file stays as last-good.
+        assert cache.get("600519.SH") is None
+        assert cache.get_stale("600519.SH") is not None
+
+    def test_persists_across_instances(self, tmp_path):
+        FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path).set(
+            "600519.SH", [_indicator(eps=32.1)]
+        )
+        fresh = FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+        assert fresh.get("600519.SH") == [_indicator(eps=32.1)]
+
+    def test_clear_removes_files(self, tmp_path):
+        cache = FinancialReportCache(ttl_seconds=60, root_dir=tmp_path)
+        cache.set("600519.SH", [_indicator()])
+        cache.clear()
+        assert cache.get("600519.SH") is None
+        assert cache.get_stale("600519.SH") is None
+
+
+class TestLoadFinancialReportCaching:
+    def test_second_call_served_from_cache_without_refetch(self, monkeypatch, tmp_path):
+        calls = {"n": 0}
+
+        def fake_fetch(code, max_periods=12):  # noqa: ARG001
+            calls["n"] += 1
+            return [_indicator(eps=32.1)]
+
+        monkeypatch.setattr(frd, "fetch_financial_indicators", fake_fetch)
+        cache = FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+
+        first = load_financial_report("600519.SH", consensus_eps=30.0, cache=cache)
+        assert calls["n"] == 1
+        assert first.beat_miss == "beat"
+
+        # Cache hit: no refetch, but beat/miss is rebuilt against the fresh consensus.
+        second = load_financial_report("600519.SH", consensus_eps=34.0, cache=cache)
+        assert calls["n"] == 1
+        assert second.periods[0].eps == 32.1
+        assert second.beat_miss == "miss"
+
+    def test_restart_serves_persisted_cache_without_network(self, monkeypatch, tmp_path):
+        calls = {"n": 0}
+
+        def fake_fetch(code, max_periods=12):  # noqa: ARG001
+            calls["n"] += 1
+            return [_indicator(eps=32.1)]
+
+        monkeypatch.setattr(frd, "fetch_financial_indicators", fake_fetch)
+
+        first = load_financial_report(
+            "600519.SH", cache=FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+        )
+        assert first.periods[0].eps == 32.1
+        assert calls["n"] == 1
+
+        # A fresh cache instance over the same directory == server restart.
+        second = load_financial_report(
+            "600519.SH", cache=FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+        )
+        assert calls["n"] == 1
+        assert second.periods[0].eps == 32.1
+
+    def test_fetch_failure_falls_back_to_last_persisted_report(self, monkeypatch, tmp_path):
+        calls = {"n": 0}
+
+        def flaky(code, max_periods=12):  # noqa: ARG001
+            calls["n"] += 1
+            if calls["n"] == 1:
+                return [_indicator(eps=32.1)]
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(frd, "fetch_financial_indicators", flaky)
+        # ttl<0 makes the entry expire immediately, so the second load must refetch.
+        cache = FinancialReportCache(ttl_seconds=-1.0, root_dir=tmp_path)
+
+        first = load_financial_report("600519.SH", cache=cache)
+        assert calls["n"] == 1
+        assert first.periods[0].eps == 32.1
+
+        second = load_financial_report("600519.SH", cache=cache)
+        assert calls["n"] == 2  # refresh attempted after expiry
+        assert second.error is None  # but the persisted last-good is served
+        assert second.periods[0].eps == 32.1
+
+    def test_force_bypasses_cache(self, monkeypatch, tmp_path):
+        calls = {"n": 0}
+
+        def fake_fetch(code, max_periods=12):  # noqa: ARG001
+            calls["n"] += 1
+            return [_indicator(eps=32.1)]
+
+        monkeypatch.setattr(frd, "fetch_financial_indicators", fake_fetch)
+        cache = FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+
+        load_financial_report("600519.SH", consensus_eps=30.0, cache=cache)
+        load_financial_report("600519.SH", consensus_eps=30.0, cache=cache)
+        assert calls["n"] == 1  # second read served from cache
+
+        forced = load_financial_report("600519.SH", consensus_eps=34.0, cache=cache, force=True)
+        assert calls["n"] == 2  # force ignores the cache and re-fetches
+        assert forced.periods[0].eps == 32.1
+        assert forced.beat_miss == "miss"  # rebuilt against the fresh consensus
+
+    def test_fetch_failure_with_no_cache_is_not_cached(self, monkeypatch, tmp_path):
+        def fail(code, max_periods=12):  # noqa: ARG001
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(frd, "fetch_financial_indicators", fail)
+        cache = FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+        report = load_financial_report("600519.SH", cache=cache)
+        assert report.error == "no financial report data"
+        assert cache.get("600519.SH") is None
+        assert cache.get_stale("600519.SH") is None
+
+    def test_empty_result_not_cached(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            frd, "fetch_financial_indicators", lambda code, max_periods=12: []  # noqa: ARG005
+        )
+        cache = FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+        report = load_financial_report("600519.SH", cache=cache)
+        assert report.error == "no financial report data"
+        assert report.periods == []
+        assert cache.get("600519.SH") is None
+
+    def test_transient_failure_retries_next_call(self, monkeypatch, tmp_path):
+        calls = {"n": 0}
+
+        def flaky(code, max_periods=12):  # noqa: ARG001
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("boom")
+            return [_indicator()]
+
+        monkeypatch.setattr(frd, "fetch_financial_indicators", flaky)
+        cache = FinancialReportCache(ttl_seconds=3600, root_dir=tmp_path)
+        assert (
+            load_financial_report("600519.SH", cache=cache).error
+            == "no financial report data"
+        )
+        ok = load_financial_report("600519.SH", cache=cache)
+        assert ok.error is None
+        assert cache.get("600519.SH") is not None
 
 
 class TestBeatMissHelper:

@@ -11,19 +11,38 @@
 设计原则：
 - 纯函数与编排分离：``build_financial_report`` 可独立单测；``load_financial_report``
   是唯一的网络入口。
-- 手动按需：不进日频 refresh，无缓存（每次点击实时拉取，低频）。
+- 不进日频 refresh：由前端在选中标的时触发读取（后端缓存命中即秒回），
+  手动"刷新"走 ``force`` 强制重拉。
+- 持久化缓存：财报指标只在报告期披露后变化，按 code 把东财返回落盘到
+  ``data/stock_tracker/financial_reports/<code>.json``（进程重启后仍命中），
+  默认 24h TTL，命中优先返回缓存、不再打网络；拉取失败时回退展示上一份缓存。
 - 永不抛异常，缺数据/失败降级为带 ``error`` 的空报告。
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+import json
+import logging
+import threading
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Dict, List, Optional
 
 from src.stock_tracker.models import FinancialPeriod, FinancialReportSnapshot
+from src.stock_tracker.store import atomic_write_json, tracker_data_root
 from src.tools.financial_statements_tool import fetch_financial_indicators
+
+logger = logging.getLogger(__name__)
 
 # Beat/miss 判定阈值：实际 EPS 相对一致预期 ±5% 内视为 inline。
 _BEAT_TOLERANCE = 0.05
+
+# 财报指标按报告期披露（季度级），日内不变；24h TTL 让同一自然日内重复点击
+# 直接命中缓存，又不会把盘后新披露的报告期冻结太久。
+_CACHE_TTL_SECONDS = 24 * 60 * 60
+# 落盘缓存的子目录（tracker 数据根下），与 snapshots/analyses 同级。
+_CACHE_DIRNAME = "financial_reports"
+_CACHE_SCHEMA_VERSION = 1
 
 
 def _beat_miss(actual_eps: Optional[float], consensus_eps: Optional[float]) -> Optional[str]:
@@ -92,28 +111,185 @@ def build_financial_report(
     return snapshot
 
 
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _default_cache_root() -> Path:
+    """Tracker-local folder holding the per-symbol report cache files."""
+    return tracker_data_root() / _CACHE_DIRNAME
+
+
+def _safe_filename(code: str) -> str:
+    return "".join(c if c.isalnum() or c in "._-" else "_" for c in code)
+
+
+class _CachedReportEntry:
+    __slots__ = ("periods", "expires_at")
+
+    def __init__(self, periods: List[dict], expires_at: datetime) -> None:
+        self.periods = periods
+        self.expires_at = expires_at
+
+
+class FinancialReportCache:
+    """Disk-persistent TTL cache of one symbol's clean financial indicators.
+
+    Keyed by code; each entry is a JSON file under
+    ``data/stock_tracker/financial_reports/<code>.json`` so cache hits survive
+    process restarts (the tracker commits ``data/stock_tracker``). An in-memory
+    mirror serves repeat clicks without touching disk; expiry is wall-clock so a
+    restart cannot accidentally resurrect a stale entry as fresh.
+
+    Caches the network payload (``fetch_financial_indicators`` newest-first
+    dicts) rather than the derived snapshot: red flags are cheap to recompute,
+    and the beat/miss depends on the latest consensus EPS which may have moved
+    since the entry was stored. Rebuilding per request keeps beat/miss fresh.
+
+    Writes are atomic (temp file + ``os.replace``) so a crash never leaves a
+    half-written report.
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: float = _CACHE_TTL_SECONDS,
+        root_dir: Path | str | None = None,
+    ) -> None:
+        self._ttl_seconds = ttl_seconds
+        self.root = Path(root_dir) if root_dir else _default_cache_root()
+        self._mem: Dict[str, _CachedReportEntry] = {}
+        self._lock = threading.Lock()
+
+    def get(self, code: str) -> Optional[List[dict]]:
+        """Return fresh cached indicators for ``code``, or ``None`` when stale/missing."""
+        now = _utcnow()
+        with self._lock:
+            entry = self._mem.get(code)
+            if entry is not None and entry.expires_at > now:
+                return entry.periods
+            self._mem.pop(code, None)
+        loaded = self._read(code)
+        if loaded is None or loaded.expires_at <= now:
+            return None
+        with self._lock:
+            self._mem[code] = loaded
+        return loaded.periods
+
+    def get_stale(self, code: str) -> Optional[List[dict]]:
+        """Return the last known indicators for ``code`` even past the TTL.
+
+        Used as a fallback so a failed refresh still shows the previous report
+        instead of an error card. Returns the in-memory value when present
+        (fresh or not) and otherwise reads the persisted file, expiry ignored.
+        """
+        with self._lock:
+            entry = self._mem.get(code)
+            if entry is not None:
+                return entry.periods
+        loaded = self._read(code)
+        return loaded.periods if loaded is not None else None
+
+    def set(self, code: str, periods: List[dict]) -> None:
+        """Persist ``periods`` for ``code`` for the configured TTL."""
+        if not periods:
+            return
+        expires_at = _utcnow() + timedelta(seconds=self._ttl_seconds)
+        envelope = {
+            "schema": _CACHE_SCHEMA_VERSION,
+            "code": code,
+            "fetched_at": _utcnow().isoformat(),
+            "expires_at": expires_at.isoformat(),
+            "periods": periods,
+        }
+        self._write(code, envelope)
+        with self._lock:
+            self._mem[code] = _CachedReportEntry(periods, expires_at)
+
+    def clear(self) -> None:
+        """Drop in-memory entries and delete all persisted report files."""
+        with self._lock:
+            self._mem.clear()
+        if self.root.exists():
+            for path in self.root.glob("*.json"):
+                try:
+                    path.unlink()
+                except OSError:  # noqa: BLE001 - best-effort cleanup
+                    logger.warning("Failed to remove report cache %s", path)
+
+    # -- persistence helpers -------------------------------------------------
+
+    def _path(self, code: str) -> Path:
+        return self.root / f"{_safe_filename(code)}.json"
+
+    def _read(self, code: str) -> Optional[_CachedReportEntry]:
+        path = self._path(code)
+        try:
+            with path.open("r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except (OSError, ValueError, TypeError):
+            return None
+        if not isinstance(raw, dict) or raw.get("schema") != _CACHE_SCHEMA_VERSION:
+            return None
+        periods = raw.get("periods")
+        if not isinstance(periods, list):
+            return None
+        try:
+            expires_at = datetime.fromisoformat(str(raw["expires_at"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        return _CachedReportEntry(periods, expires_at)
+
+    def _write(self, code: str, envelope: dict) -> None:
+        atomic_write_json(self._path(code), envelope)
+
+
+_DEFAULT_CACHE = FinancialReportCache()
+
+
 def load_financial_report(
     code: str,
     *,
     consensus_eps: Optional[float] = None,
     max_periods: int = 12,
+    cache: Optional[FinancialReportCache] = None,
+    force: bool = False,
 ) -> FinancialReportSnapshot:
-    """Fetch and build a financial report for one symbol. Never raises.
+    """Fetch (or serve from the persisted cache) a financial report. Never raises.
 
     Args:
         code: A-share symbol (e.g. ``"600519.SH"``).
         consensus_eps: Optional latest-year consensus EPS for beat/miss.
         max_periods: Most recent report periods to keep.
+        cache: Cache to consult; defaults to the process-wide module cache,
+            persisted under ``data/stock_tracker/financial_reports``.
+        force: Skip the cache read and hit the network (e.g. a manual Refresh
+            click); a successful fetch still refreshes the cache.
 
     Returns:
         Financial report snapshot; unresolvable / fetch failure degrades to
-        ``error="no financial report data"``.
+        ``error="no financial report data"`` (unless a previously cached report
+        exists, which is then served as a last-good fallback).
     """
+    cache = cache or _DEFAULT_CACHE
+    if not force:
+        cached = cache.get(code)
+        if cached is not None:
+            return build_financial_report(code, cached, consensus_eps=consensus_eps)
     try:
         indicators = fetch_financial_indicators(code, max_periods=max_periods)
     except Exception:  # noqa: BLE001 - never raise out of the loader
-        return FinancialReportSnapshot(code=code, error="no financial report data")
-    return build_financial_report(code, indicators, consensus_eps=consensus_eps)
+        indicators = []
+    if indicators:
+        cache.set(code, indicators)
+        return build_financial_report(code, indicators, consensus_eps=consensus_eps)
+    stale = cache.get_stale(code)
+    if stale is not None:
+        return build_financial_report(code, stale, consensus_eps=consensus_eps)
+    return build_financial_report(code, [], consensus_eps=consensus_eps)
 
 
-__all__ = ["build_financial_report", "load_financial_report"]
+__all__ = [
+    "FinancialReportCache",
+    "build_financial_report",
+    "load_financial_report",
+]

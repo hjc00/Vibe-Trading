@@ -21,7 +21,7 @@ _ANALYSES_DIRNAME = "analyses"
 _SCHEMA_VERSION = 1
 
 
-def _default_root() -> Path:
+def tracker_data_root() -> Path:
     """Return the tracker data root.
 
     Prefers a project-local ``data/stock_tracker`` directory so the tracker's
@@ -37,6 +37,48 @@ def _default_root() -> Path:
     if (repo_root / "pyproject.toml").exists():
         return repo_root / "data" / "stock_tracker"
     return get_runtime_root() / "stock_tracker"
+
+
+def _default_root() -> Path:
+    """Backward-compatible alias for :func:`tracker_data_root` (used by tests)."""
+    return tracker_data_root()
+
+
+def _fsync_dir(directory: Path) -> None:
+    """Ensure the directory entry for a newly written file is durable."""
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+
+
+def atomic_write_json(path: Path, data: Dict[str, Any]) -> None:
+    """Atomically write a JSON object to disk.
+
+    Temp file in the same directory + ``os.replace`` + fsync, so a crash never
+    leaves a half-written file. Shared by the store and per-module persisted
+    caches that live under the tracker data root.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(encoded)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_name, path)
+        _fsync_dir(path.parent)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
 
 class TrackerStore:
@@ -256,35 +298,8 @@ class TrackerStore:
 
     @staticmethod
     def _write_json(path: Path, data: Dict[str, Any]) -> None:
-        """Atomically write a JSON object to disk."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        encoded = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
-        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-        try:
-            with os.fdopen(fd, "wb") as f:
-                f.write(encoded)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp_name, path)
-            TrackerStore._fsync_dir(path.parent)
-        except Exception:
-            try:
-                os.unlink(tmp_name)
-            except OSError:
-                pass
-            raise
-
-    @staticmethod
-    def _fsync_dir(directory: Path) -> None:
-        """Ensure the directory entry for a new file is durable."""
-        try:
-            fd = os.open(directory, os.O_RDONLY)
-            try:
-                os.fsync(fd)
-            finally:
-                os.close(fd)
-        except OSError:
-            pass
+        """Atomically write a JSON object to disk (module helper)."""
+        atomic_write_json(path, data)
 
 
-__all__ = ["TrackerStore"]
+__all__ = ["TrackerStore", "atomic_write_json", "tracker_data_root"]

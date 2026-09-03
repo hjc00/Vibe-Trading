@@ -1,5 +1,5 @@
 import { FileText, Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   type FinancialPeriod,
@@ -109,9 +109,11 @@ const METRICS: MetricDef[] = [
 ];
 
 /**
- * On-demand financial-report reading (财报速读): fetch one symbol's latest
- * reported periods and compare them in a multi-period table with a 1/4/8
- * period switch. Not part of the daily snapshot — data is fetched per click.
+ * Financial-report reading (财报速读): shows one symbol's latest reported
+ * periods in a multi-period table with a 1/4/8 period switch. Auto-loads for
+ * the selected symbol — the backend serves the persisted cache when fresh, so
+ * re-selecting an already-read symbol is instant. Not part of the daily
+ * snapshot; the header button forces a live re-fetch.
  */
 export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps) {
   const { t } = useTranslation();
@@ -119,25 +121,32 @@ export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps
   const [report, setReport] = useState<FinancialReportSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [visible, setVisible] = useState(DEFAULT_PERIODS);
+  const requestSeq = useRef(0);
 
-  // Clear stale data when the selected symbol changes.
+  const runFetch = useCallback((targetCode: string, force = false) => {
+    const seq = ++requestSeq.current;
+    setLoading(true);
+    api
+      .getStockTrackerFinancialReport(targetCode, force)
+      .then((res) => {
+        if (requestSeq.current === seq) setReport(res.report);
+      })
+      .catch(() => {
+        if (requestSeq.current === seq) setReport(null);
+      })
+      .finally(() => {
+        if (requestSeq.current === seq) setLoading(false);
+      });
+  }, []);
+
+  // Auto-load on mount / symbol change; stale responses from a previously
+  // selected symbol are dropped via the sequence guard.
   useEffect(() => {
+    requestSeq.current += 1;
     setReport(null);
     setLoading(false);
-  }, [code]);
-
-  const fetchReport = useCallback(async () => {
-    if (!code) return;
-    setLoading(true);
-    try {
-      const res = await api.getStockTrackerFinancialReport(code);
-      setReport(res.report);
-    } catch {
-      setReport(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [code]);
+    if (code) runFetch(code);
+  }, [code, runFetch]);
 
   if (!symbol) return null;
 
@@ -163,7 +172,7 @@ export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps
         actions={
           <button
             type="button"
-            onClick={fetchReport}
+            onClick={() => code && runFetch(code, true)}
             disabled={loading || !code}
             className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -181,8 +190,17 @@ export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps
 
       {!report ? (
         <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-muted-foreground">
-          <FileText className="h-8 w-8 opacity-40" />
-          <span className="text-xs">{t("stockTracker.financialReportEmpty")}</span>
+          {loading ? (
+            <>
+              <Loader2 className="h-8 w-8 animate-spin opacity-40" />
+              <span className="text-xs">{t("stockTracker.financialReportLoading")}</span>
+            </>
+          ) : (
+            <>
+              <FileText className="h-8 w-8 opacity-40" />
+              <span className="text-xs">{t("stockTracker.financialReportEmpty")}</span>
+            </>
+          )}
         </div>
       ) : !latest ? (
         <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-muted-foreground">

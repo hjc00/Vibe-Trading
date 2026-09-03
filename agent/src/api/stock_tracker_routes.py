@@ -684,6 +684,7 @@ def register_stock_tracker_routes(
     @app.get("/api/stock-tracker/symbols/{code}/financial-report")
     async def get_symbol_financial_report(
         code: str,
+        refresh: bool = False,
         principal=Depends(require_auth),  # noqa: ARG001
     ) -> Dict[str, Any]:
         """Return an on-demand multi-period financial report for one symbol.
@@ -691,7 +692,9 @@ def register_stock_tracker_routes(
         Fetches the symbol's most recent report periods (年报/中报/季报, mixed)
         and derives red flags plus a beat/miss vs the latest consensus EPS held
         in the current snapshot. Runs in a worker thread (same as quotes/analyze)
-        because it hits the Eastmoney datacenter.
+        because it hits the Eastmoney datacenter. Reads are served from the
+        persisted per-symbol cache when fresh; ``refresh=true`` forces a network
+        re-fetch (frontend Refresh button).
         """
         normalized = normalize_a_share_code(code)
         if normalized is None:
@@ -706,7 +709,10 @@ def register_stock_tracker_routes(
                     break
 
         report = await asyncio.to_thread(
-            load_financial_report, normalized, consensus_eps=consensus_eps
+            load_financial_report,
+            normalized,
+            consensus_eps=consensus_eps,
+            force=refresh,
         )
         return {"status": "ok", "report": report.model_dump(mode="json")}
 
