@@ -22,7 +22,12 @@ export function SignalBadge({ type, signal, compact = false, meta }: SignalBadge
   }
 
   const isStrong = signal.state === "strong";
-  const direction = meta?.direction ?? inferDirectionFromDescription(signal.description);
+  // Direction resolution is a three-level fallback: the detector's explicit
+  // `SignalValue.direction` wins (it knows its sign at detect time), then the
+  // signal metadata `direction`, then the English keyword heuristic over the
+  // description. Without the first level, "MACD golden cross below zero"
+  // misclassifies as bearish because of the literal word "below".
+  const direction = signal.direction ?? meta?.direction ?? inferDirectionFromDescription(signal.description);
   const isBullish = direction === "bullish" || (direction === "both" && isBullishDescription(signal.description));
   const isBearish = direction === "bearish" || (direction === "both" && isBearishDescription(signal.description));
 

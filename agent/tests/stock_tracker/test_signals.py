@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+import numpy as np
 import pandas as pd
 import pytest
 
+from src.stock_tracker.indicators import compute_kdj, compute_macd
 from src.stock_tracker.models import (
     CapitalMetrics,
     FundFlowHistoryItem,
@@ -16,6 +18,11 @@ from src.stock_tracker.models import (
     TrackerThresholds,
 )
 from src.stock_tracker.signals import (
+    BollingerPctBDetector,
+    BollingerSqueezeDetector,
+    DivergenceDetector,
+    KdjDetector,
+    MacdDetector,
     MainForceInflowDetector,
     MarginExpansionDetector,
     NetInflowSpikeDetector,
@@ -324,3 +331,228 @@ class TestMarginExpansionDetector:
         value = detector.detect("000001.SZ", df, 10, TrackerThresholds())
         assert value.triggered is False
         assert "margin" in value.description.lower()
+
+
+def _macd_cross_frame(segments: list[np.ndarray], cross_kind: str, dif_sign: int | None = None) -> pd.DataFrame:
+    """Concatenate price segments and truncate at the first qualifying MACD cross.
+
+    ``dif_sign`` filters the cross by the sign of DIF at the cross bar (``+1``
+    for above-zero, ``-1`` for below-zero) so tests can target graded states.
+    """
+    close = pd.Series(np.concatenate(segments))
+    dif, dea, _ = compute_macd(close)
+    for i in range(1, len(close)):
+        crossed = (
+            cross_kind == "golden"
+            and dif.iloc[i] > dea.iloc[i]
+            and dif.iloc[i - 1] <= dea.iloc[i - 1]
+        ) or (
+            cross_kind == "death"
+            and dif.iloc[i] < dea.iloc[i]
+            and dif.iloc[i - 1] >= dea.iloc[i - 1]
+        )
+        if not crossed:
+            continue
+        if dif_sign is not None and float(dif.iloc[i]) * dif_sign <= 0:
+            continue
+        return pd.DataFrame({"close": close.iloc[: i + 1]})
+    raise AssertionError(f"no {cross_kind} MACD cross found")
+
+
+def _kdj_cross_frame(segments: list[np.ndarray], cross_kind: str) -> pd.DataFrame:
+    """Concatenate price segments and truncate at the first KDJ K/D cross."""
+    close = pd.Series(np.concatenate(segments))
+    df = pd.DataFrame({"close": close, "high": close + 1.0, "low": close - 1.0})
+    k, d, _ = compute_kdj(df)
+    for i in range(1, len(close)):
+        if cross_kind == "golden" and k.iloc[i] > d.iloc[i] and k.iloc[i - 1] <= d.iloc[i - 1]:
+            return df.iloc[: i + 1]
+        if cross_kind == "death" and k.iloc[i] < d.iloc[i] and k.iloc[i - 1] >= d.iloc[i - 1]:
+            return df.iloc[: i + 1]
+    raise AssertionError(f"no {cross_kind} KDJ cross found")
+
+
+class TestMacdDetector:
+    def test_meta_registered(self) -> None:
+        meta = get_detector_meta("macd")
+        assert meta.category == "trend"
+        assert meta.direction == "both"
+        assert meta.format == "raw"
+        assert meta.params["macd_fast"]["default"] == 12.0
+
+    def test_golden_cross_above_zero_is_strong(self) -> None:
+        df = _macd_cross_frame(
+            [np.linspace(100, 98, 5), np.linspace(98, 130, 30), np.linspace(130, 122, 10), np.linspace(122, 140, 20)],
+            "golden",
+            dif_sign=1,
+        )
+        value = MacdDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.state.value == "strong"
+        assert value.direction == "bullish"
+        assert "above zero" in value.description
+
+    def test_golden_cross_below_zero_is_triggered(self) -> None:
+        df = _macd_cross_frame([np.linspace(20, 12, 40), np.linspace(12, 24, 40)], "golden", dif_sign=-1)
+        value = MacdDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.state.value == "triggered"
+        assert value.direction == "bullish"
+        assert "below zero" in value.description
+
+    def test_death_cross_is_bearish(self) -> None:
+        df = _macd_cross_frame([np.linspace(12, 20, 40), np.linspace(20, 10, 40)], "death")
+        value = MacdDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.state.value == "triggered"
+        assert value.direction == "bearish"
+        assert "death cross" in value.description
+
+    def test_no_cross_returns_no_trigger(self) -> None:
+        df = pd.DataFrame({"close": np.linspace(100, 200, 60)})
+        value = MacdDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+        assert value.triggered is False
+
+
+class TestKdjDetector:
+    def test_meta_registered(self) -> None:
+        meta = get_detector_meta("kdj")
+        assert meta.category == "momentum"
+        assert meta.direction == "both"
+        assert meta.format == "raw"
+        assert meta.params["kdj_n"]["default"] == 9.0
+
+    def test_golden_cross_is_bullish(self) -> None:
+        df = _kdj_cross_frame([np.linspace(20, 12, 40), np.linspace(12, 24, 40)], "golden")
+        value = KdjDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.state.value in ("triggered", "strong")
+        assert value.direction == "bullish"
+        assert "golden cross" in value.description
+
+    def test_death_cross_is_bearish(self) -> None:
+        df = _kdj_cross_frame([np.linspace(12, 20, 40), np.linspace(20, 10,40)], "death")
+        value = KdjDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.direction == "bearish"
+        assert "death cross" in value.description
+
+    def test_no_cross_returns_no_trigger(self) -> None:
+        df = pd.DataFrame(
+            {"close": np.linspace(100, 200, 60), "high": np.linspace(100, 200, 60) + 1.0, "low": np.linspace(100, 200, 60) - 1.0}
+        )
+        value = KdjDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+        assert value.triggered is False
+
+
+class TestBollingerPctBDetector:
+    def test_meta_registered(self) -> None:
+        meta = get_detector_meta("bollinger_pct_b")
+        assert meta.category == "momentum"
+        assert meta.direction == "both"
+        assert meta.params["bb_n"]["default"] == 20.0
+
+    def test_close_above_upper_band_is_strong_bullish(self) -> None:
+        df = pd.DataFrame({"close": [10.0] * 30 + [20.0]})
+        value = BollingerPctBDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.state.value == "strong"
+        assert value.direction == "bullish"
+        assert value.value is not None and value.value > 1.0
+
+    def test_close_below_lower_band_is_bearish(self) -> None:
+        df = pd.DataFrame({"close": [10.0] * 30 + [0.0]})
+        value = BollingerPctBDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.state.value == "triggered"
+        assert value.direction == "bearish"
+        assert value.value is not None and value.value < 0.0
+
+    def test_within_band_returns_no_trigger(self) -> None:
+        df = pd.DataFrame({"close": np.linspace(100, 110, 30)})
+        value = BollingerPctBDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+        assert value.triggered is False
+
+
+class TestBollingerSqueezeDetector:
+    def test_meta_registered(self) -> None:
+        meta = get_detector_meta("bollinger_squeeze")
+        assert meta.category == "volatility"
+        assert meta.direction == "neutral"
+        assert meta.ranking_enabled is False
+
+    def test_squeeze_is_neutral_strong(self) -> None:
+        # Long high-volatility run then a sharp collapse to flat -> bandwidth at
+        # a historically low percentile.
+        oscillating = 100 + np.sin(np.linspace(0, 20 * np.pi, 100)) * 10
+        df = pd.DataFrame({"close": list(oscillating) + [100.0] * 20})
+        value = BollingerSqueezeDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.state.value == "strong"
+        assert value.direction == "neutral"
+        assert value.value is not None and value.value < 0.05
+
+    def test_normal_bandwidth_returns_no_trigger(self) -> None:
+        oscillating = 100 + np.sin(np.linspace(0, 20 * np.pi, 100)) * 10
+        df = pd.DataFrame({"close": list(oscillating)})
+        value = BollingerSqueezeDetector().detect("000001.SZ", df, 20, TrackerThresholds())
+        assert value.triggered is False
+
+
+def _top_divergence_frame() -> pd.DataFrame:
+    close = pd.Series(
+        list(np.linspace(100, 150, 30))
+        + list(np.linspace(150, 110, 15))
+        + list(np.linspace(110, 155, 20))
+        + list(np.linspace(155, 150, 4))
+    )
+    return pd.DataFrame({"close": close, "high": close + 0.5, "low": close - 0.5})
+
+
+def _bottom_divergence_frame() -> pd.DataFrame:
+    close = pd.Series(
+        list(np.linspace(100, 50, 30))
+        + list(np.linspace(50, 90, 15))
+        + list(np.linspace(90, 45, 20))
+        + list(np.linspace(45, 50, 4))
+    )
+    return pd.DataFrame({"close": close, "high": close + 0.5, "low": close - 0.5})
+
+
+class TestDivergenceDetector:
+    def test_meta_registered(self) -> None:
+        meta = get_detector_meta("divergence")
+        assert meta.category == "momentum"
+        assert meta.direction == "both"
+        assert meta.params["divergence_pivot"]["default"] == 3.0
+
+    def test_top_divergence_is_bearish(self) -> None:
+        # Pass a large enough period so the lookback covers both swing highs.
+        value = DivergenceDetector().detect("000001.SZ", _top_divergence_frame(), 100, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.direction == "bearish"
+        assert value.value is not None and value.value < 0
+        assert "top divergence" in value.description.lower()
+
+    def test_bottom_divergence_is_bullish(self) -> None:
+        value = DivergenceDetector().detect("000001.SZ", _bottom_divergence_frame(), 100, TrackerThresholds())
+
+        assert value.triggered is True
+        assert value.direction == "bullish"
+        assert value.value is not None and value.value > 0
+        assert "bottom divergence" in value.description.lower()
+
+    def test_no_divergence_returns_no_trigger(self) -> None:
+        close = np.linspace(100, 200, 60)
+        df = pd.DataFrame({"close": close, "high": close + 0.5, "low": close - 0.5})
+        value = DivergenceDetector().detect("000001.SZ", df, 100, TrackerThresholds())
+        assert value.triggered is False

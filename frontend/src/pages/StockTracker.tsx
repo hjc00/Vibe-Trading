@@ -27,6 +27,7 @@ import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysi
 import { MarginChartCard } from "@/components/stock-tracker/MarginChartCard";
 import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard";
 import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
+import { IndicatorChartCard } from "@/components/stock-tracker/IndicatorChartCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
 import { EventTimelineCard } from "@/components/stock-tracker/EventTimelineCard";
@@ -478,6 +479,8 @@ export function StockTracker() {
                     />
                   ))}
                 </div>
+
+                <IndicatorChartCard symbol={selectedSymbol} />
 
                 {isCardVisible("financial_report", config?.card_visibility) ? (
                   <FinancialReportCard

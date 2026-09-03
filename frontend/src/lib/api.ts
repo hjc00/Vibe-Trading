@@ -1878,6 +1878,7 @@ export interface SignalValue {
   value?: number | null;
   threshold?: number | null;
   description: string;
+  direction?: "bullish" | "bearish" | "neutral" | null;
 }
 
 export type SignalType = string;
@@ -2131,6 +2132,43 @@ export interface VolumePoint {
   is_burst: boolean;
 }
 
+export interface IndicatorBar {
+  trade_date?: string | null;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  close?: number | null;
+  volume?: number | null;
+  ma5?: number | null;
+  ma10?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+  dif?: number | null;
+  dea?: number | null;
+  macd_hist?: number | null;
+  k?: number | null;
+  d?: number | null;
+  j?: number | null;
+  bb_upper?: number | null;
+  bb_mid?: number | null;
+  bb_lower?: number | null;
+  pct_b?: number | null;
+  bandwidth?: number | null;
+}
+
+export interface DivergenceMark {
+  kind: "top" | "bottom";
+  price_hi_idx?: number | null;
+  price_lo_idx?: number | null;
+  dif_hi_idx?: number | null;
+  dif_lo_idx?: number | null;
+}
+
+export interface IndicatorSeries {
+  bars: IndicatorBar[];
+  divergence_marks: DivergenceMark[];
+}
+
 export interface SymbolSnapshot {
   code: string;
   name?: string | null;
@@ -2150,6 +2188,7 @@ export interface SymbolSnapshot {
   concept?: ConceptSnapshot | null;
   consensus?: ConsensusSnapshot | null;
   chip?: ChipSnapshot | null;
+  indicators?: IndicatorSeries | null;
   diff?: CrossDayDiff | null;
   sector_board?: string | null;
   sector_board_source?: string | null;

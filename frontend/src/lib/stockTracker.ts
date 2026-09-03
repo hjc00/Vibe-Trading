@@ -8,11 +8,39 @@ import type {
 import type { TFunction } from "i18next";
 
 export const SIGNAL_LABEL_KEYS: Record<SignalType, string> = {
+  // Signal names.
   volume_spike: "stockTracker.volumeSpike",
   breakout: "stockTracker.breakout",
   ma_alignment: "stockTracker.maAlignment",
   rsi: "stockTracker.rsi",
   margin_expansion: "stockTracker.marginExpansion",
+  net_inflow_spike: "stockTracker.netInflowSpike",
+  main_force_inflow: "stockTracker.mainForceInflow",
+  macd: "stockTracker.macd",
+  divergence: "stockTracker.divergence",
+  kdj: "stockTracker.kdj",
+  bollinger_pct_b: "stockTracker.bollingerPctB",
+  bollinger_squeeze: "stockTracker.bollingerSqueeze",
+  // Threshold parameter names (the config panel resolves labels through the
+  // same lookup as signal names, so each param needs a key too).
+  breakout_window: "stockTracker.breakout_window",
+  rsi_period: "stockTracker.rsi_period",
+  rsi_overbought: "stockTracker.rsi_overbought",
+  rsi_oversold: "stockTracker.rsi_oversold",
+  margin_expansion_threshold: "stockTracker.margin_expansion_threshold",
+  net_inflow_spike_multiple: "stockTracker.net_inflow_spike_multiple",
+  main_force_inflow_days: "stockTracker.main_force_inflow_days",
+  macd_fast: "stockTracker.macd_fast",
+  macd_slow: "stockTracker.macd_slow",
+  macd_signal: "stockTracker.macd_signal",
+  divergence_min_lookback: "stockTracker.divergence_min_lookback",
+  divergence_pivot: "stockTracker.divergence_pivot",
+  divergence_tolerance: "stockTracker.divergence_tolerance",
+  kdj_n: "stockTracker.kdj_n",
+  bb_n: "stockTracker.bb_n",
+  bb_k: "stockTracker.bb_k",
+  squeeze_lookback: "stockTracker.squeeze_lookback",
+  squeeze_pctile: "stockTracker.squeeze_pctile",
 } as const;
 
 // Dashboard data cards that can be hidden via the card's hide button. Order

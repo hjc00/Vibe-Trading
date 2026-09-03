@@ -18,6 +18,12 @@ from src.stock_tracker.consensus_data import (
     load_consensus_data,
 )
 from src.stock_tracker.events_data import EventsDataCache, load_events_data
+from src.stock_tracker.indicators import (
+    compute_bollinger,
+    compute_kdj,
+    compute_macd,
+    find_divergence,
+)
 from src.stock_tracker.models import (
     CARD_DATA_DIMENSIONS,
     CapitalMetrics,
@@ -26,8 +32,11 @@ from src.stock_tracker.models import (
     ConceptStrength,
     ConsensusSnapshot,
     CrossDayDiff,
+    DivergenceMark,
     EventSnapshot,
     HIDEABLE_CARDS,
+    IndicatorBar,
+    IndicatorSeries,
     PeriodMetrics,
     PeriodSignals,
     RiskMetrics,
@@ -50,9 +59,28 @@ from src.tools.sector_tool import resolve_concept_boards, resolve_industry_board
 
 logger = logging.getLogger(__name__)
 
+
+def _opt_float(value: Any) -> Optional[float]:
+    """Coerce a scalar to ``float``, mapping missing/NaN to ``None``."""
+    if value is None:
+        return None
+    try:
+        fv = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if pd.isna(fv) else fv
+
+
 # Extra calendar days before the earliest requested period so that moving
-# averages (especially 60-day) have enough history even with holidays.
-_BUFFER_DAYS = 90
+# averages (especially 60-day) have enough history even with holidays. Raised
+# from 90 to 225 so the trailing frame holds at least _PRICE_BARS trading bars
+# (225 ≈ 130 × 1.5 calendar→trading + 30 holiday buffer); this also keeps the
+# Bollinger-squeeze lookback (125) from permanently degrading on a short frame.
+_BUFFER_DAYS = 225
+
+# Number of trailing daily bars serialized for the frontend technical chart.
+# Must be >= the Bollinger-squeeze lookback (125).
+_PRICE_BARS = 130
 
 # A session counts as a 放量 burst when its volume reaches this multiple of the
 # trailing 5-session average volume (an A-share convention, softer than the
@@ -696,6 +724,7 @@ class StockTrackerEngine:
             period_signals[str(period)] = PeriodSignals(metrics=metrics, signals=signals)
 
         volume_series = self._build_volume_series(df, burst=burst_series)
+        indicators = self._build_indicator_series(df)
 
         return SymbolSnapshot(
             code=code,
@@ -714,6 +743,7 @@ class StockTrackerEngine:
             concept=concept,
             consensus=consensus,
             period_signals=period_signals,
+            indicators=indicators,
             sector_board=sector_board,
             sector_board_source="eastmoney" if sector_board else None,
         )
@@ -879,6 +909,66 @@ class StockTrackerEngine:
                 thresholds=self.config.thresholds,
             )
         return results
+
+    def _build_indicator_series(self, df: pd.DataFrame) -> Optional[IndicatorSeries]:
+        """Serialize trailing indicator bars plus divergence marks for the chart."""
+        if df.empty or "close" not in df.columns:
+            return None
+
+        tail = df.tail(_PRICE_BARS)
+        close = tail["close"]
+        dif, dea, hist = compute_macd(close)
+        k, d, j = compute_kdj(tail)
+        mid, upper, lower, pct_b, bandwidth = compute_bollinger(close)
+
+        bars: List[IndicatorBar] = []
+        for i in range(len(tail)):
+            row = tail.iloc[i]
+            bars.append(
+                IndicatorBar(
+                    trade_date=tail.index[i].date(),
+                    open=_opt_float(row.get("open")),
+                    high=_opt_float(row.get("high")),
+                    low=_opt_float(row.get("low")),
+                    close=_opt_float(row.get("close")),
+                    volume=_opt_float(row.get("volume")),
+                    ma5=_opt_float(row.get("ma5")),
+                    ma10=_opt_float(row.get("ma10")),
+                    ma20=_opt_float(row.get("ma20")),
+                    ma60=_opt_float(row.get("ma60")),
+                    dif=_opt_float(dif.iloc[i]),
+                    dea=_opt_float(dea.iloc[i]),
+                    macd_hist=_opt_float(hist.iloc[i]),
+                    k=_opt_float(k.iloc[i]),
+                    d=_opt_float(d.iloc[i]),
+                    j=_opt_float(j.iloc[i]),
+                    bb_upper=_opt_float(upper.iloc[i]),
+                    bb_mid=_opt_float(mid.iloc[i]),
+                    bb_lower=_opt_float(lower.iloc[i]),
+                    pct_b=_opt_float(pct_b.iloc[i]),
+                    bandwidth=_opt_float(bandwidth.iloc[i]),
+                )
+            )
+
+        marks = self._build_divergence_marks(tail, dif)
+        return IndicatorSeries(bars=bars, divergence_marks=marks)
+
+    def _build_divergence_marks(self, tail: pd.DataFrame, dif: pd.Series) -> List[DivergenceMark]:
+        """Detect divergence over the trailing frame and emit chart annotations."""
+        pivot = int(self.config.thresholds.get("divergence_pivot", 3))
+        tolerance = float(self.config.thresholds.get("divergence_tolerance", 0.002))
+        result = find_divergence(tail, dif, lookback=len(tail), pivot=pivot, tolerance=tolerance)
+        if not result.triggered or result.kind is None:
+            return []
+        return [
+            DivergenceMark(
+                kind=result.kind,
+                price_hi_idx=result.price_hi_idx,
+                price_lo_idx=result.price_lo_idx,
+                dif_hi_idx=result.dif_hi_idx,
+                dif_lo_idx=result.dif_lo_idx,
+            )
+        ]
 
     def _compute_and_attach_rps(
         self,

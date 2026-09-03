@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -15,6 +15,10 @@ DEFAULT_SIGNALS: List[SignalType] = [
     "ma_alignment",
     "rsi",
     "margin_expansion",
+    "macd",
+    "divergence",
+    "kdj",
+    "bollinger_pct_b",
 ]
 DEFAULT_PERIODS: List[int] = [10, 20, 60]
 DEFAULT_WATCHLIST: List[str] = [
@@ -247,13 +251,20 @@ class SignalState(str, Enum):
 
 
 class SignalValue(BaseModel):
-    """One detected signal for one symbol/period."""
+    """One detected signal for one symbol/period.
+
+    ``direction`` is an explicit bullish/bearish/neutral override so the
+    frontend badge can color ``direction="both"`` signals correctly without
+    relying on keyword heuristics over ``description``. Detectors that know
+    their sign at detect time should set it.
+    """
 
     triggered: bool = False
     state: SignalState = SignalState.NONE
     value: Optional[float] = None
     threshold: Optional[float] = None
     description: str = ""
+    direction: Optional[Literal["bullish", "bearish", "neutral"]] = None
 
 
 class PeriodMetrics(BaseModel):
@@ -690,6 +701,63 @@ class VolumePoint(BaseModel):
     is_burst: bool = False
 
 
+class IndicatorBar(BaseModel):
+    """One trailing daily bar plus its precomputed technical indicators.
+
+    Populated by :mod:`src.stock_tracker.engine` from the same pure functions
+    the signal detectors use, so plotted values match badge values. Warm-up
+    bars carry ``None`` for indicators that need more history.
+    """
+
+    trade_date: Optional[date] = None
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
+    volume: Optional[float] = None
+    ma5: Optional[float] = None
+    ma10: Optional[float] = None
+    ma20: Optional[float] = None
+    ma60: Optional[float] = None
+    dif: Optional[float] = None
+    dea: Optional[float] = None
+    macd_hist: Optional[float] = None
+    k: Optional[float] = None
+    d: Optional[float] = None
+    j: Optional[float] = None
+    bb_upper: Optional[float] = None
+    bb_mid: Optional[float] = None
+    bb_lower: Optional[float] = None
+    pct_b: Optional[float] = None
+    bandwidth: Optional[float] = None
+
+
+class DivergenceMark(BaseModel):
+    """Coordinates of one top/bottom divergence for chart annotation.
+
+    Indices are ``iloc`` positions within the ``bars`` list of the enclosing
+    :class:`IndicatorSeries`.
+    """
+
+    kind: str = "top"  # top | bottom
+    price_hi_idx: Optional[int] = None
+    price_lo_idx: Optional[int] = None
+    dif_hi_idx: Optional[int] = None
+    dif_lo_idx: Optional[int] = None
+
+
+class IndicatorSeries(BaseModel):
+    """Trailing technical-indicator series for one symbol's chart.
+
+    ``bars`` holds the last ``_PRICE_BARS`` daily bars in chronological order;
+    ``divergence_marks`` holds any MACD-DIF divergence annotations detected over
+    that same window.
+    """
+
+    bars: List[IndicatorBar] = Field(default_factory=list)
+    divergence_marks: List[DivergenceMark] = Field(default_factory=list)
+
+
 class SymbolSnapshot(BaseModel):
     """One symbol's slice of a tracker snapshot."""
 
@@ -712,6 +780,7 @@ class SymbolSnapshot(BaseModel):
     consensus: Optional[ConsensusSnapshot] = None
     chip: Optional[ChipSnapshot] = None
     diff: Optional[CrossDayDiff] = None
+    indicators: Optional[IndicatorSeries] = None
     sector_board: Optional[str] = None
     sector_board_source: Optional[str] = None
     sector_strength_rank: Optional[int] = None  # board's market rank (1-based)
@@ -907,6 +976,9 @@ __all__ = [
     "ChipHolderItem",
     "ChipSnapshot",
     "CrossDayDiff",
+    "DivergenceMark",
+    "IndicatorBar",
+    "IndicatorSeries",
     "SymbolSnapshot",
     "TrackerSnapshot",
     "AnalysisAction",

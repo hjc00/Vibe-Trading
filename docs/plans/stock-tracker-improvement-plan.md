@@ -2,7 +2,7 @@
 
 > 本文档用于跟踪 A 股多周期股票追踪器（`stock_tracker`）的后续优化方向。
 > 创建时间：2026-09-01
-> 最后更新：2026-09-03（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.9 事件日历、2.10 AI 分析结构化升级、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度；2.19 财报速读进行中）
+> 最后更新：2026-09-04（已落地 2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.9 事件日历、2.10 AI 分析结构化升级、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度；2.19 财报速读进行中；2.20 技术指标信号已完成）
 
 ## 一、现状概述
 
@@ -83,6 +83,15 @@
   - 每个 symbol 都有共振评分与趋势级别判断。
   - 评分规则可配置或可解释。
   - 新增测试覆盖评分边界。
+
+#### 2.20 技术指标信号扩展
+- **目标**：在 signals 体系补齐 A 股技术交易者的基础指标——MACD、KDJ、布林带（%B + 挤压）、量价/指标背离，把看板从「看」补成「决策」。
+- **投资人价值**：针对中长线（3–6 个月）+ 短线打法——MACD 定趋势方向、背离抓顶底反转、KDJ 抓短线买卖点、布林 %B 判强势持有、布林挤压埋伏大级别突破。
+- **涉及模块**：`agent/src/stock_tracker/signals.py`、`models.py`、前端 label / i18n、`test_signals.py`。
+- **大致方案**：新增 5 个 detector（`macd` / `divergence` / `kdj` / `bollinger_pct_b` / `bollinger_squeeze`），纯 pandas 计算、零新数据源；阈值走 `extra="allow"` 机制；背离 lookback 跟周期联动（`max(period, divergence_min_lookback=40)`）；顺手修复前端 `net_inflow_spike` / `main_force_inflow` label 遗漏。
+- **周期改造后置**：120 日 / 半年线 / ma_alignment 五线升级归属 2.4，本批不触碰。
+- **验收标准**：5 个信号注册进 registry 且单测覆盖；前端显示中文标签；LLM 分析自动注入新信号。
+- **详细设计**：[stock-tracker-2.20-technical-signals.md](stock-tracker-2.20-technical-signals.md)
 
 ---
 
@@ -279,6 +288,7 @@
 | 2.17 | 盈利预期/一致预期 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `consensus_data.py`（东财研报主源 + THS 一致预期 + tushare `report_rc` 目标价/EPS 修正兜底）；`ConsensusDataCache` TTL 1 天；forward PE/上行空间由 engine 拿 close 后回填；前端 `ConsensusCard` |
 | 2.18 | 筹码集中度/机构动向 | 已完成 | jinchu | 2026-09-03 | 2026-09-03 | 新增 `chip_data.py`（东财股东户数主源 + 北向 `hk_hold`/公募 `fund_portfolio` tushare 兜底）；`ChipDataCache` TTL 7 天；集中度分 0–100（户数下降/户均上升/机构增持 0.40/0.30/0.30）；前端 `ChipCard` |
 | 2.19 | 财报速读（Phase 1 数据卡） | 进行中 | jinchu | 2026-09-03 | - | 手动按需单标的「阅读财报」：新 `financial_reports_data.py` + `src.tools.financial_statements_tool.fetch_financial_indicators`（东财 `RPT_F10_FINANCE_MAINFINADATA` 多期倒序）；新模型 `FinancialPeriod`/`FinancialReportSnapshot`（不挂 `SymbolSnapshot`）；GET `/api/stock-tracker/symbols/{code}/financial-report`；红旗 + beat/miss（对比一致预期 EPS）；前端 `FinancialReportCard`（多期指标表，1/4/8 期切换，默认 4）；Phase A（LLM 速读点评）未做 |
+| 2.20 | 技术指标信号扩展（MACD/KDJ/布林/背离） | 已完成 | jinchu | 2026-09-04 | 2026-09-04 | 新增 `indicators.py`（MACD/KDJ/布林/背离纯函数）+ `signals.py` 五个检测器（MACD/背离/KDJ/布林%B/布林收口）+ 逐 bar 序列化 `IndicatorSeries`（`SymbolSnapshot.indicators`），前端 `IndicatorChartCard` 四窗格技术指标子图；详见 [stock-tracker-2.20-technical-signals.md](stock-tracker-2.20-technical-signals.md) |
 
 ---
 

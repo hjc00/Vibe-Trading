@@ -9,6 +9,12 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Type
 import numpy as np
 import pandas as pd
 
+from src.stock_tracker.indicators import (
+    compute_bollinger,
+    compute_kdj,
+    compute_macd,
+    find_divergence,
+)
 from src.stock_tracker.models import (
     SignalState,
     SignalType,
@@ -647,6 +653,341 @@ class MarginExpansionDetector(SignalDetector):
         )
 
 
+class MacdDetector(SignalDetector):
+    """Detect MACD golden/death cross on the latest bar.
+
+    A golden cross above the zero line is graded ``STRONG`` (trend up and just
+    accelerating); below zero it is ``TRIGGERED``. Death crosses are always
+    ``TRIGGERED`` (bearish).
+    """
+
+    name = "macd"
+    meta = SignalMeta(
+        name="macd",
+        category="trend",
+        direction="both",
+        label="MACD",
+        description="MACD DIF/DEA cross with zero-line strength grading.",
+        params={
+            "macd_fast": {"type": "int", "min": 2, "max": 60, "default": 12, "description": "Fast EMA period."},
+            "macd_slow": {"type": "int", "min": 2, "max": 250, "default": 26, "description": "Slow EMA period."},
+            "macd_signal": {"type": "int", "min": 2, "max": 60, "default": 9, "description": "Signal EMA period."},
+        },
+        default_params={"macd_fast": 12.0, "macd_slow": 26.0, "macd_signal": 9.0},
+        format="raw",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: abs(sv.value or 0.0),
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        fast = int(thresholds.get("macd_fast", 12))
+        slow = int(thresholds.get("macd_slow", 26))
+        signal = int(thresholds.get("macd_signal", 9))
+        if len(df) < slow + signal:
+            return SignalValue(triggered=False, description="Insufficient data for MACD")
+
+        dif, dea, _ = compute_macd(df["close"], fast, slow, signal)
+        cur_dif = float(dif.iloc[-1])
+        prev_dif = float(dif.iloc[-2])
+        cur_dea = float(dea.iloc[-1])
+        prev_dea = float(dea.iloc[-2])
+        if pd.isna(cur_dif) or pd.isna(cur_dea):
+            return SignalValue(triggered=False, description="Insufficient data for MACD")
+
+        value = round(cur_dif - cur_dea, 4)
+        crossed_up = cur_dif > cur_dea and prev_dif <= prev_dea
+        crossed_down = cur_dif < cur_dea and prev_dif >= prev_dea
+
+        if crossed_up:
+            above_zero = cur_dif > 0
+            return SignalValue(
+                triggered=True,
+                state=SignalState.STRONG if above_zero else SignalState.TRIGGERED,
+                value=value,
+                direction="bullish",
+                description=(
+                    "MACD golden cross above zero line (DIF>0)"
+                    if above_zero
+                    else "MACD golden cross below zero line"
+                ),
+            )
+        if crossed_down:
+            return SignalValue(
+                triggered=True,
+                state=SignalState.TRIGGERED,
+                value=value,
+                direction="bearish",
+                description="MACD death cross",
+            )
+        return SignalValue(triggered=False, value=value, description="MACD no cross")
+
+
+class DivergenceDetector(SignalDetector):
+    """Detect MACD-DIF top/bottom divergence over the trailing window."""
+
+    name = "divergence"
+    meta = SignalMeta(
+        name="divergence",
+        category="momentum",
+        direction="both",
+        label="Divergence",
+        description="Price makes a new high/low but DIF does not confirm.",
+        params={
+            "divergence_min_lookback": {
+                "type": "int",
+                "min": 20,
+                "max": 250,
+                "default": 40,
+                "description": "Minimum lookback for swing detection.",
+            },
+            "divergence_pivot": {
+                "type": "int",
+                "min": 1,
+                "max": 10,
+                "default": 3,
+                "description": "Bars on each side to confirm a swing point.",
+            },
+            "divergence_tolerance": {
+                "type": "float",
+                "min": 0.0,
+                "max": 0.05,
+                "default": 0.002,
+                "description": "Relative tolerance for a new high/low.",
+            },
+        },
+        default_params={"divergence_min_lookback": 40.0, "divergence_pivot": 3.0, "divergence_tolerance": 0.002},
+        format="raw",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: abs(sv.value or 0.0),
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        min_lookback = int(thresholds.get("divergence_min_lookback", 40))
+        pivot = int(thresholds.get("divergence_pivot", 3))
+        tolerance = float(thresholds.get("divergence_tolerance", 0.002))
+        lookback = max(period, min_lookback)
+        if len(df) < 2 * pivot + 2:
+            return SignalValue(triggered=False, description="insufficient swing points")
+
+        # Divergence is defined on the standard 12/26/9 DIF regardless of any
+        # per-signal MACD tuning, matching how traders read the indicator.
+        dif, _, _ = compute_macd(df["close"])
+        result = find_divergence(df, dif, lookback, pivot, tolerance)
+        if not result.triggered:
+            return SignalValue(triggered=False, value=0.0, description=result.description)
+
+        direction = "bearish" if result.kind == "top" else "bullish"
+        return SignalValue(
+            triggered=True,
+            state=SignalState.TRIGGERED,
+            value=result.strength,
+            direction=direction,
+            description=result.description,
+        )
+
+
+class KdjDetector(SignalDetector):
+    """Detect KDJ golden/death cross with overbought/oversold grading."""
+
+    name = "kdj"
+    meta = SignalMeta(
+        name="kdj",
+        category="momentum",
+        direction="both",
+        label="KDJ",
+        description="KDJ golden/death cross with oversold/overbought grading.",
+        params={
+            "kdj_n": {"type": "int", "min": 3, "max": 60, "default": 9, "description": "HHV/LLV window."},
+        },
+        default_params={"kdj_n": 9.0},
+        format="raw",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: abs((sv.value or 50.0) - 50.0),
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        n = int(thresholds.get("kdj_n", 9))
+        if len(df) < n + 1:
+            return SignalValue(triggered=False, description="Insufficient data for KDJ")
+
+        k, d, j = compute_kdj(df, n)
+        cur_k = float(k.iloc[-1])
+        prev_k = float(k.iloc[-2])
+        cur_d = float(d.iloc[-1])
+        prev_d = float(d.iloc[-2])
+        value = round(float(j.iloc[-1]), 1)
+
+        crossed_up = cur_k > cur_d and prev_k <= prev_d
+        crossed_down = cur_k < cur_d and prev_k >= prev_d
+
+        if crossed_up:
+            if cur_k < 20:
+                return SignalValue(
+                    triggered=True, state=SignalState.STRONG, value=value, direction="bullish",
+                    description="KDJ golden cross in oversold zone (K<20)",
+                )
+            return SignalValue(
+                triggered=True, state=SignalState.TRIGGERED, value=value, direction="bullish",
+                description="KDJ golden cross",
+            )
+        if crossed_down:
+            if cur_k > 80:
+                return SignalValue(
+                    triggered=True, state=SignalState.STRONG, value=value, direction="bearish",
+                    description="KDJ death cross in overbought zone (K>80)",
+                )
+            return SignalValue(
+                triggered=True, state=SignalState.TRIGGERED, value=value, direction="bearish",
+                description="KDJ death cross",
+            )
+        return SignalValue(triggered=False, value=value, description="KDJ no cross")
+
+
+class BollingerPctBDetector(SignalDetector):
+    """Detect close above the upper or below the lower Bollinger band."""
+
+    name = "bollinger_pct_b"
+    meta = SignalMeta(
+        name="bollinger_pct_b",
+        category="momentum",
+        direction="both",
+        label="Bollinger %B",
+        description="Close above the upper or below the lower Bollinger band.",
+        params={
+            "bb_n": {"type": "int", "min": 5, "max": 120, "default": 20, "description": "Bollinger moving-average window."},
+            "bb_k": {"type": "float", "min": 1.0, "max": 3.0, "default": 2.0, "description": "Bollinger standard-deviation multiple."},
+        },
+        default_params={"bb_n": 20.0, "bb_k": 2.0},
+        format="raw",
+        ranking_enabled=True,
+        ranking_extractor=lambda sv: abs((sv.value or 0.5) - 0.5),
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        n = int(thresholds.get("bb_n", 20))
+        k = float(thresholds.get("bb_k", 2.0))
+        if len(df) < n:
+            return SignalValue(triggered=False, description="Insufficient data for Bollinger %B")
+
+        _, _, _, pct_b, _ = compute_bollinger(df["close"], n, k)
+        value = float(pct_b.iloc[-1])
+        if pd.isna(value):
+            return SignalValue(triggered=False, description="Degenerate Bollinger band")
+        value = round(value, 3)
+
+        if value > 1:
+            return SignalValue(
+                triggered=True, state=SignalState.STRONG, value=value, direction="bullish",
+                description="Close above upper Bollinger band (%B>1)",
+            )
+        if value < 0:
+            return SignalValue(
+                triggered=True, state=SignalState.TRIGGERED, value=value, direction="bearish",
+                description="Close below lower Bollinger band (%B<0)",
+            )
+        return SignalValue(triggered=False, value=value, description="Close within Bollinger band")
+
+
+class BollingerSqueezeDetector(SignalDetector):
+    """Detect historically low bandwidth (squeeze) and its release."""
+
+    name = "bollinger_squeeze"
+    meta = SignalMeta(
+        name="bollinger_squeeze",
+        category="volatility",
+        direction="neutral",
+        label="Bollinger squeeze",
+        description="Bandwidth percentile is historically low (squeeze) or just released.",
+        params={
+            "squeeze_lookback": {
+                "type": "int",
+                "min": 30,
+                "max": 250,
+                "default": 125,
+                "description": "Lookback for bandwidth percentile.",
+            },
+            "squeeze_pctile": {
+                "type": "float",
+                "min": 0.0,
+                "max": 1.0,
+                "default": 0.05,
+                "description": "Percentile below which to flag a squeeze.",
+            },
+        },
+        default_params={"squeeze_lookback": 125.0, "squeeze_pctile": 0.05},
+        format="percent",
+        ranking_enabled=False,
+    )
+
+    def detect(
+        self,
+        code: str,
+        df: pd.DataFrame,
+        period: int,
+        thresholds: TrackerThresholds,
+    ) -> SignalValue:
+        n = int(thresholds.get("bb_n", 20))
+        k = float(thresholds.get("bb_k", 2.0))
+        lookback = int(thresholds.get("squeeze_lookback", 125))
+        pctile = float(thresholds.get("squeeze_pctile", 0.05))
+        if len(df) < n:
+            return SignalValue(triggered=False, description="Insufficient data for Bollinger squeeze")
+
+        _, _, _, _, bandwidth = compute_bollinger(df["close"], n, k)
+        bw = bandwidth.dropna()
+        if len(bw) < 2:
+            return SignalValue(triggered=False, description="Degenerate Bollinger band")
+
+        window = bw.iloc[-min(lookback, len(bw)):]
+        cur = float(window.iloc[-1])
+        pct = float((window <= cur).mean())
+        value = round(pct, 4)
+
+        if pct < pctile:
+            return SignalValue(
+                triggered=True, state=SignalState.STRONG, value=value, direction="neutral",
+                description=f"Bollinger squeeze (bandwidth at {pct * 100:.1f}th percentile)",
+            )
+
+        if len(bw) >= min(lookback, len(bw)) + 1:
+            prev_window = bw.iloc[-min(lookback, len(bw)) - 1 : -1]
+            prev_cur = float(prev_window.iloc[-1])
+            prev_pct = float((prev_window <= prev_cur).mean())
+            if prev_pct < pctile and cur > prev_cur:
+                return SignalValue(
+                    triggered=True, state=SignalState.TRIGGERED, value=value, direction="neutral",
+                    description="Bollinger squeeze released (bandwidth expanding)",
+                )
+
+        return SignalValue(
+            triggered=False, value=value, description=f"Bollinger bandwidth at {pct * 100:.1f}th percentile"
+        )
+
+
 register_detector(VolumeSpikeDetector)
 register_detector(BreakoutDetector)
 register_detector(MaAlignmentDetector)
@@ -654,6 +995,11 @@ register_detector(RSIDetector)
 register_detector(MarginExpansionDetector)
 register_detector(NetInflowSpikeDetector)
 register_detector(MainForceInflowDetector)
+register_detector(MacdDetector)
+register_detector(DivergenceDetector)
+register_detector(KdjDetector)
+register_detector(BollingerPctBDetector)
+register_detector(BollingerSqueezeDetector)
 
 
 def list_detector_names() -> List[SignalType]:
@@ -701,6 +1047,11 @@ __all__ = [
     "MarginExpansionDetector",
     "NetInflowSpikeDetector",
     "MainForceInflowDetector",
+    "MacdDetector",
+    "DivergenceDetector",
+    "KdjDetector",
+    "BollingerPctBDetector",
+    "BollingerSqueezeDetector",
     "get_detector",
     "get_detector_meta",
     "list_detector_meta",
