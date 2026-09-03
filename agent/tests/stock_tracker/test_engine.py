@@ -980,5 +980,59 @@ def test_compute_sector_strength_fetches_without_previous(monkeypatch):
     assert captured["ranking"] is None
 
 
+def test_compute_period_metrics_volume_fields_quiet():
+    df = _make_df(rows=80)  # mild 10k-14k cycling, never 1.5x the prior 5-day mean
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[10, 20])
+    engine = StockTrackerEngine(config)
+
+    metrics = engine._compute_period_metrics(df, 20)
+    assert metrics.avg_volume == round(float(df["volume"].tail(20).mean()), 2)
+    assert metrics.volume_ratio is not None
+    assert metrics.volume_expansion_days == 0
+    assert metrics.volume_expansion_ratio == 0.0
+    assert metrics.sessions == 20
+
+
+def test_compute_period_metrics_counts_spike_as_expansion():
+    df = _make_df(rows=80, volume_spike_idx=-1)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[5, 20])
+    engine = StockTrackerEngine(config)
+
+    metrics = engine._compute_period_metrics(df, 20)
+    assert metrics.volume_expansion_days == 1
+    assert metrics.volume_expansion_ratio == pytest.approx(1 / 20)
+    assert metrics.avg_volume == round(float(df["volume"].tail(20).mean()), 2)
+
+    metrics5 = engine._compute_period_metrics(df, 5)
+    assert metrics5.volume_expansion_days == 1
+    assert metrics5.volume_expansion_ratio == pytest.approx(1 / 5)
+
+
+def test_volume_series_captured_with_burst_flags():
+    df = _make_df(rows=80, volume_spike_idx=-1)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[5, 20])
+    engine = StockTrackerEngine(config)
+    snapshot = engine._analyze_symbol("000001.SZ", df)
+
+    series = snapshot.volume_series
+    # longest period (20) + 6 context sessions.
+    assert len(series) == 26
+    assert series[-1].volume == float(df["volume"].iloc[-1])
+    assert series[-1].is_burst is True
+    # Burst flags over the visible 20-session tail match the period metric.
+    tail20 = series[-20:]
+    assert sum(1 for p in tail20 if p.is_burst) == snapshot.period_signals["20"].metrics.volume_expansion_days
+
+
+def test_volume_series_quiet_has_no_bursts():
+    df = _make_df(rows=80)
+    config = TrackerConfig(watchlist=["000001.SZ"], periods=[5, 20])
+    engine = StockTrackerEngine(config)
+    snapshot = engine._analyze_symbol("000001.SZ", df)
+
+    assert len(snapshot.volume_series) == 26
+    assert all(p.is_burst is False for p in snapshot.volume_series)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

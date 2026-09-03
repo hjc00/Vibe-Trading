@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "snapshot": {
-    "generated_at": "2026-09-03T00:17:44.125634+08:00",
+    "generated_at": "2026-09-03T11:54:49.564873+08:00",
     "trading_date": "2026-09-02",
     "config": {
       "watchlist": [
@@ -35,7 +35,7 @@
         "stop_loss_atr_multiple": 2.0
       },
       "refresh_interval_seconds": 600,
-      "detail_card_count": 6
+      "detail_card_count": 10
     },
     "symbols": [
       {
@@ -47,6 +47,338 @@
         "daily_return": -0.005487,
         "volume": 228076.0,
         "avg_volume_20": 465185.7,
+        "volume_series": [
+          {
+            "trade_date": "2026-06-02",
+            "volume": 432526.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-03",
+            "volume": 415160.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-04",
+            "volume": 339605.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-05",
+            "volume": 336382.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-08",
+            "volume": 311557.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-09",
+            "volume": 350753.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-10",
+            "volume": 558671.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-06-11",
+            "volume": 417414.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-12",
+            "volume": 394069.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-15",
+            "volume": 407764.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-16",
+            "volume": 463086.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-17",
+            "volume": 515303.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-18",
+            "volume": 519518.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-22",
+            "volume": 595216.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-23",
+            "volume": 372238.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-24",
+            "volume": 300294.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-25",
+            "volume": 526432.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-26",
+            "volume": 361679.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-29",
+            "volume": 352685.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-30",
+            "volume": 281286.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-01",
+            "volume": 318194.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-02",
+            "volume": 251926.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-03",
+            "volume": 557886.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-06",
+            "volume": 403006.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-07",
+            "volume": 258396.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-08",
+            "volume": 195060.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-09",
+            "volume": 393196.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-10",
+            "volume": 440017.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-13",
+            "volume": 256201.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-14",
+            "volume": 335874.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-15",
+            "volume": 242571.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-16",
+            "volume": 641647.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-17",
+            "volume": 840900.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-20",
+            "volume": 627629.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-21",
+            "volume": 676936.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-22",
+            "volume": 630191.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-23",
+            "volume": 445514.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-24",
+            "volume": 481576.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-27",
+            "volume": 552056.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-28",
+            "volume": 540973.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-29",
+            "volume": 567993.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-30",
+            "volume": 515984.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-31",
+            "volume": 510574.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-03",
+            "volume": 438910.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-04",
+            "volume": 475776.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-05",
+            "volume": 606878.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-06",
+            "volume": 465342.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-07",
+            "volume": 341447.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-10",
+            "volume": 1054143.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-08-11",
+            "volume": 677037.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-12",
+            "volume": 664307.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-13",
+            "volume": 748642.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-14",
+            "volume": 509493.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-17",
+            "volume": 514371.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-18",
+            "volume": 522757.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-19",
+            "volume": 414940.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-20",
+            "volume": 320642.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-21",
+            "volume": 438910.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-24",
+            "volume": 362146.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-25",
+            "volume": 262591.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-26",
+            "volume": 314703.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-27",
+            "volume": 427904.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-28",
+            "volume": 326400.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-31",
+            "volume": 301448.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-09-01",
+            "volume": 408415.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-09-02",
+            "volume": 228076.0,
+            "is_burst": false
+          }
+        ],
         "currency": "CNY",
         "period_signals": {
           "5": {
@@ -58,6 +390,9 @@
               "return_pct": -0.081972,
               "annualized_volatility": 0.681768,
               "volume_ratio": 0.996,
+              "avg_volume": 338448.6,
+              "volume_expansion_days": 0,
+              "volume_expansion_ratio": 0.0,
               "rsi": 50.34,
               "price_vs_ma20": -0.04763,
               "ma5": 93.04799999999999,
@@ -66,7 +401,7 @@
               "ma60": 79.6615,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.017779
+              "benchmark_return_pct": -0.008273
             },
             "signals": {
               "volume_spike": {
@@ -93,9 +428,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.02546,
+                "value": 0.00689,
                 "threshold": 0.03,
-                "description": "Financing balance -2.55% over 5 session(s)"
+                "description": "Financing balance +0.69% over 5 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -129,6 +464,9 @@
               "return_pct": -0.004595,
               "annualized_volatility": 0.748609,
               "volume_ratio": 0.574,
+              "avg_volume": 339123.5,
+              "volume_expansion_days": 0,
+              "volume_expansion_ratio": 0.0,
               "rsi": 50.34,
               "price_vs_ma20": -0.04763,
               "ma5": 93.04799999999999,
@@ -137,7 +475,7 @@
               "ma60": 79.6615,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.009752
+              "benchmark_return_pct": -0.01036
             },
             "signals": {
               "volume_spike": {
@@ -164,9 +502,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.04721,
+                "value": -0.04101,
                 "threshold": 0.03,
-                "description": "Financing balance -4.72% over 10 session(s)"
+                "description": "Financing balance -4.10% over 10 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -200,6 +538,9 @@
               "return_pct": 0.028846,
               "annualized_volatility": 0.863113,
               "volume_ratio": 0.91,
+              "avg_volume": 465185.7,
+              "volume_expansion_days": 1,
+              "volume_expansion_ratio": 0.05,
               "rsi": 50.34,
               "price_vs_ma20": -0.04763,
               "ma5": 93.04799999999999,
@@ -208,7 +549,7 @@
               "ma60": 79.6615,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.02222
+              "benchmark_return_pct": -0.026284
             },
             "signals": {
               "volume_spike": {
@@ -235,9 +576,9 @@
               "margin_expansion": {
                 "triggered": true,
                 "state": "strong",
-                "value": 0.28369,
+                "value": 0.2396,
                 "threshold": 0.03,
-                "description": "Financing balance +28.37% over 20 session(s) (>= 3.00%)"
+                "description": "Financing balance +23.96% over 20 session(s) (>= 3.00%)"
               },
               "breakout": {
                 "triggered": false,
@@ -271,6 +612,9 @@
               "return_pct": 0.178789,
               "annualized_volatility": 0.886563,
               "volume_ratio": null,
+              "avg_volume": 459587.22,
+              "volume_expansion_days": 5,
+              "volume_expansion_ratio": 0.0833,
               "rsi": 50.34,
               "price_vs_ma20": -0.04763,
               "ma5": 93.04799999999999,
@@ -279,7 +623,7 @@
               "ma60": 79.6615,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.04225
+              "benchmark_return_pct": -0.032051
             },
             "signals": {
               "volume_spike": {
@@ -306,9 +650,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.03874,
+                "value": -0.00659,
                 "threshold": 0.03,
-                "description": "Financing balance -3.87% over 60 session(s)"
+                "description": "Financing balance -0.66% over 60 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -347,12 +691,17 @@
             "history": []
           },
           "margin": {
-            "trade_date": "2026-09-01",
-            "financing_balance": 2452920700.0,
-            "financing_balance_change": -39384116.0,
-            "margin_total_balance": 2458501950.0,
-            "margin_total_change": -39833491.0,
+            "trade_date": "2026-09-02",
+            "financing_balance": 2556654669.0,
+            "financing_balance_change": 103733969.0,
+            "margin_total_balance": 2562134246.0,
+            "margin_total_change": 103632296.0,
             "history": [
+              {
+                "trade_date": "2026-09-02",
+                "financing_balance": 2556654669.0,
+                "margin_total_balance": 2562134246.0
+              },
               {
                 "trade_date": "2026-09-01",
                 "financing_balance": 2452920700.0,
@@ -652,11 +1001,6 @@
                 "trade_date": "2026-06-09",
                 "financing_balance": 2573603521.0,
                 "margin_total_balance": 2577137911.66
-              },
-              {
-                "trade_date": "2026-06-08",
-                "financing_balance": 2551786257.0,
-                "margin_total_balance": 2561668225.0
               }
             ]
           },
@@ -669,7 +1013,7 @@
           "atr_14": 6.7329,
           "atr_pct": 0.075812,
           "max_drawdown_60d": -0.228966,
-          "beta_vs_index": 1.7086,
+          "beta_vs_index": 1.7533,
           "beta_window": 60,
           "benchmark_code": "000300.SH",
           "stop_loss_price": 75.344,
@@ -749,7 +1093,6 @@
             "CPO概念",
             "柔性屏(折叠屏)",
             "英伟达概念",
-            "昨日高振幅",
             "通信技术",
             "大盘股",
             "大盘成长",
@@ -818,6 +1161,338 @@
         "daily_return": -0.008612,
         "volume": 1369865.0,
         "avg_volume_20": 2206253.15,
+        "volume_series": [
+          {
+            "trade_date": "2026-06-02",
+            "volume": 1501290.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-03",
+            "volume": 2165744.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-04",
+            "volume": 1255174.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-05",
+            "volume": 2266742.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-08",
+            "volume": 1764756.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-09",
+            "volume": 1148061.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-10",
+            "volume": 1182841.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-11",
+            "volume": 912259.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-12",
+            "volume": 1098317.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-15",
+            "volume": 1362856.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-16",
+            "volume": 1025606.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-17",
+            "volume": 1277040.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-18",
+            "volume": 1252082.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-22",
+            "volume": 1473284.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-23",
+            "volume": 1150216.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-24",
+            "volume": 1158908.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-25",
+            "volume": 1920264.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-06-26",
+            "volume": 2236751.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-06-29",
+            "volume": 1552713.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-30",
+            "volume": 1678661.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-01",
+            "volume": 3392066.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-02",
+            "volume": 2173792.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-03",
+            "volume": 2461803.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-06",
+            "volume": 3156814.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-07",
+            "volume": 2803559.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-08",
+            "volume": 4798849.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-09",
+            "volume": 4356987.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-10",
+            "volume": 4828361.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-13",
+            "volume": 4939318.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-14",
+            "volume": 4639139.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-15",
+            "volume": 3268892.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-16",
+            "volume": 4519608.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-17",
+            "volume": 4020481.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-20",
+            "volume": 5027473.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-21",
+            "volume": 5027001.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-22",
+            "volume": 5378216.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-23",
+            "volume": 5216997.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-24",
+            "volume": 3605371.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-27",
+            "volume": 3278909.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-28",
+            "volume": 4340059.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-29",
+            "volume": 3494249.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-30",
+            "volume": 2539454.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-31",
+            "volume": 4034086.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-03",
+            "volume": 2869903.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-04",
+            "volume": 2391766.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-05",
+            "volume": 4290122.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-06",
+            "volume": 3939139.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-07",
+            "volume": 3047273.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-10",
+            "volume": 1940834.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-11",
+            "volume": 2251033.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-12",
+            "volume": 1944189.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-13",
+            "volume": 4177214.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-08-14",
+            "volume": 3245979.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-17",
+            "volume": 2704804.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-18",
+            "volume": 2745994.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-19",
+            "volume": 2439725.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-20",
+            "volume": 1616168.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-21",
+            "volume": 1524792.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-24",
+            "volume": 1540939.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-25",
+            "volume": 1066409.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-26",
+            "volume": 952308.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-27",
+            "volume": 1402215.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-28",
+            "volume": 1641134.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-31",
+            "volume": 2670435.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-09-01",
+            "volume": 1904614.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-09-02",
+            "volume": 1369865.0,
+            "is_burst": false
+          }
+        ],
         "currency": "CNY",
         "period_signals": {
           "5": {
@@ -829,6 +1504,9 @@
               "return_pct": 0.042822,
               "annualized_volatility": 0.783277,
               "volume_ratio": 1.341,
+              "avg_volume": 1797652.6,
+              "volume_expansion_days": 1,
+              "volume_expansion_ratio": 0.2,
               "rsi": 53.38,
               "price_vs_ma20": 0.01674,
               "ma5": 37.516000000000005,
@@ -837,7 +1515,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.017779
+              "benchmark_return_pct": -0.008273
             },
             "signals": {
               "volume_spike": {
@@ -864,9 +1542,9 @@
               "margin_expansion": {
                 "triggered": true,
                 "state": "strong",
-                "value": 0.07116,
+                "value": 0.08503,
                 "threshold": 0.03,
-                "description": "Financing balance +7.12% over 5 session(s) (>= 3.00%)"
+                "description": "Financing balance +8.50% over 5 session(s) (>= 3.00%)"
               },
               "breakout": {
                 "triggered": false,
@@ -900,6 +1578,9 @@
               "return_pct": 0.065339,
               "annualized_volatility": 0.637261,
               "volume_ratio": 0.552,
+              "avg_volume": 1568887.9,
+              "volume_expansion_days": 1,
+              "volume_expansion_ratio": 0.1,
               "rsi": 53.38,
               "price_vs_ma20": 0.01674,
               "ma5": 37.516000000000005,
@@ -908,7 +1589,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.009752
+              "benchmark_return_pct": -0.01036
             },
             "signals": {
               "volume_spike": {
@@ -935,9 +1616,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.08673,
+                "value": 0.0173,
                 "threshold": 0.03,
-                "description": "Financing balance -8.67% over 10 session(s)"
+                "description": "Financing balance +1.73% over 10 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -971,6 +1652,9 @@
               "return_pct": 0.001318,
               "annualized_volatility": 0.66256,
               "volume_ratio": 0.538,
+              "avg_volume": 2206253.15,
+              "volume_expansion_days": 2,
+              "volume_expansion_ratio": 0.1,
               "rsi": 53.38,
               "price_vs_ma20": 0.01674,
               "ma5": 37.516000000000005,
@@ -979,7 +1663,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 33.33,
               "rps_sector": null,
-              "benchmark_return_pct": -0.02222
+              "benchmark_return_pct": -0.026284
             },
             "signals": {
               "volume_spike": {
@@ -1005,10 +1689,10 @@
               },
               "margin_expansion": {
                 "triggered": true,
-                "state": "triggered",
-                "value": 0.04452,
+                "state": "strong",
+                "value": 0.04552,
                 "threshold": 0.03,
-                "description": "Financing balance +4.45% over 20 session(s) (>= 3.00%)"
+                "description": "Financing balance +4.55% over 20 session(s) (>= 3.00%)"
               },
               "breakout": {
                 "triggered": false,
@@ -1042,6 +1726,9 @@
               "return_pct": 0.469348,
               "annualized_volatility": 0.838947,
               "volume_ratio": null,
+              "avg_volume": 2737668.93,
+              "volume_expansion_days": 6,
+              "volume_expansion_ratio": 0.1,
               "rsi": 53.38,
               "price_vs_ma20": 0.01674,
               "ma5": 37.516000000000005,
@@ -1050,7 +1737,7 @@
               "ma60": 34.50866666666666,
               "rps_market": 100.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.04225
+              "benchmark_return_pct": -0.032051
             },
             "signals": {
               "volume_spike": {
@@ -1077,9 +1764,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.01619,
+                "value": 0.0126,
                 "threshold": 0.03,
-                "description": "Financing balance -1.62% over 60 session(s)"
+                "description": "Financing balance +1.26% over 60 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -1118,12 +1805,17 @@
             "history": []
           },
           "margin": {
-            "trade_date": "2026-09-01",
-            "financing_balance": 4550813423.0,
-            "financing_balance_change": -20300255.0,
-            "margin_total_balance": 4562451207.0,
-            "margin_total_change": -23775071.0,
+            "trade_date": "2026-09-02",
+            "financing_balance": 4626430596.0,
+            "financing_balance_change": 75617173.0,
+            "margin_total_balance": 4638610190.0,
+            "margin_total_change": 76158983.0,
             "history": [
+              {
+                "trade_date": "2026-09-02",
+                "financing_balance": 4626430596.0,
+                "margin_total_balance": 4638610190.0
+              },
               {
                 "trade_date": "2026-09-01",
                 "financing_balance": 4550813423.0,
@@ -1423,11 +2115,6 @@
                 "trade_date": "2026-06-09",
                 "financing_balance": 4568867237.0,
                 "margin_total_balance": 4575121935.0
-              },
-              {
-                "trade_date": "2026-06-08",
-                "financing_balance": 4625719329.0,
-                "margin_total_balance": 4630235442.0
               }
             ]
           },
@@ -1440,7 +2127,7 @@
           "atr_14": 2.2809,
           "atr_pct": 0.060038,
           "max_drawdown_60d": -0.262806,
-          "beta_vs_index": 1.6369,
+          "beta_vs_index": 1.6304,
           "beta_window": 60,
           "benchmark_code": "000300.SH",
           "stop_loss_price": 33.428,
@@ -1486,6 +2173,7 @@
             "IT服务Ⅲ",
             "计算机",
             "北京板块",
+            "富时罗素",
             "区块链",
             "MSCI中国",
             "深股通",
@@ -1494,8 +2182,8 @@
             "5G概念",
             "安防概念",
             "网络安全",
-            "大数据",
-            "富时罗素",
+            "标准普尔",
+            "参股新三板",
             "融资融券",
             "云计算",
             "深成500",
@@ -1503,16 +2191,17 @@
             "创投",
             "HS300_",
             "互联网服务",
-            "参股新三板",
+            "大数据",
             "2026中报预增",
             "科技风格",
             "大盘股",
             "行业龙头",
             "通信技术",
+            "东方财富热股",
             "DeepSeek概念",
             "小红书概念",
-            "AI制药（医疗）",
-            "国产芯片",
+            "IPv6",
+            "英伟达概念",
             "液冷服务器",
             "算力概念",
             "CPO概念",
@@ -1520,9 +2209,8 @@
             "数字经济",
             "车联网(车路云)",
             "WiFi",
-            "IPv6",
-            "标准普尔",
-            "英伟达概念"
+            "国产芯片",
+            "AI制药（医疗）"
           ],
           "hottest_concept": null,
           "hottest_concept_rank": null,
@@ -1586,6 +2274,338 @@
         "daily_return": -0.010534,
         "volume": 209513.0,
         "avg_volume_20": 457446.05,
+        "volume_series": [
+          {
+            "trade_date": "2026-06-02",
+            "volume": 490193.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-03",
+            "volume": 581930.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-04",
+            "volume": 563351.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-05",
+            "volume": 547135.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-08",
+            "volume": 434475.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-09",
+            "volume": 419683.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-10",
+            "volume": 329972.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-11",
+            "volume": 296991.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-12",
+            "volume": 407085.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-15",
+            "volume": 475784.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-16",
+            "volume": 427785.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-17",
+            "volume": 568000.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-18",
+            "volume": 591573.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-22",
+            "volume": 525831.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-23",
+            "volume": 592914.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-24",
+            "volume": 598219.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-25",
+            "volume": 508678.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-26",
+            "volume": 493926.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-29",
+            "volume": 541209.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-06-30",
+            "volume": 449647.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-01",
+            "volume": 539702.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-02",
+            "volume": 452436.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-03",
+            "volume": 623522.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-06",
+            "volume": 601502.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-07",
+            "volume": 515651.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-08",
+            "volume": 575108.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-09",
+            "volume": 590920.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-10",
+            "volume": 887457.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-13",
+            "volume": 663107.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-14",
+            "volume": 679490.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-15",
+            "volume": 553704.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-16",
+            "volume": 545542.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-17",
+            "volume": 672083.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-20",
+            "volume": 712622.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-21",
+            "volume": 743902.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-22",
+            "volume": 759061.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-23",
+            "volume": 471340.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-24",
+            "volume": 505543.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-27",
+            "volume": 628783.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-28",
+            "volume": 443896.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-07-29",
+            "volume": 903890.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-30",
+            "volume": 971239.0,
+            "is_burst": true
+          },
+          {
+            "trade_date": "2026-07-31",
+            "volume": 856922.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-03",
+            "volume": 657009.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-04",
+            "volume": 632232.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-05",
+            "volume": 694690.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-06",
+            "volume": 618612.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-07",
+            "volume": 747518.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-10",
+            "volume": 636006.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-11",
+            "volume": 436502.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-12",
+            "volume": 456116.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-13",
+            "volume": 544439.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-14",
+            "volume": 475007.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-17",
+            "volume": 588826.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-18",
+            "volume": 607573.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-19",
+            "volume": 662806.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-20",
+            "volume": 361764.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-21",
+            "volume": 340767.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-24",
+            "volume": 448627.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-25",
+            "volume": 396495.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-26",
+            "volume": 284629.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-27",
+            "volume": 407430.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-28",
+            "volume": 352520.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-08-31",
+            "volume": 317220.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-09-01",
+            "volume": 256551.0,
+            "is_burst": false
+          },
+          {
+            "trade_date": "2026-09-02",
+            "volume": 209513.0,
+            "is_burst": false
+          }
+        ],
         "currency": "CNY",
         "period_signals": {
           "5": {
@@ -1597,6 +2617,9 @@
               "return_pct": -0.054329,
               "annualized_volatility": 0.425442,
               "volume_ratio": 0.842,
+              "avg_volume": 308646.8,
+              "volume_expansion_days": 0,
+              "volume_expansion_ratio": 0.0,
               "rsi": 42.85,
               "price_vs_ma20": -0.04045,
               "ma5": 399.17600000000004,
@@ -1605,7 +2628,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 33.33,
               "rps_sector": null,
-              "benchmark_return_pct": -0.017779
+              "benchmark_return_pct": -0.008273
             },
             "signals": {
               "volume_spike": {
@@ -1632,9 +2655,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.03743,
+                "value": -0.03869,
                 "threshold": 0.03,
-                "description": "Financing balance -3.74% over 5 session(s)"
+                "description": "Financing balance -3.87% over 5 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -1668,6 +2691,9 @@
               "return_pct": -0.036283,
               "annualized_volatility": 0.591498,
               "volume_ratio": 0.585,
+              "avg_volume": 337551.6,
+              "volume_expansion_days": 0,
+              "volume_expansion_ratio": 0.0,
               "rsi": 42.85,
               "price_vs_ma20": -0.04045,
               "ma5": 399.17600000000004,
@@ -1676,7 +2702,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.009752
+              "benchmark_return_pct": -0.01036
             },
             "signals": {
               "volume_spike": {
@@ -1703,9 +2729,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.08873,
+                "value": -0.06513,
                 "threshold": 0.03,
-                "description": "Financing balance -8.87% over 10 session(s)"
+                "description": "Financing balance -6.51% over 10 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -1739,6 +2765,9 @@
               "return_pct": 0.010026,
               "annualized_volatility": 0.663746,
               "volume_ratio": 0.674,
+              "avg_volume": 457446.05,
+              "volume_expansion_days": 0,
+              "volume_expansion_ratio": 0.0,
               "rsi": 42.85,
               "price_vs_ma20": -0.04045,
               "ma5": 399.17600000000004,
@@ -1747,7 +2776,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 66.67,
               "rps_sector": null,
-              "benchmark_return_pct": -0.02222
+              "benchmark_return_pct": -0.026284
             },
             "signals": {
               "volume_spike": {
@@ -1774,9 +2803,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": 0.00836,
+                "value": -0.01156,
                 "threshold": 0.03,
-                "description": "Financing balance +0.84% over 20 session(s)"
+                "description": "Financing balance -1.16% over 20 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -1810,6 +2839,9 @@
               "return_pct": -0.19129,
               "annualized_volatility": 0.97282,
               "volume_ratio": null,
+              "avg_volume": 547298.13,
+              "volume_expansion_days": 3,
+              "volume_expansion_ratio": 0.05,
               "rsi": 42.85,
               "price_vs_ma20": -0.04045,
               "ma5": 399.17600000000004,
@@ -1818,7 +2850,7 @@
               "ma60": 505.69899999999996,
               "rps_market": 0.0,
               "rps_sector": null,
-              "benchmark_return_pct": -0.04225
+              "benchmark_return_pct": -0.032051
             },
             "signals": {
               "volume_spike": {
@@ -1845,9 +2877,9 @@
               "margin_expansion": {
                 "triggered": false,
                 "state": "none",
-                "value": -0.04217,
+                "value": -0.09512,
                 "threshold": 0.03,
-                "description": "Financing balance -4.22% over 60 session(s)"
+                "description": "Financing balance -9.51% over 60 session(s)"
               },
               "breakout": {
                 "triggered": false,
@@ -1886,12 +2918,17 @@
             "history": []
           },
           "margin": {
-            "trade_date": "2026-09-01",
-            "financing_balance": 17835342977.0,
-            "financing_balance_change": -32976206.0,
-            "margin_total_balance": 17881324763.0,
-            "margin_total_change": -42211232.0,
+            "trade_date": "2026-09-02",
+            "financing_balance": 17665185357.0,
+            "financing_balance_change": -170157620.0,
+            "margin_total_balance": 17715776820.72,
+            "margin_total_change": -165547942.27999878,
             "history": [
+              {
+                "trade_date": "2026-09-02",
+                "financing_balance": 17665185357.0,
+                "margin_total_balance": 17715776820.72
+              },
               {
                 "trade_date": "2026-09-01",
                 "financing_balance": 17835342977.0,
@@ -2191,11 +3228,6 @@
                 "trade_date": "2026-06-09",
                 "financing_balance": 19522209673.0,
                 "margin_total_balance": 19564902323.0
-              },
-              {
-                "trade_date": "2026-06-08",
-                "financing_balance": 18620494573.0,
-                "margin_total_balance": 18659458195.0
               }
             ]
           },
@@ -2208,7 +3240,7 @@
           "atr_14": 26.6705,
           "atr_pct": 0.068587,
           "max_drawdown_60d": -0.594357,
-          "beta_vs_index": 2.9443,
+          "beta_vs_index": 2.939,
           "beta_window": 60,
           "benchmark_code": "000300.SH",
           "stop_loss_price": 335.519,
@@ -2361,15 +3393,20 @@
         "603228.SH",
         "603986.SH"
       ],
+      "main_force_inflow": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
+      "margin_expansion": [
+        "603228.SH",
+        "000938.SZ",
+        "603986.SH"
+      ],
       "volume_spike": [
         "000938.SZ",
         "603228.SH",
         "603986.SH"
-      ],
-      "rsi": [
-        "603228.SH",
-        "603986.SH",
-        "000938.SZ"
       ],
       "breakout": [
         "000938.SZ",
@@ -2381,15 +3418,10 @@
         "000938.SZ",
         "603986.SH"
       ],
-      "margin_expansion": [
+      "rsi": [
         "603228.SH",
-        "000938.SZ",
-        "603986.SH"
-      ],
-      "main_force_inflow": [
-        "603228.SH",
-        "000938.SZ",
-        "603986.SH"
+        "603986.SH",
+        "000938.SZ"
       ],
       "signal_count": [
         "000938.SZ",
@@ -3921,23 +4953,6 @@
       },
       {
         "board_code": null,
-        "board_name": "昨日高振幅",
-        "change_pct": null,
-        "fund_flow_net": null,
-        "up_count": null,
-        "down_count": null,
-        "leader": null,
-        "limit_up_count": null,
-        "market_rank": null,
-        "member_count": 1,
-        "members": [
-          "603228.SH"
-        ],
-        "source": "watchlist",
-        "error": null
-      },
-      {
-        "board_code": null,
         "board_name": "通信技术",
         "change_pct": null,
         "fund_flow_net": null,
@@ -4184,7 +5199,7 @@
       },
       {
         "board_code": null,
-        "board_name": "大数据",
+        "board_name": "参股新三板",
         "change_pct": null,
         "fund_flow_net": null,
         "up_count": null,
@@ -4305,7 +5320,7 @@
       },
       {
         "board_code": null,
-        "board_name": "参股新三板",
+        "board_name": "大数据",
         "change_pct": null,
         "fund_flow_net": null,
         "up_count": null,
@@ -4357,6 +5372,23 @@
       },
       {
         "board_code": null,
+        "board_name": "东方财富热股",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "limit_up_count": null,
+        "market_rank": null,
+        "member_count": 1,
+        "members": [
+          "000938.SZ"
+        ],
+        "source": "watchlist",
+        "error": null
+      },
+      {
+        "board_code": null,
         "board_name": "DeepSeek概念",
         "change_pct": null,
         "fund_flow_net": null,
@@ -4391,7 +5423,7 @@
       },
       {
         "board_code": null,
-        "board_name": "AI制药（医疗）",
+        "board_name": "IPv6",
         "change_pct": null,
         "fund_flow_net": null,
         "up_count": null,
@@ -4402,24 +5434,6 @@
         "member_count": 1,
         "members": [
           "000938.SZ"
-        ],
-        "source": "watchlist",
-        "error": null
-      },
-      {
-        "board_code": null,
-        "board_name": "国产芯片",
-        "change_pct": null,
-        "fund_flow_net": null,
-        "up_count": null,
-        "down_count": null,
-        "leader": null,
-        "limit_up_count": null,
-        "market_rank": null,
-        "member_count": 2,
-        "members": [
-          "000938.SZ",
-          "603986.SH"
         ],
         "source": "watchlist",
         "error": null
@@ -4528,7 +5542,25 @@
       },
       {
         "board_code": null,
-        "board_name": "IPv6",
+        "board_name": "国产芯片",
+        "change_pct": null,
+        "fund_flow_net": null,
+        "up_count": null,
+        "down_count": null,
+        "leader": null,
+        "limit_up_count": null,
+        "market_rank": null,
+        "member_count": 2,
+        "members": [
+          "000938.SZ",
+          "603986.SH"
+        ],
+        "source": "watchlist",
+        "error": null
+      },
+      {
+        "board_code": null,
+        "board_name": "AI制药（医疗）",
         "change_pct": null,
         "fund_flow_net": null,
         "up_count": null,

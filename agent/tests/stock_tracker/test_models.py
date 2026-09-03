@@ -38,7 +38,7 @@ def test_tracker_config_accepts_rsi() -> None:
 
 def test_tracker_config_detail_card_count_default() -> None:
     config = TrackerConfig()
-    assert config.detail_card_count == 9
+    assert config.detail_card_count == 11
 
 
 def test_tracker_config_rejects_nonpositive_detail_card_count() -> None:

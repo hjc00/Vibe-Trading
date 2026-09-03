@@ -77,7 +77,7 @@ class TrackerConfig(BaseModel):
     # row; the rest wrap onto the next row. Defaults to the full card set so no
     # card is hidden unless the user lowers the count.
     detail_card_count: int = Field(
-        default=9,
+        default=11,
         ge=1,
         description="Number of detail cards to show (max three per row; extras wrap).",
     )
@@ -159,7 +159,14 @@ class PeriodMetrics(BaseModel):
     sessions: int = 0
     return_pct: Optional[float] = None
     annualized_volatility: Optional[float] = None
+    # Volume energy over the window. ``volume_ratio`` compares the window's
+    # mean daily volume against the equal-length preceding window; the
+    # expansion fields count sessions whose volume was >= 1.5x the trailing
+    # 5-session average (a conventional 放量 burst).
     volume_ratio: Optional[float] = None
+    avg_volume: Optional[float] = None
+    volume_expansion_days: Optional[int] = None
+    volume_expansion_ratio: Optional[float] = None
     rsi: Optional[float] = None
     price_vs_ma20: Optional[float] = None
     ma5: Optional[float] = None
@@ -518,6 +525,14 @@ class ChipSnapshot(BaseModel):
     error: Optional[str] = None
 
 
+class VolumePoint(BaseModel):
+    """One daily volume observation for charting within the tracker."""
+
+    trade_date: Optional[date] = None
+    volume: Optional[float] = None
+    is_burst: bool = False  # volume >= 1.5x the trailing 5-session average
+
+
 class SymbolSnapshot(BaseModel):
     """One symbol's slice of a tracker snapshot."""
 
@@ -529,6 +544,7 @@ class SymbolSnapshot(BaseModel):
     daily_return: Optional[float] = None
     volume: Optional[float] = None
     avg_volume_20: Optional[float] = None
+    volume_series: List[VolumePoint] = Field(default_factory=list)
     currency: str = "CNY"
     period_signals: Dict[str, PeriodSignals] = Field(default_factory=dict)
     capital: Optional[CapitalMetrics] = None

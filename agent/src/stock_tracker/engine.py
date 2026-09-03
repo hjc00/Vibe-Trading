@@ -36,6 +36,7 @@ from src.stock_tracker.models import (
     TrackerConfig,
     TrackerSnapshot,
     ValuationSnapshot,
+    VolumePoint,
 )
 from src.stock_tracker.names import fetch_a_share_names
 from src.stock_tracker.risk import compute_atr, compute_beta, compute_max_drawdown
@@ -50,6 +51,27 @@ logger = logging.getLogger(__name__)
 # Extra calendar days before the earliest requested period so that moving
 # averages (especially 60-day) have enough history even with holidays.
 _BUFFER_DAYS = 90
+
+# A session counts as a 放量 burst when its volume reaches this multiple of the
+# trailing 5-session average volume (an A-share convention, softer than the
+# 2.0x ``volume_spike`` signal which fires on the single latest bar).
+_VOLUME_EXPANSION_FACTOR = 1.5
+
+# Extra sessions kept ahead of the longest period so the volume bar chart can
+# classify the earliest visible bar (burst uses a 5-session trailing baseline).
+_VOLUME_SERIES_CONTEXT = 6
+
+
+def _volume_burst_series(df: pd.DataFrame) -> pd.Series:
+    """Boolean per-session mask: volume >= 1.5x the trailing 5-session average.
+
+    Shared by ``_compute_period_metrics`` (burst-day counts) and
+    ``_build_volume_series`` (bar-chart burst coloring) so both stay consistent.
+    """
+    if "volume" not in df.columns:
+        return pd.Series(index=df.index, dtype=bool)
+    baseline = df["volume"].rolling(5).mean().shift(1) * _VOLUME_EXPANSION_FACTOR
+    return (df["volume"] >= baseline).fillna(False)
 
 # Historical days to fetch for capital data (fund-flow + margin-trading).
 # Must cover the 30-day fund-flow lookback used by the spike detector. The
@@ -536,10 +558,13 @@ class StockTrackerEngine:
         risk = self._compute_risk_metrics(df, close, benchmark_df)
 
         period_signals: Dict[str, PeriodSignals] = {}
+        burst_series = _volume_burst_series(df) if "volume" in df.columns else None
         for period in self.config.periods:
-            metrics = self._compute_period_metrics(df, period)
+            metrics = self._compute_period_metrics(df, period, burst=burst_series)
             signals = self._compute_period_signals(df, period)
             period_signals[str(period)] = PeriodSignals(metrics=metrics, signals=signals)
+
+        volume_series = self._build_volume_series(df, burst=burst_series)
 
         return SymbolSnapshot(
             code=code,
@@ -549,6 +574,7 @@ class StockTrackerEngine:
             daily_return=round(daily_return, 6),
             volume=volume,
             avg_volume_20=avg_volume_20,
+            volume_series=volume_series,
             capital=capital,
             risk=risk,
             valuation=valuation,
@@ -599,7 +625,12 @@ class StockTrackerEngine:
             stop_loss_atr_multiple=stop_k,
         )
 
-    def _compute_period_metrics(self, df: pd.DataFrame, period: int) -> PeriodMetrics:
+    def _compute_period_metrics(
+        self,
+        df: pd.DataFrame,
+        period: int,
+        burst: Optional[pd.Series] = None,
+    ) -> PeriodMetrics:
         """Return numeric metrics for the given period window."""
         window = df.tail(period)
         if window.empty:
@@ -621,6 +652,19 @@ class StockTrackerEngine:
             if prior_vol and prior_vol > 0:
                 volume_ratio = float(recent_vol / prior_vol)
 
+        avg_volume: Optional[float] = None
+        if "volume" in window.columns:
+            avg_volume = float(window["volume"].mean())
+
+        volume_expansion_days: Optional[int] = None
+        volume_expansion_ratio: Optional[float] = None
+        if "volume" in df.columns:
+            burst = burst if burst is not None else _volume_burst_series(df)
+            window_burst = burst.iloc[-period:]
+            if len(window_burst):
+                volume_expansion_days = int(window_burst.sum())
+                volume_expansion_ratio = float(window_burst.mean())
+
         rsi: Optional[float] = None
         if "rsi" in df.columns and pd.notna(window["rsi"].iloc[-1]):
             rsi = float(window["rsi"].iloc[-1])
@@ -638,6 +682,11 @@ class StockTrackerEngine:
             return_pct=round(return_pct, 6),
             annualized_volatility=round(volatility, 6) if volatility is not None else None,
             volume_ratio=round(volume_ratio, 3) if volume_ratio is not None else None,
+            avg_volume=round(avg_volume, 2) if avg_volume is not None else None,
+            volume_expansion_days=volume_expansion_days,
+            volume_expansion_ratio=round(volume_expansion_ratio, 4)
+            if volume_expansion_ratio is not None
+            else None,
             rsi=round(rsi, 2) if rsi is not None else None,
             price_vs_ma20=round(price_vs_ma20, 5) if price_vs_ma20 is not None else None,
             ma5=float(latest["ma5"]) if "ma5" in latest and pd.notna(latest["ma5"]) else None,
@@ -645,6 +694,35 @@ class StockTrackerEngine:
             ma20=float(latest["ma20"]) if "ma20" in latest and pd.notna(latest["ma20"]) else None,
             ma60=float(latest["ma60"]) if "ma60" in latest and pd.notna(latest["ma60"]) else None,
         )
+
+    def _build_volume_series(
+        self,
+        df: pd.DataFrame,
+        burst: Optional[pd.Series] = None,
+    ) -> List[VolumePoint]:
+        """Daily volume tail for the volume card's bar chart.
+
+        Keeps the longest configured period plus a small context window so the
+        earliest visible bar can still be classified as a burst (a 5-session
+        trailing baseline). ``burst`` is the shared mask from
+        ``_volume_burst_series``; computed here when the caller did not supply it.
+        """
+        if "volume" not in df.columns or df.empty:
+            return []
+        longest = max(self.config.periods)
+        tail = df.tail(longest + _VOLUME_SERIES_CONTEXT)
+        if burst is None:
+            burst = _volume_burst_series(df)
+        points: List[VolumePoint] = []
+        for idx, row in tail.iterrows():
+            points.append(
+                VolumePoint(
+                    trade_date=idx.date(),
+                    volume=float(row["volume"]),
+                    is_burst=bool(burst.get(idx, False)),
+                )
+            )
+        return points
 
     def _compute_period_signals(
         self,

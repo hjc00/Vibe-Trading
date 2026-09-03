@@ -18,6 +18,8 @@ import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
 import { EventTimelineCard } from "@/components/stock-tracker/EventTimelineCard";
+import { VolumeCard } from "@/components/stock-tracker/VolumeCard";
+import { VolumeChartCard } from "@/components/stock-tracker/VolumeChartCard";
 import { ConceptHeatCard } from "@/components/stock-tracker/ConceptHeatCard";
 import { ConsensusCard } from "@/components/stock-tracker/ConsensusCard";
 import { ChipCard } from "@/components/stock-tracker/ChipCard";
@@ -30,6 +32,8 @@ const POLL_INTERVAL_MS = 2000;
 // Fixed render order for the middle detail cards; the first
 // `detail_card_count` are shown, at most three per row.
 const DETAIL_CARD_COMPONENTS = [
+  VolumeCard,
+  VolumeChartCard,
   MarginChartCard,
   FundFlowChartCard,
   RpsChartCard,

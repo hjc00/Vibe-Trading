@@ -1800,6 +1800,9 @@ export interface PeriodMetrics {
   return_pct?: number | null;
   annualized_volatility?: number | null;
   volume_ratio?: number | null;
+  avg_volume?: number | null;
+  volume_expansion_days?: number | null;
+  volume_expansion_ratio?: number | null;
   rsi?: number | null;
   price_vs_ma20?: number | null;
   ma5?: number | null;
@@ -2075,6 +2078,12 @@ export interface EventSnapshot {
   error?: string | null;
 }
 
+export interface VolumePoint {
+  trade_date?: string | null;
+  volume?: number | null;
+  is_burst: boolean;
+}
+
 export interface SymbolSnapshot {
   code: string;
   name?: string | null;
@@ -2084,6 +2093,7 @@ export interface SymbolSnapshot {
   daily_return?: number | null;
   volume?: number | null;
   avg_volume_20?: number | null;
+  volume_series?: VolumePoint[] | null;
   currency: string;
   period_signals: Record<string, PeriodSignals>;
   capital?: CapitalMetrics | null;
