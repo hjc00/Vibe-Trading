@@ -19,8 +19,10 @@ from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.financial_reports_data import load_financial_report
 from src.stock_tracker.models import (
+    ANALYSIS_FOCUS_OPTIONS,
     ANALYSIS_INDICATORS,
     AnalysisReport,
+    SymbolSnapshot,
     TrackerConfig,
     normalize_a_share_code,
 )
@@ -146,9 +148,18 @@ class TrackerSettingsRequest(BaseModel):
         default=None,
         description="Indicator blocks fed to LLM analysis (subset of ANALYSIS_INDICATORS).",
     )
+    analysis_focus: Optional[str] = Field(
+        default=None,
+        description="Analysis emphasis preset (balanced|technical).",
+    )
     card_visibility: Optional[Dict[str, bool]] = Field(
         default=None,
         description="Per-card visibility map (key: HIDEABLE_CARDS id, value: visible).",
+    )
+    break_even_prices: Optional[Dict[str, Optional[float]]] = Field(
+        default=None,
+        description="Per-symbol break-even price (key: normalized code). "
+        "Sent as the full map; a cleared entry is a missing key.",
     )
 
 
@@ -162,7 +173,9 @@ class TrackerConfigResponse(BaseModel):
     refresh_interval_seconds: int
     detail_card_count: int
     analysis_indicators: List[str]
+    analysis_focus: str
     card_visibility: Dict[str, bool]
+    break_even_prices: Dict[str, float]
 
 
 class TrackerSettingsResponse(BaseModel):
@@ -199,6 +212,9 @@ class TrackerAnalyzeRequest(BaseModel):
     # Per-run indicator selection; None falls back to the persisted config.
     # When present it must be a non-empty subset of ANALYSIS_INDICATORS.
     analysis_indicators: Optional[List[str]] = None
+    # Per-run analysis emphasis; None falls back to the persisted config.
+    # When present it must be one of ANALYSIS_FOCUS_OPTIONS.
+    analysis_focus: Optional[str] = None
 
 
 class TrackerAnalyzeResponse(BaseModel):
@@ -238,9 +254,14 @@ def _config_from_request(request: TrackerSettingsRequest) -> TrackerConfig:
         kwargs["detail_card_count"] = request.detail_card_count
     if request.analysis_indicators is not None:
         kwargs["analysis_indicators"] = request.analysis_indicators
+    if request.analysis_focus is not None:
+        kwargs["analysis_focus"] = request.analysis_focus
     if request.card_visibility is not None:
         # Replace the whole map (the frontend sends the full visibility state).
         kwargs["card_visibility"] = request.card_visibility
+    if request.break_even_prices is not None:
+        # Replace the whole map (the frontend sends the full per-symbol state).
+        kwargs["break_even_prices"] = request.break_even_prices
 
     # Merge with current config so omitted fields keep their defaults, then
     # reconstruct to re-run Pydantic validators (model_copy skips them).
@@ -466,6 +487,60 @@ def _fetch_quotes(codes: List[str]) -> Dict[str, Any]:
     return {"status": "ok", "quotes": quotes, "data_gaps": data_gaps}
 
 
+def _fetch_live_close_map(codes: List[str]) -> Dict[str, Dict[str, Any]]:
+    """Best-effort fetch of the freshest live price (现价) per code.
+
+    Returns ``{code: {"close": float, "prev_close": float|None,
+    "daily_return": float|None}}`` for every code the live feed resolved.
+    Never raises: the analyzer falls back to snapshot closes when the feed
+    fails, so analysis never hard-fails on a stale quote.
+    """
+    result: Dict[str, Dict[str, Any]] = {}
+    try:
+        payload = _fetch_quotes(codes)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Live quotes unavailable for analysis (%s); using snapshot closes", exc
+        )
+        return result
+    for quote in payload.get("quotes") or []:
+        code = quote.get("code")
+        close = quote.get("close")
+        if not code or close is None:
+            continue
+        result[code] = {
+            "close": float(close),
+            "prev_close": quote.get("prev_close"),
+            "daily_return": quote.get("daily_return"),
+        }
+    return result
+
+
+def _with_live_price(
+    symbols: List[SymbolSnapshot],
+    live_prices: Dict[str, Dict[str, Any]],
+) -> List[SymbolSnapshot]:
+    """Return copies of ``symbols`` priced at the freshest live quote.
+
+    The persisted snapshot close can lag the live feed by a session; analysis
+    should weigh the 现价 the user is watching. Symbols without a live quote are
+    returned untouched.
+    """
+    overridden: List[SymbolSnapshot] = []
+    for symbol in symbols:
+        quote = live_prices.get(symbol.code)
+        if quote is None or quote.get("close") is None:
+            overridden.append(symbol)
+            continue
+        update: Dict[str, Any] = {"close": float(quote["close"])}
+        if quote.get("prev_close") is not None:
+            update["prev_close"] = float(quote["prev_close"])
+        if quote.get("daily_return") is not None:
+            update["daily_return"] = float(quote["daily_return"])
+        overridden.append(symbol.model_copy(update=update))
+    return overridden
+
+
 # ---------------------------------------------------------------------------
 # Route registration
 # ---------------------------------------------------------------------------
@@ -626,6 +701,14 @@ def register_stock_tracker_routes(
             len(request.symbols),
             snapshot.trading_date,
         )
+        # Price each analyzed symbol at the freshest live quote (现价), not the
+        # persisted snapshot close which can lag the live feed by a session. The
+        # same feed drives the /quotes endpoint the frontend polls. Best-effort:
+        # symbols without a live quote keep their snapshot price.
+        codes = [symbol.code for symbol in selected.symbols]
+        live_prices = await asyncio.to_thread(_fetch_live_close_map, codes)
+        analysis_symbols = _with_live_price(selected.symbols, live_prices)
+
         # Feed the model its recent conclusions per symbol (count is
         # user-configurable via history_limit; 0 opts out) so each run is an
         # incremental review, not a memory-less from-scratch re-analysis.
@@ -634,20 +717,25 @@ def register_stock_tracker_routes(
             history_limit = _DEFAULT_HISTORY_LIMIT
         history = {}
         if history_limit > 0:
+            closes = {symbol.code: symbol.close for symbol in snapshot.symbols}
+            for code, quote in live_prices.items():
+                if quote.get("close") is not None:
+                    closes[code] = quote["close"]
             history = select_symbol_history(
                 store.list_analysis_envelopes(limit=200),
-                {symbol.code: symbol.close for symbol in snapshot.symbols},
-                codes=[symbol.code for symbol in selected.symbols],
+                closes,
+                codes=codes,
                 limit=history_limit,
             )
         try:
-            # The indicator selection is prompt organization, not snapshot
-            # computation. Prefer the per-run override; otherwise fall back to
-            # the *current* settings (not the snapshot-embedded config) so a
-            # config change applies without a refresh first.
+            # The indicator selection and break-even map are prompt organization,
+            # not snapshot computation. Both come from the *current* settings
+            # (not the snapshot-embedded config) so a config change applies
+            # without a refresh first.
+            current_config = _get_store().get_settings().config
             indicator_selection = request.analysis_indicators
             if indicator_selection is None:
-                indicator_selection = _get_store().get_settings().config.analysis_indicators
+                indicator_selection = current_config.analysis_indicators
             else:
                 unknown = set(indicator_selection) - set(ANALYSIS_INDICATORS)
                 if unknown or not indicator_selection:
@@ -655,13 +743,23 @@ def register_stock_tracker_routes(
                         status_code=422,
                         detail=f"Invalid analysis_indicators: {sorted(unknown) or 'empty'}",
                     )
+            analysis_focus = request.analysis_focus
+            if analysis_focus is None:
+                analysis_focus = current_config.analysis_focus
+            elif analysis_focus not in ANALYSIS_FOCUS_OPTIONS:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid analysis_focus: {analysis_focus}",
+                )
             report = await asyncio.to_thread(
                 run_analysis,
                 snapshot,
-                selected.symbols,
+                analysis_symbols,
                 request.user_prompt,
                 history,
                 analysis_indicators=indicator_selection,
+                break_even_prices=current_config.break_even_prices,
+                analysis_focus=analysis_focus,
             )
         except Exception as exc:  # surface provider/LLM failures as readable errors
             hint = _friendly_provider_error(exc)

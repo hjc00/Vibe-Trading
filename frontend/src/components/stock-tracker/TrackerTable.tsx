@@ -23,6 +23,8 @@ interface TrackerTableProps {
   onSelectCode: (code: string) => void;
   onRemoveSymbol?: (code: string) => void;
   quotesUpdatedAt?: string | null;
+  breakEvenPrices?: Record<string, number>;
+  onBreakEvenChange?: (code: string, value: number | null) => void;
 }
 
 const EXPANDED_ROWS_STORAGE_KEY = "stockTracker.expandedRows";
@@ -56,6 +58,8 @@ export function TrackerTable({
   onSelectCode,
   onRemoveSymbol,
   quotesUpdatedAt,
+  breakEvenPrices,
+  onBreakEvenChange,
 }: TrackerTableProps) {
   const { t } = useTranslation();
   const { collapsed, toggle } = useCardCollapse("watchlist", TABLE_COLLAPSE_KEY);
@@ -101,6 +105,7 @@ export function TrackerTable({
             <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
               <th className="py-2 ps-4 pr-4 font-medium">{t("stockTracker.symbols")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.price")}</th>
+              <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.breakEvenPrice")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.change")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.rps")}</th>
               <th className="py-2 pr-4 font-medium text-right">{t("stockTracker.valuation")}</th>
@@ -171,6 +176,21 @@ export function TrackerTable({
                       </div>
                     </td>
                     <td className="py-3 pr-4 text-right">
+                      {onBreakEvenChange ? (
+                        <BreakEvenInput
+                          code={symbol.code}
+                          value={breakEvenPrices?.[symbol.code]}
+                          onChange={onBreakEvenChange}
+                        />
+                      ) : (
+                        <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                          {breakEvenPrices && breakEvenPrices[symbol.code] != null
+                            ? breakEvenPrices[symbol.code].toFixed(2)
+                            : "—"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 pr-4 text-right">
                       <CompactChangeCell symbol={symbol} />
                     </td>
                     <td className="py-3 pr-4 text-right">
@@ -203,7 +223,7 @@ export function TrackerTable({
                       key={`${symbol.code}-expanded`}
                       className={cn("border-b last:border-0", isSelected ? "bg-primary/10" : "bg-muted/5")}
                     >
-                      <td colSpan={7} className="p-0">
+                      <td colSpan={8} className="p-0">
                         <div className="grid grid-cols-1 gap-4 px-4 py-3 sm:grid-cols-[1fr_auto]">
                           <div className="flex flex-col gap-2">
                             {quotesUpdatedAt && (
@@ -507,5 +527,65 @@ function CrossDayDiffCell({ diff }: { diff: SymbolSnapshot["diff"] }) {
         <span className="text-muted-foreground">{t("stockTracker.none")}</span>
       )}
     </div>
+  );
+}
+
+// Editable per-symbol break-even (保本) price. Keeps a local text draft while
+// typing and commits on blur/Enter; an empty value clears the break-even.
+// All pointer/keyboard events stop propagation so editing never triggers the
+// row's click-to-select behaviour.
+function BreakEvenInput({
+  code,
+  value,
+  onChange,
+}: {
+  code: string;
+  value?: number | null;
+  onChange: (code: string, value: number | null) => void;
+}) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<string>(() => (value != null ? String(value) : ""));
+
+  useEffect(() => {
+    setDraft(value != null ? String(value) : "");
+  }, [value]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      onChange(code, null);
+      return;
+    }
+    const parsed = Number(trimmed);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      onChange(code, parsed);
+    } else {
+      setDraft(value != null ? String(value) : "");
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min="0"
+      step="0.01"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={(e) => {
+        e.stopPropagation();
+        commit();
+      }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+          e.currentTarget.blur();
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+      onFocus={(e) => e.stopPropagation()}
+      aria-label={t("stockTracker.breakEvenPrice")}
+      title={t("stockTracker.breakEvenPlaceholder")}
+      className="w-24 rounded-md border border-border/60 bg-background px-2 py-1 text-right font-mono text-xs tabular-nums outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+    />
   );
 }

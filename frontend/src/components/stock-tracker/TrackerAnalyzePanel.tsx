@@ -4,6 +4,7 @@ import { ChevronDown, Loader2, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SymbolSnapshot } from "@/lib/api";
 import {
+  ANALYSIS_FOCUS_OPTIONS,
   ANALYSIS_INDICATORS,
   ALL_ANALYSIS_INDICATOR_KEYS,
 } from "@/lib/stockTracker";
@@ -22,6 +23,9 @@ interface TrackerAnalyzePanelProps {
   /** Indicator blocks to feed the LLM; toggling persists via onAnalysisIndicatorsChange. */
   analysisIndicators?: string[];
   onAnalysisIndicatorsChange?: (keys: string[]) => void;
+  /** Analysis emphasis preset (balanced|technical); persists via onAnalysisFocusChange. */
+  analysisFocus?: string;
+  onAnalysisFocusChange?: (focus: string) => void;
 }
 
 export function TrackerAnalyzePanel({
@@ -37,6 +41,8 @@ export function TrackerAnalyzePanel({
   onHistoryLimitChange = () => {},
   analysisIndicators = [...ALL_ANALYSIS_INDICATOR_KEYS],
   onAnalysisIndicatorsChange = () => {},
+  analysisFocus = "balanced",
+  onAnalysisFocusChange = () => {},
 }: TrackerAnalyzePanelProps) {
   const { t } = useTranslation();
   const [indicatorsOpen, setIndicatorsOpen] = useState(true);
@@ -156,6 +162,31 @@ export function TrackerAnalyzePanel({
           className="w-16 rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary disabled:opacity-60"
         />
         <span className="text-[11px] text-muted-foreground">{t("stockTracker.historyLimitHint")}</span>
+      </div>
+
+      <div className="mb-4 rounded-md border border-border/60 p-3">
+        <p className="mb-2 text-xs font-medium text-muted-foreground">{t("stockTracker.analysisFocus")}</p>
+        <div className="flex flex-wrap gap-1.5">
+          {ANALYSIS_FOCUS_OPTIONS.map((opt) => {
+            const active = analysisFocus === opt.key;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => onAnalysisFocusChange(opt.key)}
+                disabled={loading}
+                className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border/60 bg-background text-muted-foreground hover:border-primary/50"
+                }`}
+              >
+                {t(opt.labelKey as never)}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-1.5 text-[10px] text-muted-foreground">{t("stockTracker.analysisFocusHint")}</p>
       </div>
 
       <div className="mb-4 rounded-md border border-border/60 p-3">

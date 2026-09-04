@@ -17,6 +17,7 @@ from src.stock_tracker.models import (
     TrackerSnapshot,
 )
 from src.stock_tracker.store import TrackerStore
+from src.api.stock_tracker_routes import _with_live_price
 
 
 @pytest.fixture
@@ -29,8 +30,13 @@ def isolated_tracker_store():
     """Use a temporary directory for tracker state during tests."""
     with tempfile.TemporaryDirectory() as tmp:
         store = TrackerStore(root_dir=tmp)
+        # Stub the live-quote fetch so analyze tests never hit the network; the
+        # route degrades to snapshot closes when this returns {}.
         with patch("src.api.stock_tracker_routes._store", store):
-            yield store
+            with patch(
+                "src.api.stock_tracker_routes._fetch_live_close_map", return_value={}
+            ):
+                yield store
 
 
 def test_list_signals_endpoint(client):
@@ -457,6 +463,51 @@ def test_analyze_returns_report(client, isolated_tracker_store):
     assert data["report"]["summary"] == "综述"
 
 
+def test_analyze_uses_live_price_not_stale_snapshot_close(
+    client, isolated_tracker_store
+):
+    """The model must weigh the freshest live 现价, not a stale snapshot close."""
+    _saved_snapshot(isolated_tracker_store)  # snapshot close = 1500.0
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    live = {
+        "600519.SH": {"close": 1510.5, "prev_close": 1500.0, "daily_return": 0.007}
+    }
+    with patch(
+        "src.api.stock_tracker_routes._fetch_live_close_map", return_value=live
+    ), patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"]},
+        )
+    assert response.status_code == 200
+    args, _kwargs = mocked.call_args
+    symbols = args[1]
+    assert len(symbols) == 1
+    assert symbols[0].close == 1510.5
+
+
+def test_with_live_price_overrides_only_symbols_with_a_quote():
+    s1 = SymbolSnapshot(code="600519.SH", close=1500.0, prev_close=1480.0)
+    s2 = SymbolSnapshot(code="000001.SZ", close=10.0)
+    live = {
+        "600519.SH": {"close": 1510.5, "prev_close": 1500.0, "daily_return": 0.007}
+    }
+    out = _with_live_price([s1, s2], live)
+    assert out[0] is not s1
+    assert out[0].close == 1510.5
+    assert out[0].prev_close == 1500.0
+    assert out[0].daily_return == 0.007
+    assert out[1] is s2  # no live quote -> original object untouched
+    assert s1.close == 1500.0  # original unchanged (copies are returned)
+
+
 def test_analyze_passes_persisted_analysis_indicators(client, isolated_tracker_store):
     _saved_snapshot(isolated_tracker_store)
     isolated_tracker_store.save_settings(
@@ -484,6 +535,60 @@ def test_analyze_passes_persisted_analysis_indicators(client, isolated_tracker_s
     assert response.status_code == 200
     _args, kwargs = mocked.call_args
     assert kwargs["analysis_indicators"] == ["margin"]
+
+
+def test_analyze_uses_persisted_focus_when_request_omits(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    isolated_tracker_store.save_settings(
+        isolated_tracker_store.get_settings().model_copy(
+            update={"config": TrackerConfig(watchlist=["600519.SH"], analysis_focus="technical")}
+        )
+    )
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"]},
+        )
+    assert response.status_code == 200
+    _args, kwargs = mocked.call_args
+    assert kwargs["analysis_focus"] == "technical"
+
+
+def test_analyze_prefers_request_focus_override(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "analysis_focus": "technical"},
+        )
+    assert response.status_code == 200
+    _args, kwargs = mocked.call_args
+    assert kwargs["analysis_focus"] == "technical"
+
+
+def test_analyze_rejects_unknown_focus(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    response = client.post(
+        "/api/stock-tracker/analyze",
+        json={"symbols": ["600519.SH"], "analysis_focus": "fundamental_only"},
+    )
+    assert response.status_code == 422
 
 
 def test_analyze_prefers_request_indicator_override(client, isolated_tracker_store):

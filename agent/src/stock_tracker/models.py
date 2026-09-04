@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from datetime import date, datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
@@ -49,6 +50,17 @@ ANALYSIS_INDICATORS: List[str] = [
     "market_sentiment",
     "sectors",
     "concepts",
+]
+
+# Analysis emphasis presets. ``balanced`` weighs every enabled block equally;
+# ``technical`` instructs the model to treat price action + technical signals as
+# the primary evidence and other dimensions as secondary context. Stored on
+# ``TrackerConfig.analysis_focus`` and overridable per analyze request.
+ANALYSIS_FOCUS_BALANCED = "balanced"
+ANALYSIS_FOCUS_TECHNICAL = "technical"
+ANALYSIS_FOCUS_OPTIONS: List[str] = [
+    ANALYSIS_FOCUS_BALANCED,
+    ANALYSIS_FOCUS_TECHNICAL,
 ]
 
 # Cards on the stock-tracker dashboard that can be hidden via the card's hide
@@ -158,12 +170,26 @@ class TrackerConfig(BaseModel):
         default_factory=lambda: list(ANALYSIS_INDICATORS),
         description="Analysis indicator blocks fed to the LLM (subset of ANALYSIS_INDICATORS).",
     )
+    # Analysis emphasis preset. ``balanced`` (default) weighs all enabled blocks
+    # equally; ``technical`` biases the prompt toward price action/technical
+    # signals. Stored with the config and overridable per analyze request.
+    analysis_focus: str = Field(
+        default=ANALYSIS_FOCUS_BALANCED,
+        description="Analysis emphasis preset (balanced|technical).",
+    )
     # Per-card visibility for the dashboard cards listed in HIDEABLE_CARDS. A
     # missing key means the card is visible; ``{id: false}`` hides it from the
     # UI and stops a refresh from fetching its data dimensions.
     card_visibility: Dict[str, bool] = Field(
         default_factory=dict,
         description="Per-card visibility map (key: HIDEABLE_CARDS id, value: visible).",
+    )
+    # Per-symbol user break-even (保本) price, keyed by normalized code. A code
+    # without an entry (or whose entry was cleared) has no break-even set. Fed to
+    # LLM analysis as the user's cost basis so the model can weigh gain/loss.
+    break_even_prices: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Per-symbol user break-even price, keyed by normalized code.",
     )
 
     @field_validator("watchlist")
@@ -228,6 +254,17 @@ class TrackerConfig(BaseModel):
             raise ValueError("analysis_indicators must contain at least one indicator")
         return unique
 
+    @field_validator("analysis_focus")
+    @classmethod
+    def _validate_analysis_focus(cls, value: Any) -> str:
+        """Restrict analysis emphasis to the known presets."""
+        focus = value or ANALYSIS_FOCUS_BALANCED
+        if focus not in ANALYSIS_FOCUS_OPTIONS:
+            raise ValueError(
+                f"Unknown analysis_focus {focus!r}; expected one of {ANALYSIS_FOCUS_OPTIONS}"
+            )
+        return focus
+
     @field_validator("card_visibility")
     @classmethod
     def _validate_card_visibility(cls, value: Dict[str, bool]) -> Dict[str, bool]:
@@ -237,6 +274,39 @@ class TrackerConfig(BaseModel):
             if key not in known:
                 raise ValueError(f"Unknown hideable card: {key}")
         return {key: bool(visible) for key, visible in value.items()}
+
+    @field_validator("break_even_prices", mode="before")
+    @classmethod
+    def _validate_break_even_prices(
+        cls, value: Any
+    ) -> Dict[str, float]:
+        """Normalize codes and keep only finite, positive break-even prices.
+
+        Runs before type coercion so raw API input (``None`` clears, strings)
+        is cleaned first; a ``Dict[str, float]`` field would otherwise reject
+        those before this validator could drop them. Entries with an unknown
+        code or a non-finite / non-positive price are dropped rather than
+        rejected so user edits can never wedge the config.
+        """
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise ValueError("break_even_prices must be a dict")
+        cleaned: Dict[str, float] = {}
+        for raw_code, raw_price in value.items():
+            code = normalize_a_share_code(raw_code)
+            if code is None:
+                continue
+            if raw_price is None:
+                continue
+            try:
+                price = float(raw_price)
+            except (TypeError, ValueError):
+                continue
+            if not math.isfinite(price) or price <= 0:
+                continue
+            cleaned[code] = price
+        return cleaned
 
     def model_dump_json_safe(self) -> Dict[str, Any]:
         """Return a plain JSON-serializable dict."""
@@ -827,6 +897,19 @@ class PriceZone(BaseModel):
     high: Optional[float] = None
 
 
+class EvidenceItem(BaseModel):
+    """One concrete indicator reading cited as evidence for a recommendation.
+
+    ``indicator`` names the metric (e.g. "MACD DIF/DEA", "KDJ J", "RPS_10"),
+    ``value`` is the exact value copied from the input snapshot (never invented),
+    and ``read`` is the short interpretation ("金叉偏多/超买/放量 1.6x …").
+    """
+
+    indicator: str
+    value: Optional[Any] = None
+    read: Optional[str] = None
+
+
 class SymbolRecommendation(BaseModel):
     """Structured per-symbol recommendation produced by the LLM analyzer."""
 
@@ -844,6 +927,8 @@ class SymbolRecommendation(BaseModel):
     risks: List[str] = Field(default_factory=list)
     # Snapshot value chips (rsi/volume_ratio/...) preserved for the frontend.
     key_metrics: Dict[str, Any] = Field(default_factory=dict)
+    # Concrete indicator -> reading -> judgment list the model must fill.
+    basis: List[EvidenceItem] = Field(default_factory=list)
 
 
 class PortfolioInsight(BaseModel):
@@ -984,6 +1069,7 @@ __all__ = [
     "TrackerSnapshot",
     "AnalysisAction",
     "PriceZone",
+    "EvidenceItem",
     "SymbolRecommendation",
     "PortfolioInsight",
     "AnalysisReport",

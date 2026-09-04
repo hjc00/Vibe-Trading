@@ -1774,12 +1774,19 @@ export interface TrackerConfig {
   detail_card_count: number;
   /** Indicator blocks fed to LLM analysis (subset of ANALYSIS_INDICATORS). */
   analysis_indicators: string[];
+  /** Analysis emphasis preset: "balanced" (default) or "technical". */
+  analysis_focus: string;
   /**
    * Per-card visibility. Keys are HIDEABLE_CARD_IDS; a missing key means the
    * card is visible (so `{}` shows every card). `{ id: false }` hides the card
    * and stops a refresh from fetching its data.
    */
   card_visibility: Record<string, boolean>;
+  /**
+   * Per-symbol break-even (保本) price keyed by code. A missing key means no
+   * break-even is set; used as the user's cost basis in AI analysis.
+   */
+  break_even_prices: Record<string, number>;
 }
 
 export interface StockTrackerQuote {
@@ -2232,11 +2239,19 @@ export interface TrackerAnalyzeRequest {
   history_limit?: number | null;
   /** Per-run indicator selection; omitted/undefined falls back to persisted config. */
   analysis_indicators?: string[] | null;
+  /** Per-run emphasis preset ("balanced"|"technical"); undefined falls back to persisted config. */
+  analysis_focus?: string | null;
 }
 
 export interface PriceZone {
   low?: number | null;
   high?: number | null;
+}
+
+export interface EvidenceItem {
+  indicator: string;
+  value?: unknown;
+  read?: string | null;
 }
 
 export interface SymbolRecommendation {
@@ -2255,6 +2270,8 @@ export interface SymbolRecommendation {
   reduce_trigger?: string | null;
   track_metrics?: string[];
   key_metrics?: Record<string, unknown>;
+  /** Concrete indicator readings the model relied on (indicator + value + read). */
+  basis?: EvidenceItem[] | null;
   risks?: string[];
   time_horizon?: string | null;
 }

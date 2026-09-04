@@ -99,6 +99,7 @@ function SymbolCard({ symbol }: { symbol: SymbolRecommendation }) {
   const action = resolveAction(symbol);
   const confidence = formatConfidence(symbol.confidence);
   const keyMetrics = Object.entries(symbol.key_metrics ?? {});
+  const basis = symbol.basis ?? [];
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
@@ -132,6 +133,27 @@ function SymbolCard({ symbol }: { symbol: SymbolRecommendation }) {
 
       {symbol.rationale ? (
         <p className="mb-2 text-sm leading-relaxed text-foreground/90">{symbol.rationale}</p>
+      ) : null}
+
+      {basis.length > 0 ? (
+        <div className="mb-2">
+          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("stockTracker.analysisBasis")}</p>
+          <ul className="space-y-1">
+            {basis.map((item, index) => (
+              <li key={index} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-foreground/80">
+                  {item.indicator}
+                </span>
+                {item.value !== undefined && item.value !== null ? (
+                  <span className="font-mono font-semibold tabular-nums text-foreground/90">
+                    {formatMetric(item.value)}
+                  </span>
+                ) : null}
+                {item.read ? <span className="text-foreground/75">{item.read}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : null}
 
       <StructuredPlan symbol={symbol} />

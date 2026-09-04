@@ -59,6 +59,7 @@ def test_build_analysis_prompt_includes_symbol_data():
     assert "贵州茅台" in prompt
     assert "buy" in prompt  # structured action vocabulary is present
     assert "avoid" in prompt
+    assert '"basis"' in prompt  # concrete indicator-evidence field is requested
 
 
 def test_build_analysis_prompt_appends_user_prompt():
@@ -100,6 +101,109 @@ def test_build_analysis_prompt_omits_history_when_absent():
     prompt = build_analysis_prompt(snapshot, snapshot.symbols)
     assert "current_close" not in prompt
     assert "增量研判" not in prompt
+
+
+def test_build_analysis_prompt_injects_break_even_price_from_config():
+    snapshot = _snapshot()
+    snapshot.config.break_even_prices = {"600519.SH": 1480.0}
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert '"break_even_price": 1480.0' in prompt
+    # close=1500 vs break-even 1480 => +1.35%, derived so the model cannot skip it.
+    assert '"break_even_pnl_pct": 1.35' in prompt
+
+
+def test_build_analysis_prompt_break_even_price_defaults_null():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert '"break_even_price": null' in prompt
+    assert "break_even_pnl_pct" not in prompt
+
+
+def test_build_analysis_prompt_break_even_price_override_wins():
+    snapshot = _snapshot()
+    snapshot.config.break_even_prices = {"600519.SH": 1480.0}
+    prompt = build_analysis_prompt(
+        snapshot, snapshot.symbols, break_even_prices={"600519.SH": 1550.0}
+    )
+    assert '"break_even_price": 1550.0' in prompt
+    assert '"break_even_price": 1480.0' not in prompt
+    # close=1500 vs break-even 1550 => -3.23%.
+    assert '"break_even_pnl_pct": -3.23' in prompt
+
+
+def test_build_analysis_prompt_break_even_pnl_zero_when_at_par():
+    snapshot = _snapshot()  # close=1500.0
+    snapshot.config.break_even_prices = {"600519.SH": 1500.0}
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert '"break_even_pnl_pct": 0.0' in prompt
+
+
+def test_build_analysis_prompt_balanced_is_default_and_unbiased():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert "综合权衡" in prompt
+    assert "以技术面为主" not in prompt
+
+
+def test_build_analysis_prompt_technical_focus_emphasizes_technical():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols, analysis_focus="technical")
+    assert "以技术面为主" in prompt
+    assert "主要证据" in prompt
+    # Technical bullets lead: the MACD directive precedes the fund-flow one.
+    tech_pos = prompt.find("近端逐日 MACD")
+    fund_pos = prompt.find("资金面·主力资金")
+    assert tech_pos != -1 and fund_pos != -1
+    assert tech_pos < fund_pos
+
+
+def test_build_analysis_prompt_technical_focus_reads_from_config():
+    snapshot = _snapshot()
+    snapshot.config.analysis_focus = "technical"
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert "以技术面为主" in prompt
+
+
+def test_normalize_report_carries_structured_basis():
+    parsed = {
+        "symbols": [
+            {
+                "code": "600519.SH",
+                "name": "贵州茅台",
+                "action": "buy",
+                "rationale": "依据 basis 的具体读数",
+                "basis": [
+                    {"indicator": "MACD DIF/DEA", "value": 1.23, "read": "零轴上方多头"},
+                    "KDJ J",
+                    {"indicator": "close", "value": 1500.0},
+                ],
+            }
+        ]
+    }
+    report = _normalize_report(parsed, "raw")
+    rec = report.symbols[0]
+    assert len(rec.basis) == 3
+    assert rec.basis[0].indicator == "MACD DIF/DEA"
+    assert rec.basis[0].value == 1.23
+    assert rec.basis[0].read == "零轴上方多头"
+    assert rec.basis[1].indicator == "KDJ J"
+    assert rec.basis[1].value is None
+    assert rec.basis[2].indicator == "close"
+    assert rec.basis[2].value == 1500.0
+
+
+def test_normalize_report_basis_drops_entries_without_indicator():
+    parsed = {
+        "symbols": [
+            {
+                "code": "600519.SH",
+                "action": "hold",
+                "basis": [{"value": 1.0, "read": "没有指标名的条目应被丢弃"}, "  "],
+            }
+        ]
+    }
+    report = _normalize_report(parsed, "raw")
+    assert report.symbols[0].basis == []
 
 
 def test_serialize_symbol_carries_capital_risk_and_sector():

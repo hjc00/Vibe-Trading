@@ -86,6 +86,68 @@ def test_tracker_config_corrects_wrong_suffix() -> None:
     assert config.watchlist == ["000938.SZ"]
 
 
+def test_tracker_config_break_even_prices_default_empty() -> None:
+    config = TrackerConfig()
+    assert config.break_even_prices == {}
+
+
+def test_tracker_config_break_even_prices_normalizes_code() -> None:
+    config = TrackerConfig(break_even_prices={"000938.SH": 21.5})
+    assert config.break_even_prices == {"000938.SZ": 21.5}
+
+
+def test_tracker_config_break_even_prices_drops_invalid_entries() -> None:
+    config = TrackerConfig(
+        break_even_prices={
+            "600519.SH": 1500.0,
+            "NOT_A_CODE": 10.0,  # unknown code dropped
+            "000001.SZ": None,  # cleared entry dropped
+            "300750.SZ": -5.0,  # non-positive dropped
+            "688888.SH": float("nan"),  # non-finite dropped
+            "600036.SH": "abc",  # non-numeric dropped
+        }
+    )
+    assert config.break_even_prices == {"600519.SH": 1500.0}
+
+
+def test_tracker_config_break_even_prices_round_trips_json() -> None:
+    config = TrackerConfig(break_even_prices={"600519.SH": 1500.0})
+    assert TrackerConfig.model_validate_json(config.model_dump_json()) == config
+
+
+def test_tracker_config_analysis_focus_defaults_balanced() -> None:
+    assert TrackerConfig().analysis_focus == "balanced"
+
+
+def test_tracker_config_analysis_focus_accepts_technical() -> None:
+    config = TrackerConfig(analysis_focus="technical")
+    assert config.analysis_focus == "technical"
+
+
+def test_tracker_config_analysis_focus_rejects_unknown() -> None:
+    with pytest.raises(ValueError, match="Unknown analysis_focus"):
+        TrackerConfig(analysis_focus="fundamental_only")
+
+
+def test_symbol_recommendation_serializes_evidence_basis() -> None:
+    from src.stock_tracker.models import EvidenceItem, SymbolRecommendation
+
+    rec = SymbolRecommendation(
+        code="600519.SH",
+        action="buy",
+        basis=[
+            EvidenceItem(indicator="MACD DIF/DEA", value=1.23, read="零轴上方多头"),
+            EvidenceItem(indicator="KDJ J", value=82.0, read=None),
+        ],
+    )
+    dumped = rec.model_dump(mode="json")
+    assert dumped["basis"] == [
+        {"indicator": "MACD DIF/DEA", "value": 1.23, "read": "零轴上方多头"},
+        {"indicator": "KDJ J", "value": 82.0, "read": None},
+    ]
+
+
+
 def test_period_metrics_serializes_rps_fields() -> None:
     from src.stock_tracker.models import PeriodMetrics
 

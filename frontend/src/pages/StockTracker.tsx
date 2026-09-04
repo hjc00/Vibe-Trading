@@ -272,6 +272,22 @@ export function StockTracker() {
     [config],
   );
 
+  // Persist the analysis emphasis preset (balanced|technical). Like the
+  // indicator selection it only shapes prompt composition, so no refresh needed.
+  const handleAnalysisFocusChange = useCallback(
+    async (focus: string) => {
+      if (!config) return;
+      setConfig((prev) => (prev ? { ...prev, analysis_focus: focus } : prev));
+      setError(null);
+      try {
+        await api.updateStockTrackerSettings({ analysis_focus: focus });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [config],
+  );
+
   // Hide/show a dashboard data card. Hiding persists to the backend config so
   // the card stays hidden across reloads and the next refresh skips its fetch.
   const handleToggleCard = useCallback(
@@ -348,6 +364,28 @@ export function StockTracker() {
 
   const analysisSectionRef = useRef<HTMLElement>(null);
 
+  // Save a per-symbol break-even price. Optimistic, like the indicator-selection
+  // handler: it only feeds the table column and AI prompt, so no refresh needed.
+  const handleBreakEvenChange = useCallback(
+    async (code: string, value: number | null) => {
+      if (!config) return;
+      const next = { ...(config.break_even_prices ?? {}) };
+      if (value == null) {
+        delete next[code];
+      } else {
+        next[code] = value;
+      }
+      setConfig((prev) => (prev ? { ...prev, break_even_prices: next } : prev));
+      setError(null);
+      try {
+        await api.updateStockTrackerSettings({ break_even_prices: next });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [config],
+  );
+
   const openAnalyze = useCallback(() => {
     const codes = snapshot?.symbols.map((s) => s.code) ?? [];
     setSelectedSymbols(codes);
@@ -389,7 +427,9 @@ export function StockTracker() {
         refresh_interval_seconds: 10,
         detail_card_count: 9,
         analysis_indicators: [...ALL_ANALYSIS_INDICATOR_KEYS],
+        analysis_focus: "balanced",
         card_visibility: {},
+        break_even_prices: {},
       },
     [config],
   );
@@ -520,6 +560,8 @@ export function StockTracker() {
                   onSelectCode={setSelectedCode}
                   onRemoveSymbol={handleRemoveSymbol}
                   quotesUpdatedAt={quotesUpdatedAt}
+                  breakEvenPrices={config?.break_even_prices}
+                  onBreakEvenChange={handleBreakEvenChange}
                 />
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -614,8 +656,15 @@ export function StockTracker() {
                     onHistoryLimitChange={setHistoryLimit}
                     analysisIndicators={config?.analysis_indicators}
                     onAnalysisIndicatorsChange={handleAnalysisIndicatorsChange}
+                    analysisFocus={config?.analysis_focus ?? "balanced"}
+                    onAnalysisFocusChange={handleAnalysisFocusChange}
                     loading={analysisLoading}
-                    onRun={() => runAnalysis(config?.analysis_indicators ?? null)}
+                    onRun={() =>
+                      runAnalysis(
+                        config?.analysis_indicators ?? null,
+                        config?.analysis_focus ?? null,
+                      )
+                    }
                     onClose={() => setAnalyzeOpen(false)}
                   />
                 ) : null}

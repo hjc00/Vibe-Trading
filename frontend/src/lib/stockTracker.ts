@@ -125,6 +125,12 @@ export const ANALYSIS_INDICATORS: AnalysisIndicatorMeta[] = [
 
 export const ALL_ANALYSIS_INDICATOR_KEYS: string[] = ANALYSIS_INDICATORS.map((i) => i.key);
 
+// Analysis emphasis presets; order matches backend models.ANALYSIS_FOCUS_OPTIONS.
+export const ANALYSIS_FOCUS_OPTIONS: AnalysisIndicatorMeta[] = [
+  { key: "balanced", labelKey: "stockTracker.focusBalanced" },
+  { key: "technical", labelKey: "stockTracker.focusTechnical" },
+];
+
 export function getSignalLabelKey(signal: SignalType): string {
   return SIGNAL_LABEL_KEYS[signal] ?? signal;
 }

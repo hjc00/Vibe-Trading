@@ -16,9 +16,12 @@ from typing import Any, Dict, List, Optional
 
 from src.providers.chat import ChatLLM
 from src.stock_tracker.models import (
+    ANALYSIS_FOCUS_BALANCED,
+    ANALYSIS_FOCUS_TECHNICAL,
     ANALYSIS_INDICATORS,
     AnalysisAction,
     AnalysisReport,
+    EvidenceItem,
     PortfolioInsight,
     PriceZone,
     SymbolRecommendation,
@@ -44,9 +47,15 @@ You are a quantitative analyst reviewing A-share technical, capital-flow, \
 fundamental and risk signals. You work strictly from the tracker data provided \
 and give research-oriented commentary, not personalized investment advice. \
 Be concise and data-driven. Do not invent metrics that are not in the input. \
+Quote metric values exactly as they appear in the input JSON; never round, \
+derive or invent numbers for key_metrics or basis. \
 Price levels (entry/target/stop zones) are research estimates derived from \
-support/resistance, ATR stop distance and valuation bands. Write all narrative \
-fields in Chinese.
+support/resistance, ATR stop distance and valuation bands. When a symbol \
+carries a user-supplied break_even_price (保本价/cost basis), the context also \
+gives break_even_pnl_pct = (close / break_even - 1)%; weigh the current close \
+against that cost basis, explicitly acknowledge sizeable unrealized gain/loss \
+in the rationale, and factor it into risk, stop and target levels. Write all \
+narrative fields in Chinese.
 """
 
 # One prompt directive bullet per analysis indicator block, keyed exactly as in
@@ -73,14 +82,57 @@ _INDICATOR_DIRECTIVES: Dict[str, str] = {
     "concepts": "概念热度榜：全市场概念板块涨幅/主力净流入/涨停家数排行；",
 }
 
+# Bullets listed first when ``analysis_focus=technical``; pure price/technical
+# dimensions lead so the emphasis reads top-down, then the remaining enabled
+# blocks follow in canonical order.
+_TECHNICAL_FIRST_KEYS = ["technical_indicators", "period_signals", "diff"]
+
+# One line appended to the system prompt per analysis focus (empty for balanced
+# so the default system prompt is untouched). Reinforces the emphasis at the
+# role level, not just in the user directive.
+_SYSTEM_FOCUS_NOTES: Dict[str, str] = {
+    ANALYSIS_FOCUS_TECHNICAL: (
+        "Technical signals and price action are your primary evidence; treat "
+        "fundamental, capital-flow, theme and sentiment data as secondary "
+        "context, and explicitly flag when they conflict with the dominant "
+        "technical picture.\n"
+    ),
+}
+
 _ANALYSIS_TAIL = """\
 不要套用一个固定模板，按每个标的实际的数据特点给出差异化判断；用 structured 的
 action 与价位区间把结论表达清楚，让报告可直接被跟踪验证。
 """
 
 
-def _build_analysis_directive(enabled: "set[str]") -> str:
-    """Compose the analysis directive from the enabled indicator blocks."""
+def _build_analysis_directive(enabled: "set[str]", focus: str = ANALYSIS_FOCUS_BALANCED) -> str:
+    """Compose the analysis directive from the enabled blocks and the focus.
+
+    ``balanced`` (default) weighs every enabled block equally, preserving the
+    canonical order. ``technical`` re-leads the directive toward price action +
+    technical signals, lists technical bullets first, and adds an explicit
+    conflict-resolution instruction so the model cannot quietly drop the other
+    dimensions.
+    """
+    if focus == ANALYSIS_FOCUS_TECHNICAL:
+        lines = [
+            "对所选标的做一次以技术面为主的定量研究分析。以价格行为与技术指标/信号为最主要"
+            "依据，其它数据维度（资金/题材/基本面等）仅作辅助参考："
+        ]
+        order = [k for k in _TECHNICAL_FIRST_KEYS if k in enabled]
+        order += [
+            k
+            for k in ANALYSIS_INDICATORS
+            if k in enabled and k not in _TECHNICAL_FIRST_KEYS
+        ]
+        lines.extend(f"- {_INDICATOR_DIRECTIVES[key]}" for key in order)
+        lines.append(
+            "技术指标与信号为主要证据；当资金、题材或基本面信号与主要技术信号冲突时，"
+            "须在 rationale 中指出冲突并给出按技术面的倾向，同时把反向风险写进 risks。"
+        )
+        lines.append(_ANALYSIS_TAIL)
+        return "\n".join(lines)
+
     lines = ["对所选标的做一次定量研究分析，综合权衡："]
     lines.extend(
         f"- {_INDICATOR_DIRECTIVES[key]}"
@@ -102,7 +154,12 @@ outside the JSON) with exactly this shape:
       "name": "贵州茅台",
       "action": "buy",
       "confidence": 75,
-      "rationale": "基于信号的简要中文判断",
+      "rationale": "依据下方 basis 的具体指标给出中文判断，先列读数再下结论",
+      "basis": [
+        {"indicator": "MACD DIF/DEA", "value": 1.23, "read": "零轴上方多头、柱放大"},
+        {"indicator": "KDJ J", "value": 82.0, "read": "偏高但未极端超买"},
+        {"indicator": "RPS_10", "value": 95.0, "read": "市场分位极强"}
+      ],
       "entry_zone": {"low": 1400.0, "high": 1450.0},
       "target_zone": {"low": 1600.0, "high": 1700.0},
       "stop_loss": 1350.0,
@@ -127,6 +184,12 @@ Rules:
 - "entry_zone"/"target_zone" are price bands; use null when not applicable.
 - "stop_loss" is a single reference price below the entry zone; null when N/A.
 - "reduce_trigger" states the concrete condition that would invalidate the call.
+- "basis" lists the concrete indicator readings you relied on. For each entry give
+  indicator (指标名) and value copied EXACTLY from the input JSON (never round,
+  derive or invent numbers; metrics only present in the input may be cited). read
+  states how that reading points to your call (e.g. 金叉/超买/放量倍数/分位). Fill at
+  least 1-3 entries per symbol and make every claim in "rationale" trace back to a
+  basis value.
 - Include one entry in "symbols" for every input symbol.
 """
 
@@ -236,6 +299,37 @@ def _coerce_str_list(value: Any) -> List[str]:
     if isinstance(value, (list, tuple)):
         return [str(x).strip() for x in value if str(x).strip()]
     return []
+
+
+def _coerce_evidence_list(value: Any) -> List[EvidenceItem]:
+    """Coerce a model-provided basis list into ``EvidenceItem`` records.
+
+    Tolerates strings, dicts and partial entries; records without an indicator
+    name are dropped so a sloppy reply degrades instead of failing.
+    """
+    if not isinstance(value, list):
+        return []
+    out: List[EvidenceItem] = []
+    for raw in value:
+        if isinstance(raw, str):
+            indicator = raw.strip()
+            if indicator:
+                out.append(EvidenceItem(indicator=indicator))
+            continue
+        if not isinstance(raw, dict):
+            continue
+        indicator = str(raw.get("indicator") or raw.get("name") or "").strip()
+        if not indicator:
+            continue
+        read = raw.get("read") or raw.get("basis") or raw.get("reason")
+        out.append(
+            EvidenceItem(
+                indicator=indicator,
+                value=raw.get("value"),
+                read=str(read).strip() if read is not None else None,
+            )
+        )
+    return out
 
 
 def _serialize_symbol(
@@ -428,6 +522,7 @@ def _normalize_symbol(item: Any) -> Optional[SymbolRecommendation]:
             key_metrics=item.get("key_metrics")
             if isinstance(item.get("key_metrics"), dict)
             else {},
+            basis=_coerce_evidence_list(item.get("basis") or item.get("evidence")),
         )
     except Exception:  # noqa: BLE001
         logger.debug("Dropping malformed analyzer symbol entry: %s", item)
@@ -460,6 +555,8 @@ def build_analysis_prompt(
     user_prompt: Optional[str] = None,
     history: Optional[Dict[str, Any]] = None,
     analysis_indicators: Optional[List[str]] = None,
+    break_even_prices: Optional[Dict[str, float]] = None,
+    analysis_focus: Optional[str] = None,
 ) -> str:
     """Build the user prompt from a snapshot and the selected symbols.
 
@@ -471,8 +568,40 @@ def build_analysis_prompt(
     ``analysis_indicators`` optionally restricts which indicator blocks are
     serialized into the context; when omitted the selection persisted on
     ``snapshot.config`` is used.
+
+    ``break_even_prices`` optionally maps each symbol code to its user-entered
+    break-even (保本) price; when omitted the map persisted on ``snapshot.config``
+    is used. Each symbol's ``break_even_price`` is injected on the identity block,
+    and when both a break-even and a current close are present a derived
+    ``break_even_pnl_pct`` (current-vs-break-even %) is added so gain/loss is
+    explicit rather than left to the model's arithmetic.
+
+    ``analysis_focus`` optionally overrides the emphasis preset persisted on
+    ``snapshot.config`` (balanced|technical); see :func:`_build_analysis_directive`.
     """
     enabled = _resolve_indicator_set(snapshot, analysis_indicators)
+    focus = (
+        analysis_focus
+        or getattr(snapshot.config, "analysis_focus", None)
+        or ANALYSIS_FOCUS_BALANCED
+    )
+
+    be_map = (
+        break_even_prices
+        if break_even_prices is not None
+        else snapshot.config.break_even_prices
+    )
+    symbols_data = []
+    for s in symbols:
+        serialized = _serialize_symbol(s, enabled)
+        break_even_price = be_map.get(s.code)
+        serialized["break_even_price"] = break_even_price
+        close = serialized.get("close")
+        if break_even_price is not None and close is not None:
+            serialized["break_even_pnl_pct"] = round(
+                (close - break_even_price) / break_even_price * 100.0, 2
+            )
+        symbols_data.append(serialized)
 
     context: Dict[str, Any] = {
         "trading_date": snapshot.trading_date.isoformat() if snapshot.trading_date else None,
@@ -480,7 +609,7 @@ def build_analysis_prompt(
         "signals": snapshot.config.signals,
         "thresholds": snapshot.config.thresholds.model_dump(mode="json"),
         "rankings": snapshot.rankings,
-        "symbols": [_serialize_symbol(s, enabled) for s in symbols],
+        "symbols": symbols_data,
     }
     if "sectors" in enabled:
         context["sectors"] = [
@@ -501,7 +630,7 @@ def build_analysis_prompt(
     extra = f"\n用户补充指令：{user_prompt}" if user_prompt else ""
 
     text = (
-        f"{_build_analysis_directive(enabled)}{extra}\n\n"
+        f"{_build_analysis_directive(enabled, focus)}{extra}\n\n"
         f"追踪快照数据（JSON）：\n"
         f"{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
     )
@@ -563,30 +692,41 @@ def run_analysis(
     user_prompt: Optional[str] = None,
     history: Optional[Dict[str, Any]] = None,
     analysis_indicators: Optional[List[str]] = None,
+    break_even_prices: Optional[Dict[str, float]] = None,
+    analysis_focus: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Call the configured LLM and return a normalized report dict.
 
     This is synchronous by design so it can be offloaded to a worker thread by
     the API route via ``asyncio.to_thread``.
     """
+    focus = (
+        analysis_focus
+        or getattr(snapshot.config, "analysis_focus", None)
+        or ANALYSIS_FOCUS_BALANCED
+    )
+    system_prompt = _SYSTEM_PROMPT + _SYSTEM_FOCUS_NOTES.get(focus, "")
     prompt = build_analysis_prompt(
         snapshot,
         symbols,
         user_prompt=user_prompt,
         history=history,
         analysis_indicators=analysis_indicators,
+        break_even_prices=break_even_prices,
+        analysis_focus=focus,
     )
     llm = ChatLLM()
     logger.info(
-        "Stock-tracker LLM analysis start: %d symbol(s), provider=%s, model=%s",
+        "Stock-tracker LLM analysis start: %d symbol(s), provider=%s, model=%s, focus=%s",
         len(symbols),
         llm.runtime_snapshot.provider,
         llm.model_name,
+        focus,
     )
     try:
         response = llm.chat(
             [
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
             ]
         )
