@@ -381,3 +381,92 @@ def test_run_analysis_falls_back_to_raw_text():
         report = run_analysis(snapshot, snapshot.symbols)
     assert report["summary"] == "无法分析"
     assert report["symbols"] == []
+
+
+def _indicator_series():
+    from datetime import timedelta
+
+    from src.stock_tracker.models import DivergenceMark, IndicatorBar, IndicatorSeries
+
+    base = date(2026, 8, 1)
+    bars = []
+    for i in range(20):
+        bars.append(
+            IndicatorBar(
+                trade_date=base + timedelta(days=i),
+                close=100.0 + i,
+                dif=float(i - 10),
+                dea=float(i - 11),
+                macd_hist=1.0,
+                k=60.0,
+                d=50.0,
+                j=70.0,
+                pct_b=0.5,
+                bandwidth=0.2,
+            )
+        )
+    return IndicatorSeries(
+        bars=bars,
+        divergence_marks=[
+            # Anchors 17/18 fall inside the serialized tail (offset 5) -> remapped.
+            DivergenceMark(kind="top", price_hi_idx=18, dif_hi_idx=17),
+            # Anchors 1/2 fall before the tail -> dropped.
+            DivergenceMark(kind="bottom", price_lo_idx=2, dif_lo_idx=1),
+        ],
+    )
+
+
+def test_serialize_symbol_keeps_indicators_null_when_absent():
+    symbol = _snapshot().symbols[0]
+    data = _serialize_symbol(symbol)
+    # Enabled-but-unavailable technical-indicator block keeps its null value.
+    assert "indicators" in data
+    assert data["indicators"] is None
+
+
+def test_serialize_indicators_compacts_and_remaps_divergence():
+    symbol = _snapshot().symbols[0]
+    symbol.indicators = _indicator_series()
+    data = _serialize_symbol(symbol)
+    assert data["indicators"] is not None
+    # Only the short trailing window survives (20 -> 15 bars), date as ISO.
+    bars = data["indicators"]["bars"]
+    assert len(bars) == 15
+    assert bars[0]["trade_date"] == "2026-08-06"
+    assert bars[-1]["close"] == 119.0
+    assert bars[-1]["dif"] == 9.0
+    assert bars[-1]["k"] == 60.0
+    # The out-of-window mark is dropped; the in-window one is re-indexed.
+    assert data["indicators"]["divergence_marks"] == [
+        {
+            "kind": "top",
+            "price_hi_idx": 13,
+            "dif_hi_idx": 12,
+            "price_lo_idx": None,
+            "dif_lo_idx": None,
+        }
+    ]
+
+
+def test_serialize_symbol_gates_technical_indicators_by_enabled():
+    symbol = _snapshot().symbols[0]
+    symbol.indicators = _indicator_series()
+    data = _serialize_symbol(symbol, enabled={"period_signals"})
+    assert "indicators" not in data
+    data = _serialize_symbol(symbol, enabled={"technical_indicators"})
+    assert "indicators" in data
+    # Other blocks stay disabled while only technical indicators are enabled.
+    assert "period_signals" not in data
+    assert "risk" not in data
+
+
+def test_build_analysis_prompt_technical_indicators_directive():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert "技术指标" in prompt
+    # Disabling the block removes its directive bullet from the prompt.
+    prompt = build_analysis_prompt(
+        snapshot, snapshot.symbols, analysis_indicators=["period_signals"]
+    )
+    assert "技术指标" not in prompt
+    assert "技术面" in prompt

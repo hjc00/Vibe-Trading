@@ -1747,6 +1747,7 @@
     "analysisIndicatorsCount": "AI 分析指标 · 已选 {{count}} 项",
     "analysisIndicatorsHint": "勾选的指标会传给 AI，未勾选的不传入",
     "indicatorPeriodSignals": "技术面",
+    "indicatorTechnicalIndicators": "技术指标",
     "indicatorFundFlow": "主力资金",
     "indicatorMargin": "融资融券",
     "indicatorRisk": "风险指标",

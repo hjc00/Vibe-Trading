@@ -32,6 +32,13 @@ logger = logging.getLogger(__name__)
 # or caller does not restrict the prompt to a subset.
 _ALL_INDICATORS = frozenset(ANALYSIS_INDICATORS)
 
+# How many of the most recent per-bar technical-indicator rows (``indicators``)
+# are fed to the model per symbol. The engine keeps ~130 bars of MACD/KDJ/
+# Bollinger history for the chart; the full series is far too large for a
+# prompt, so only a short trailing window is serialized (enough to read recent
+# crosses, oversold/overbought zones and momentum).
+_INDICATOR_TAIL_BARS = 15
+
 _SYSTEM_PROMPT = """\
 You are a quantitative analyst reviewing A-share technical, capital-flow, \
 fundamental and risk signals. You work strictly from the tracker data provided \
@@ -48,6 +55,9 @@ fields in Chinese.
 _INDICATOR_DIRECTIVES: Dict[str, str] = {
     "period_signals": "技术面：各周期信号（放量/突破/均线排列/RSI）、周期涨跌与量能、"
     "RPS 市场与行业分位、均线/RSI/波动率等趋势指标；",
+    "technical_indicators": "技术指标：近端逐日 MACD（DIF/DEA/柱）、KDJ（K/D/J）、"
+    "布林带 %B 与带宽、均线与背离标注（indices 相对 indicators.bars），判断动量、"
+    "超买超卖与波动收放；",
     "fund_flow": "资金面·主力资金：当日主力净流入及占比、5 日累计净流入、超大单/大单/中单/小单分布；",
     "margin": "资金面·融资融券：融资余额及日变化、融资融券总余额及变化；",
     "risk": "风险：ATR 波动、距止损参考价的距离、最大回撤、Beta；",
@@ -298,7 +308,67 @@ def _serialize_symbol(
         data["sector_board"] = symbol.sector_board
         data["sector_strength_rank"] = symbol.sector_strength_rank
 
+    # 2.20 technical-indicator series (MACD/KDJ/Bollinger per-bar rows plus
+    # divergence annotations), compacted to a short trailing window.
+    if "technical_indicators" in enabled:
+        data["indicators"] = _serialize_indicators(symbol.indicators)
+
     return data
+
+
+def _serialize_indicators(series: Any) -> Optional[Dict[str, Any]]:
+    """Project an :class:`IndicatorSeries` into a compact context dict.
+
+    Only the most recent ``_INDICATOR_TAIL_BARS`` daily rows are kept and the
+    OHLCV that powers the chart is dropped, so prompt size stays bounded.
+    ``divergence_marks`` anchor into the chart's full bar list; marks whose
+    anchors fall outside the serialized tail are dropped and the survivors are
+    re-indexed relative to the returned ``bars`` so the model can read them.
+    """
+    if series is None:
+        return None
+    bars = series.bars or []
+    tail = bars[-_INDICATOR_TAIL_BARS:]
+    offset = len(bars) - len(tail)
+
+    out_bars: List[Dict[str, Any]] = []
+    for bar in tail:
+        out_bars.append(
+            {
+                "trade_date": bar.trade_date.isoformat() if bar.trade_date else None,
+                "close": bar.close,
+                "ma5": bar.ma5,
+                "ma20": bar.ma20,
+                "ma60": bar.ma60,
+                "dif": bar.dif,
+                "dea": bar.dea,
+                "macd_hist": bar.macd_hist,
+                "k": bar.k,
+                "d": bar.d,
+                "j": bar.j,
+                "pct_b": bar.pct_b,
+                "bandwidth": bar.bandwidth,
+            }
+        )
+
+    marks: List[Dict[str, Any]] = []
+    for mark in series.divergence_marks or []:
+        anchor_indices = [
+            i for i in (mark.price_hi_idx, mark.price_lo_idx, mark.dif_hi_idx, mark.dif_lo_idx)
+            if i is not None
+        ]
+        if not anchor_indices or min(anchor_indices) < offset:
+            continue  # anchors lie before the serialized tail
+        marks.append(
+            {
+                "kind": mark.kind,
+                "price_hi_idx": mark.price_hi_idx - offset if mark.price_hi_idx is not None else None,
+                "price_lo_idx": mark.price_lo_idx - offset if mark.price_lo_idx is not None else None,
+                "dif_hi_idx": mark.dif_hi_idx - offset if mark.dif_hi_idx is not None else None,
+                "dif_lo_idx": mark.dif_lo_idx - offset if mark.dif_lo_idx is not None else None,
+            }
+        )
+    return {"bars": out_bars, "divergence_marks": marks}
 
 
 def _serialize_sector(sector: Any) -> Optional[Dict[str, Any]]:

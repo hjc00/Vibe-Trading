@@ -35,6 +35,7 @@ DEFAULT_WATCHLIST: List[str] = [
 # both the config canonical order and the prompt directive bullet order.
 ANALYSIS_INDICATORS: List[str] = [
     "period_signals",
+    "technical_indicators",
     "fund_flow",
     "margin",
     "risk",

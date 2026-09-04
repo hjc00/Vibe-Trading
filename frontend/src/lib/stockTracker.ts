@@ -107,6 +107,7 @@ export interface AnalysisIndicatorMeta {
 
 export const ANALYSIS_INDICATORS: AnalysisIndicatorMeta[] = [
   { key: "period_signals", labelKey: "stockTracker.indicatorPeriodSignals" },
+  { key: "technical_indicators", labelKey: "stockTracker.indicatorTechnicalIndicators" },
   { key: "fund_flow", labelKey: "stockTracker.indicatorFundFlow" },
   { key: "margin", labelKey: "stockTracker.indicatorMargin" },
   { key: "risk", labelKey: "stockTracker.indicatorRisk" },
