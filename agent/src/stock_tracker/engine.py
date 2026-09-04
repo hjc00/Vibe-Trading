@@ -103,6 +103,17 @@ def _as_float(value: Any) -> Optional[float]:
     return None if pd.isna(result) else result
 
 
+def _row_trade_date(row: Dict[str, Any]) -> Optional[date]:
+    """Return a raw market-data record's bar date, or ``None`` when unparseable."""
+    value = row.get("trade_date") or row.get("date") or row.get("datetime")
+    if value is None:
+        return None
+    try:
+        return pd.to_datetime(value).date()
+    except (TypeError, ValueError):
+        return None
+
+
 def _volume_burst_series(df: pd.DataFrame) -> pd.Series:
     """Boolean per-session mask: volume >= 1.5x the trailing 5-session average.
 
@@ -136,6 +147,9 @@ class StockTrackerEngine:
         self._events_cache = EventsDataCache()
         self._chip_cache = ChipDataCache()
         self._consensus_cache = ConsensusDataCache()
+        # Populated by ``refresh`` for same-day runs; merged into wide symbol and
+        # benchmark series so the newest snapshot bar is the live session.
+        self._current_day_live_rows: Dict[str, List[Dict[str, Any]]] = {}
 
     def refresh(
         self,
@@ -161,6 +175,20 @@ class StockTrackerEngine:
         # a refresh does not re-request throttled/blocked Eastmoney sources.
         self._seed_caches_from_previous(previous, trading_date)
         start_date = end_date - timedelta(days=max(self.config.periods) + _BUFFER_DAYS)
+
+        # Tencent's daily kline only serves the current session's bar for an
+        # exact single-day window — a wide finalized window can lag "today" until
+        # the feed settles. When refreshing the current day, fetch that single-day
+        # bar once so symbol OHLCV and the RPS benchmark can be padded to
+        # ``end_date`` when their wide series miss it (see ``_merge_current_day``).
+        # Historical (backfill) refreshes never do this.
+        self._current_day_live_rows: Dict[str, List[Dict[str, Any]]] = {}
+        if end_date >= date.today():
+            self._current_day_live_rows = self._fetch_current_day_rows(
+                list(self.config.watchlist)
+                + [_RPS_MARKET_BENCHMARK, _RPS_MARKET_BENCHMARK_FALLBACK],
+                end_date,
+            )
 
         # Only fetch the data dimensions the currently visible cards consume;
         # a hidden card no longer drives its network fetch on refresh.
@@ -412,7 +440,7 @@ class StockTrackerEngine:
     ) -> Dict[str, Any]:
         """Fetch normalized OHLCV for all configured symbols."""
         try:
-            return fetch_market_data(
+            raw = fetch_market_data(
                 codes=codes,
                 start_date=start_date,
                 end_date=end_date,
@@ -424,6 +452,78 @@ class StockTrackerEngine:
         except Exception as exc:  # noqa: BLE001
             logger.exception("Market data fetch failed")
             return {"_unresolved": codes, "error": str(exc)}
+
+        live = getattr(self, "_current_day_live_rows", {}) or {}
+        if live and isinstance(raw, dict):
+            end = date.fromisoformat(end_date)
+            for code in codes:
+                history_rows = raw.get(code)
+                live_rows = live.get(code)
+                if not isinstance(history_rows, list) or not isinstance(live_rows, list):
+                    continue
+                merged = self._merge_current_day(history_rows, live_rows, end)
+                if merged is not history_rows:
+                    raw[code] = merged
+        return raw
+
+    @staticmethod
+    def _merge_current_day(
+        history_rows: List[Dict[str, Any]],
+        live_rows: List[Dict[str, Any]],
+        end_date: date,
+    ) -> List[Dict[str, Any]]:
+        """Append the current session's live bar to a finalized series when missing.
+
+        Tencent serves today's bar only for an exact single-day window; a wide
+        finalized window lags until the feed settles. When the finalized rows do
+        not yet carry ``end_date`` (a same-day refresh) but the live fetch does,
+        the live bar is appended so the newest snapshot bar is truly the current
+        session instead of the prior one being shown as today. Rows are returned
+        unchanged when the series already reaches ``end_date`` or the live fetch
+        has no bar for it (non-trading day, pre-open, transient failure).
+        """
+        if not history_rows or not live_rows:
+            return history_rows
+        if any(_row_trade_date(row) == end_date for row in history_rows):
+            return history_rows
+        additions = [row for row in live_rows if _row_trade_date(row) == end_date]
+        if not additions:
+            return history_rows
+        return history_rows + additions
+
+    def _fetch_current_day_rows(
+        self,
+        codes: List[str],
+        end_date: date,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """Fetch each code's single-day live bar for ``end_date`` (one batch).
+
+        The loader returns a bar for that exact day when one exists — i.e. the
+        current session during/after the trading day. Codes with no bar for
+        ``end_date`` (weekend, holiday, pre-open, transient failure) are simply
+        absent, leaving the caller's settled series untouched.
+        """
+        if not codes:
+            return {}
+        end_str = end_date.isoformat()
+        try:
+            payload = fetch_market_data(
+                codes=codes,
+                start_date=end_str,
+                end_date=end_str,
+                source="auto",
+                interval="1D",
+                max_rows=0,
+                include_provenance=False,
+            )
+        except Exception:  # noqa: BLE001 - a missing live bar is not fatal
+            logger.warning("Current-day live bar fetch failed for %s", codes)
+            return {}
+        rows: Dict[str, List[Dict[str, Any]]] = {}
+        for code in codes:
+            if isinstance(payload.get(code), list) and payload[code]:
+                rows[code] = payload[code]
+        return rows
 
     @staticmethod
     def _records_to_dataframe(records: List[Dict[str, Any]]) -> pd.DataFrame:
@@ -676,6 +776,11 @@ class StockTrackerEngine:
                 records = raw.get(code)
                 if not records:
                     continue
+                live = (getattr(self, "_current_day_live_rows", {}) or {}).get(code)
+                if live:
+                    records = self._merge_current_day(
+                        records, live, date.fromisoformat(end_date)
+                    )
                 df = self._records_to_dataframe(records)
                 if not df.empty:
                     return df

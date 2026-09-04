@@ -1139,5 +1139,118 @@ def test_fetch_capital_data_forwards_include_flags(monkeypatch):
     assert seen == {"include_fund_flow": False, "include_margin": True}
 
 
+def _ohlcv_row(day: str, volume: float, close: float = 10.0) -> dict:
+    """A single normalized OHLCV market-data record for tests."""
+    return {
+        "date": day,
+        "open": close,
+        "high": close,
+        "low": close,
+        "close": close,
+        "volume": volume,
+    }
+
+
+def _history_rows(last_day: str) -> list:
+    """Two finalized rows ending on ``last_day`` (used as the "wide" series)."""
+    return [_ohlcv_row("2026-09-02", 100.0), _ohlcv_row(last_day, 200.0)]
+
+
+def test_merge_current_day_appends_missing_today_bar():
+    end = date(2026, 9, 4)
+    history = _history_rows("2026-09-03")
+    live = [_ohlcv_row("2026-09-04", 777.0)]
+    merged = StockTrackerEngine._merge_current_day(history, live, end)
+
+    assert len(merged) == 3
+    df = StockTrackerEngine._records_to_dataframe(merged)
+    assert df.index.max().date() == end
+    assert float(df["volume"].iloc[-1]) == 777.0
+
+
+def test_merge_current_day_keeps_series_when_today_already_settled():
+    end = date(2026, 9, 4)
+    history = _history_rows("2026-09-04")
+    live = [_ohlcv_row("2026-09-04", 777.0)]
+    merged = StockTrackerEngine._merge_current_day(history, live, end)
+
+    assert merged is history  # identical object, no stale refetch semantics
+
+
+def test_merge_current_day_ignores_live_bar_for_other_day():
+    # A non-trading day: the wide series ends 09-03 and the single-day window
+    # returns no bar for the weekend end_date, so nothing is appended.
+    end = date(2026, 9, 6)
+    history = _history_rows("2026-09-03")
+    live = [_ohlcv_row("2026-09-03", 200.0)]  # settled session, not the weekend
+    merged = StockTrackerEngine._merge_current_day(history, live, end)
+
+    assert merged is history
+
+
+def test_fetch_data_pads_series_with_current_day_live(monkeypatch):
+    def fake_fetch_market_data(codes, *, start_date, end_date, **kwargs):
+        return {codes[0]: _history_rows("2026-09-03")}
+
+    monkeypatch.setattr(
+        "src.stock_tracker.engine.fetch_market_data", fake_fetch_market_data
+    )
+    engine = StockTrackerEngine(TrackerConfig(watchlist=["000001.SZ"], periods=[10]))
+    engine._current_day_live_rows = {"000001.SZ": [_ohlcv_row("2026-09-04", 777.0)]}
+
+    raw = engine._fetch_data(["000001.SZ"], "2026-08-01", "2026-09-04")
+    df = StockTrackerEngine._records_to_dataframe(raw["000001.SZ"])
+
+    assert df.index.max().date() == date(2026, 9, 4)
+    assert float(df["volume"].iloc[-1]) == 777.0
+
+
+def test_fetch_data_unchanged_without_live_rows(monkeypatch):
+    def fake_fetch_market_data(codes, *, start_date, end_date, **kwargs):
+        return {codes[0]: _history_rows("2026-09-03")}
+
+    monkeypatch.setattr(
+        "src.stock_tracker.engine.fetch_market_data", fake_fetch_market_data
+    )
+    engine = StockTrackerEngine(TrackerConfig(watchlist=["000001.SZ"], periods=[10]))
+    raw = engine._fetch_data(["000001.SZ"], "2026-08-01", "2026-09-03")
+
+    assert len(raw["000001.SZ"]) == 2
+
+
+def test_fetch_benchmark_data_pads_current_day(monkeypatch):
+    def fake_fetch_market_data(codes, *, start_date, end_date, **kwargs):
+        return {codes[0]: _history_rows("2026-09-03")}
+
+    monkeypatch.setattr(
+        "src.stock_tracker.engine.fetch_market_data", fake_fetch_market_data
+    )
+    engine = StockTrackerEngine(TrackerConfig(watchlist=["000001.SZ"], periods=[10]))
+    engine._current_day_live_rows = {"000300.SH": [_ohlcv_row("2026-09-04", 777.0)]}
+
+    df = engine._fetch_benchmark_data("2026-08-01", "2026-09-04")
+
+    assert df is not None
+    assert df.index.max().date() == date(2026, 9, 4)
+
+
+def test_fetch_current_day_rows_uses_exact_single_day_window(monkeypatch):
+    seen: dict = {}
+
+    def fake_fetch_market_data(codes, *, start_date, end_date, **kwargs):
+        seen["start_date"] = start_date
+        seen["end_date"] = end_date
+        return {"000001.SZ": [_ohlcv_row("2026-09-04", 777.0)]}
+
+    monkeypatch.setattr(
+        "src.stock_tracker.engine.fetch_market_data", fake_fetch_market_data
+    )
+    engine = StockTrackerEngine(TrackerConfig(watchlist=["000001.SZ"]))
+    rows = engine._fetch_current_day_rows(["000001.SZ"], date(2026, 9, 4))
+
+    assert seen == {"start_date": "2026-09-04", "end_date": "2026-09-04"}
+    assert "000001.SZ" in rows
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
