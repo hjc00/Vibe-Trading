@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
-import { Eye, TrendingUp, Trash2 } from "lucide-react";
+import { ChevronUp, Eye, TrendingUp, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, type SignalMeta, type SymbolSnapshot, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import {
@@ -16,6 +16,11 @@ import {
   normalizeAShareCode,
   type HideableCardId,
 } from "@/lib/stockTracker";
+import {
+  cardCollapseKey,
+  isCardCollapsed,
+  setCardCollapsed,
+} from "@/hooks/useCardCollapse";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
 import { TrackerControlBar } from "@/components/stock-tracker/TrackerControlBar";
@@ -48,6 +53,8 @@ const POLL_INTERVAL_MS = 2000;
 type DetailCardComponent = ComponentType<{
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }>;
 
 const DETAIL_CARDS: { id: HideableCardId; Component: DetailCardComponent }[] = [
@@ -75,6 +82,13 @@ export function StockTracker() {
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [addCode, setAddCode] = useState("");
   const [signalMeta, setSignalMeta] = useState<SignalMeta[]>([]);
+  const [collapsedDetailIds, setCollapsedDetailIds] = useState<Set<HideableCardId>>(() => {
+    const ids = new Set<HideableCardId>();
+    for (const { id } of DETAIL_CARDS) {
+      if (isCardCollapsed(cardCollapseKey(id))) ids.add(id);
+    }
+    return ids;
+  });
   const {
     open: analyzeOpen,
     selectedSymbols,
@@ -276,6 +290,23 @@ export function StockTracker() {
     [config],
   );
 
+  // Collapse/expand a dashboard detail card. A collapsed card leaves the grid so
+  // its slot is reclaimed by later cards; it is listed below the grid to restore.
+  const handleToggleCollapse = useCallback(
+    (id: HideableCardId) => {
+      const next = new Set(collapsedDetailIds);
+      if (next.has(id)) {
+        next.delete(id);
+        setCardCollapsed(cardCollapseKey(id), false);
+      } else {
+        next.add(id);
+        setCardCollapsed(cardCollapseKey(id), true);
+      }
+      setCollapsedDetailIds(next);
+    },
+    [collapsedDetailIds],
+  );
+
   const handleAddSymbol = useCallback(async () => {
     if (!config) return;
     const normalized = normalizeAShareCode(addCode);
@@ -377,6 +408,9 @@ export function StockTracker() {
     [config?.card_visibility],
   );
 
+  const expandedDetailCards = detailCards.filter((card) => !collapsedDetailIds.has(card.id));
+  const collapsedDetailCards = detailCards.filter((card) => collapsedDetailIds.has(card.id));
+
   return (
     <div className="min-h-screen p-6 lg:p-8">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
@@ -435,6 +469,24 @@ export function StockTracker() {
               </section>
             ) : (
               <section className="flex flex-col gap-4">
+                {collapsedDetailCards.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-xs">
+                    <span className="text-muted-foreground">{t("stockTracker.collapsedCards")}</span>
+                    {collapsedDetailCards.map(({ id }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => handleToggleCollapse(id)}
+                        title={t("stockTracker.expandCard")}
+                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                      >
+                        <ChevronUp className="h-3 w-3" />
+                        {t(CARD_TITLE_LABEL_KEYS[id] as never)}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
                 {isCardVisible("market_sentiment", config?.card_visibility) ? (
                   <MarketSentimentBar
                     sentiment={snapshot.market_sentiment}
@@ -471,11 +523,13 @@ export function StockTracker() {
                 />
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {detailCards.map(({ id, Component }) => (
+                  {expandedDetailCards.map(({ id, Component }) => (
                     <Component
                       key={id}
                       symbol={selectedSymbol}
                       onHide={() => handleToggleCard(id)}
+                      collapsed={collapsedDetailIds.has(id)}
+                      onToggle={() => handleToggleCollapse(id)}
                     />
                   ))}
                 </div>

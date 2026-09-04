@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Layers } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { useCardCollapse } from "@/hooks/useCardCollapse";
 import {
   formatCapitalAmount,
   formatDataDate,
@@ -83,13 +84,10 @@ function PeriodTrendCell({ metrics }: { metrics: SectorPeriodMetric[] | undefine
 
 export function SectorStrengthBoard({ sectors, concepts, tradingDate, onHide }: SectorStrengthBoardProps) {
   const { t } = useTranslation();
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
+  const { collapsed, toggle: toggleCollapsed } = useCardCollapse(
+    "sector",
+    COLLAPSE_STORAGE_KEY,
+  );
   const [tab, setTab] = useState<BoardTab>(() => {
     try {
       return localStorage.getItem(TAB_STORAGE_KEY) === "concept" ? "concept" : "industry";
@@ -97,17 +95,6 @@ export function SectorStrengthBoard({ sectors, concepts, tradingDate, onHide }: 
       return "industry";
     }
   });
-  const toggleCollapsed = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
-      } catch {
-        /* storage unavailable — keep the in-memory state only */
-      }
-      return next;
-    });
-  }, []);
   const selectTab = useCallback((next: BoardTab) => {
     setTab(next);
     try {

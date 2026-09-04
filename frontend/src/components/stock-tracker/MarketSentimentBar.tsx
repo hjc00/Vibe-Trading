@@ -1,6 +1,7 @@
-import { EyeOff, Thermometer } from "lucide-react";
+import { ChevronDown, EyeOff, Thermometer } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
+import { useCardCollapse } from "@/hooks/useCardCollapse";
 import { getSentimentBandClass, getSentimentBandLabelKey } from "@/lib/stockTracker";
 import type { MarketSentimentSnapshot } from "@/lib/api";
 
@@ -22,6 +23,8 @@ function formatRatioPct(value: number | null | undefined): string {
 export function MarketSentimentBar({ sentiment, onHide }: MarketSentimentBarProps) {
   const { t } = useTranslation();
   const hideCard = t("stockTracker.hideCard");
+  const collapseLabel = t("stockTracker.sentimentTitle");
+  const { collapsed, toggle } = useCardCollapse("market_sentiment");
 
   if (!sentiment || sentiment.source === "unavailable") {
     return (
@@ -80,50 +83,66 @@ export function MarketSentimentBar({ sentiment, onHide }: MarketSentimentBarProp
               <EyeOff className="h-4 w-4" />
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            aria-label={collapseLabel}
+            title={collapseLabel}
+            className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <ChevronDown
+              className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")}
+            />
+          </button>
         </div>
       </div>
 
-      <div className="relative h-2.5 w-full rounded-full bg-gradient-to-r from-info via-muted to-danger">
-        <div
-          className="absolute -top-0.5 h-3.5 w-1.5 -translate-x-1/2 rounded-full bg-foreground"
-          style={{ left: `${markerLeft}%` }}
-          aria-hidden
-        />
-      </div>
+      {!collapsed && (
+        <>
+          <div className="relative h-2.5 w-full rounded-full bg-gradient-to-r from-info via-muted to-danger">
+            <div
+              className="absolute -top-0.5 h-3.5 w-1.5 -translate-x-1/2 rounded-full bg-foreground"
+              style={{ left: `${markerLeft}%` }}
+              aria-hidden
+            />
+          </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] sm:grid-cols-3 lg:grid-cols-6">
-        <Metric
-          label={t("stockTracker.sentimentLimitUp")}
-          value={sentiment.limit_up_count != null ? String(sentiment.limit_up_count) : "—"}
-          tone="text-success"
-        />
-        <Metric
-          label={t("stockTracker.sentimentLimitDown")}
-          value={sentiment.limit_down_count != null ? String(sentiment.limit_down_count) : "—"}
-          tone="text-danger"
-        />
-        <Metric
-          label={t("stockTracker.sentimentBrokenRatio")}
-          value={formatRatioPct(sentiment.broken_ratio)}
-          tone={sentiment.broken_ratio != null && sentiment.broken_ratio > 0.3 ? "text-danger" : undefined}
-        />
-        <Metric
-          label={t("stockTracker.sentimentMaxHeight")}
-          value={sentiment.max_board_height != null ? String(sentiment.max_board_height) : "—"}
-        />
-        <Metric
-          label={t("stockTracker.sentimentUpDown")}
-          value={
-            sentiment.up_count != null || sentiment.down_count != null
-              ? `${sentiment.up_count ?? "—"}/${sentiment.down_count ?? "—"}`
-              : "—"
-          }
-        />
-        <Metric
-          label={t("stockTracker.sentimentPrevPerf")}
-          value={formatRatioPct(sentiment.prev_limit_up_perf)}
-        />
-      </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] sm:grid-cols-3 lg:grid-cols-6">
+            <Metric
+              label={t("stockTracker.sentimentLimitUp")}
+              value={sentiment.limit_up_count != null ? String(sentiment.limit_up_count) : "—"}
+              tone="text-success"
+            />
+            <Metric
+              label={t("stockTracker.sentimentLimitDown")}
+              value={sentiment.limit_down_count != null ? String(sentiment.limit_down_count) : "—"}
+              tone="text-danger"
+            />
+            <Metric
+              label={t("stockTracker.sentimentBrokenRatio")}
+              value={formatRatioPct(sentiment.broken_ratio)}
+              tone={sentiment.broken_ratio != null && sentiment.broken_ratio > 0.3 ? "text-danger" : undefined}
+            />
+            <Metric
+              label={t("stockTracker.sentimentMaxHeight")}
+              value={sentiment.max_board_height != null ? String(sentiment.max_board_height) : "—"}
+            />
+            <Metric
+              label={t("stockTracker.sentimentUpDown")}
+              value={
+                sentiment.up_count != null || sentiment.down_count != null
+                  ? `${sentiment.up_count ?? "—"}/${sentiment.down_count ?? "—"}`
+                  : "—"
+              }
+            />
+            <Metric
+              label={t("stockTracker.sentimentPrevPerf")}
+              value={formatRatioPct(sentiment.prev_limit_up_perf)}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }

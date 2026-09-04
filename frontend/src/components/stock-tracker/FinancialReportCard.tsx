@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { getChangeToneClass } from "@/lib/stockTracker";
 import { cn } from "@/lib/utils";
+import { useCardCollapse } from "@/hooks/useCardCollapse";
 import { ChartCardHeader } from "./ChartCardHeader";
 
 interface FinancialReportCardProps {
@@ -117,6 +118,7 @@ const METRICS: MetricDef[] = [
  */
 export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps) {
   const { t } = useTranslation();
+  const { collapsed, toggle } = useCardCollapse("financial_report");
   const code = symbol?.code;
   const [report, setReport] = useState<FinancialReportSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
@@ -162,6 +164,8 @@ export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps
         title={t("stockTracker.financialReportTitle")}
         helpText={t("stockTracker.financialReportExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={toggle}
         meta={
           report && latest
             ? `${latest.report_type} · ${latest.end_date}`
@@ -188,7 +192,7 @@ export function FinancialReportCard({ symbol, onHide }: FinancialReportCardProps
         }
       />
 
-      {!report ? (
+      {collapsed ? null : !report ? (
         <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-muted-foreground">
           {loading ? (
             <>

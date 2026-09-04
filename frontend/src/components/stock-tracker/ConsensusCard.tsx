@@ -12,6 +12,8 @@ import type { SymbolSnapshot } from "@/lib/api";
 interface ConsensusCardProps {
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
 /** Format a fraction (e.g. 0.128) as a signed percent. */
@@ -29,7 +31,7 @@ function formatPriceOrDash(value: number | null | undefined): string {
  * Sell-side consensus for one symbol (盈利预期/一致预期): coverage, rating mix,
  * consensus EPS, forward PE, target-price range and upside vs the latest close.
  */
-export function ConsensusCard({ symbol, onHide }: ConsensusCardProps) {
+export function ConsensusCard({ symbol, onHide, collapsed = false, onToggle }: ConsensusCardProps) {
   const { t } = useTranslation();
   const consensus = symbol?.consensus;
   const hasData =
@@ -45,13 +47,15 @@ export function ConsensusCard({ symbol, onHide }: ConsensusCardProps) {
         title={t("stockTracker.consensusTitle")}
         helpText={t("stockTracker.consensusExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={onToggle}
         meta={
           consensus?.source && consensus.source !== "unavailable"
             ? t("stockTracker.dataSource", { source: consensus.source })
             : undefined
         }
       />
-      {!hasData ? (
+      {collapsed ? null : !hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-muted-foreground">
           <Target className="h-8 w-8 opacity-40" />
           <span className="text-xs">{t("stockTracker.consensusNoData")}</span>

@@ -16,9 +16,11 @@ import type { SymbolSnapshot } from "@/lib/api";
 interface RiskMetricsCardProps {
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
-export function RiskMetricsCard({ symbol, onHide }: RiskMetricsCardProps) {
+export function RiskMetricsCard({ symbol, onHide, collapsed = false, onToggle }: RiskMetricsCardProps) {
   const { t } = useTranslation();
 
   const risk = symbol?.risk;
@@ -34,11 +36,13 @@ export function RiskMetricsCard({ symbol, onHide }: RiskMetricsCardProps) {
         title={t("stockTracker.riskTitle")}
         helpText={t("stockTracker.riskExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={onToggle}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(latestPeriodEndDate(symbol)),
         })}
       />
-      {!hasData ? (
+      {collapsed ? null : !hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-muted-foreground">
           <ShieldAlert className="h-8 w-8 opacity-40" />
           <span className="text-xs">{t("stockTracker.noRiskData")}</span>

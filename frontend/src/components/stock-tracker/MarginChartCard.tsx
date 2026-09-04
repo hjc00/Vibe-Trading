@@ -10,9 +10,11 @@ import type { SymbolSnapshot } from "@/lib/api";
 interface MarginChartCardProps {
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
-export function MarginChartCard({ symbol, onHide }: MarginChartCardProps) {
+export function MarginChartCard({ symbol, onHide, collapsed = false, onToggle }: MarginChartCardProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -127,7 +129,7 @@ export function MarginChartCard({ symbol, onHide }: MarginChartCardProps) {
         ],
       };
     },
-    [data, t],
+    [data, t, collapsed],
   );
 
   return (
@@ -136,19 +138,23 @@ export function MarginChartCard({ symbol, onHide }: MarginChartCardProps) {
         title={t("stockTracker.marginChartTitle")}
         helpText={t("stockTracker.marginExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={onToggle}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(symbol?.capital?.margin?.trade_date),
         })}
       />
-      <div className="relative h-[240px] w-full">
-        <div ref={ref} className="absolute inset-0" />
-        {!hasData && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <TrendingUp className="h-8 w-8 opacity-40" />
-            <span className="text-xs">{t("stockTracker.noMarginData")}</span>
-          </div>
-        )}
-      </div>
+      {collapsed ? null : (
+        <div className="relative h-[240px] w-full">
+          <div ref={ref} className="absolute inset-0" />
+          {!hasData && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <TrendingUp className="h-8 w-8 opacity-40" />
+              <span className="text-xs">{t("stockTracker.noMarginData")}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

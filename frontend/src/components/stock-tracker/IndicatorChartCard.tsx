@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
 import { useChartLifecycle } from "@/hooks/useChartLifecycle";
+import { useCardCollapse } from "@/hooks/useCardCollapse";
 import { getChartTheme } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
 import { formatDataDate } from "@/lib/stockTracker";
@@ -50,6 +51,7 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
   const [showMa, setShowMa] = useState(true);
   const [showMacd, setShowMacd] = useState(true);
   const [showKdj, setShowKdj] = useState(true);
+  const { collapsed, toggle } = useCardCollapse("indicator");
 
   const data = useMemo(() => {
     const bars = symbol?.indicators?.bars ?? [];
@@ -338,7 +340,7 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
         series,
       };
     },
-    [data, t, showBoll, showMa, showMacd, showKdj],
+    [data, t, showBoll, showMa, showMacd, showKdj, collapsed],
   );
 
   const hasData = data != null;
@@ -362,23 +364,29 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
       <ChartCardHeader
         title={t("stockTracker.indicatorChartTitle")}
         helpText={t("stockTracker.indicatorExplanation")}
+        collapsed={collapsed}
+        onToggle={toggle}
         meta={t("stockTracker.dataDate", { date: formatDataDate(lastDate) })}
       />
-      <div className="mb-2 flex flex-wrap items-center gap-1.5">
-        {toggleChip(t("stockTracker.bollingerBands"), showBoll, () => setShowBoll((v) => !v))}
-        {toggleChip(t("stockTracker.movingAverage"), showMa, () => setShowMa((v) => !v))}
-        {toggleChip("MACD", showMacd, () => setShowMacd((v) => !v))}
-        {toggleChip("KDJ", showKdj, () => setShowKdj((v) => !v))}
-      </div>
-      <div className="relative h-[560px] w-full">
-        <div ref={ref} className="absolute inset-0" />
-        {!hasData && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <TrendingUp className="h-8 w-8 opacity-40" />
-            <span className="text-xs">{t("stockTracker.noIndicatorData")}</span>
+      {!collapsed && (
+        <>
+          <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            {toggleChip(t("stockTracker.bollingerBands"), showBoll, () => setShowBoll((v) => !v))}
+            {toggleChip(t("stockTracker.movingAverage"), showMa, () => setShowMa((v) => !v))}
+            {toggleChip("MACD", showMacd, () => setShowMacd((v) => !v))}
+            {toggleChip("KDJ", showKdj, () => setShowKdj((v) => !v))}
           </div>
-        )}
-      </div>
+          <div className="relative h-[560px] w-full">
+            <div ref={ref} className="absolute inset-0" />
+            {!hasData && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <TrendingUp className="h-8 w-8 opacity-40" />
+                <span className="text-xs">{t("stockTracker.noIndicatorData")}</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -8,6 +8,8 @@ import type { SymbolSnapshot } from "@/lib/api";
 interface ConceptHeatCardProps {
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
 /**
@@ -15,7 +17,7 @@ interface ConceptHeatCardProps {
  * boards it belongs to, its hottest board on the whole-market ranking, and the
  * composite heat score (0-100) plus that concept's limit-up count.
  */
-export function ConceptHeatCard({ symbol, onHide }: ConceptHeatCardProps) {
+export function ConceptHeatCard({ symbol, onHide, collapsed = false, onToggle }: ConceptHeatCardProps) {
   const { t } = useTranslation();
   const concept = symbol?.concept;
   const hasData =
@@ -28,13 +30,15 @@ export function ConceptHeatCard({ symbol, onHide }: ConceptHeatCardProps) {
         title={t("stockTracker.conceptTitle")}
         helpText={t("stockTracker.conceptExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={onToggle}
         meta={
           concept?.source && concept.source !== "unavailable"
             ? t("stockTracker.dataSource", { source: concept.source })
             : undefined
         }
       />
-      {!hasData ? (
+      {collapsed ? null : !hasData ? (
         <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-muted-foreground">
           <Flame className="h-8 w-8 opacity-40" />
           <span className="text-xs">{t("stockTracker.conceptNoData")}</span>

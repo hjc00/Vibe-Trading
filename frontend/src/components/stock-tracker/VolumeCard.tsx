@@ -8,6 +8,8 @@ import { ChartCardHeader } from "./ChartCardHeader";
 interface VolumeCardProps {
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
 /** Compact formatting for A-share lots: 12.3万 / 1.20亿 / 3456. */
@@ -35,7 +37,7 @@ function formatRatioPercent(value: number | null | undefined): string {
  * per-period energy comparison (window avg volume vs the prior equal window,
  * and how many 放量 bursts occurred inside the window).
  */
-export function VolumeCard({ symbol, onHide }: VolumeCardProps) {
+export function VolumeCard({ symbol, onHide, collapsed = false, onToggle }: VolumeCardProps) {
   const { t } = useTranslation();
   const periodSignals = symbol?.period_signals;
   const periods = periodSignals
@@ -69,8 +71,10 @@ export function VolumeCard({ symbol, onHide }: VolumeCardProps) {
         title={t("stockTracker.volumeTitle")}
         helpText={t("stockTracker.volumeExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={onToggle}
       />
-      {!hasData ? (
+      {collapsed ? null : !hasData ? (
         <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-muted-foreground">
           <Activity className="h-8 w-8 opacity-40" />
           <span className="text-xs">{t("stockTracker.volumeNoData")}</span>

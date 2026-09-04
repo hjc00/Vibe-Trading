@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCardCollapse } from "@/hooks/useCardCollapse";
 import {
   computePriceChange,
   formatCapitalAmount,
@@ -25,6 +26,7 @@ interface TrackerTableProps {
 }
 
 const EXPANDED_ROWS_STORAGE_KEY = "stockTracker.expandedRows";
+const TABLE_COLLAPSE_KEY = "stockTracker.tableCollapsed";
 
 function readExpandedRows(): Set<string> {
   try {
@@ -56,6 +58,7 @@ export function TrackerTable({
   quotesUpdatedAt,
 }: TrackerTableProps) {
   const { t } = useTranslation();
+  const { collapsed, toggle } = useCardCollapse("watchlist", TABLE_COLLAPSE_KEY);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(() => readExpandedRows());
 
   useEffect(() => {
@@ -79,7 +82,20 @@ export function TrackerTable({
 
   return (
     <div className="overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
-      <div className="overflow-x-auto">
+      <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-2">
+        <h3 className="text-sm font-semibold">{t("stockTracker.watchlist")}</h3>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? t("stockTracker.expand") : t("stockTracker.collapse")}
+          title={collapsed ? t("stockTracker.expand") : t("stockTracker.collapse")}
+          className="inline-flex items-center justify-center rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+        >
+          <ChevronDown className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
+        </button>
+      </div>
+      <div className={cn("overflow-x-auto", collapsed && "hidden")}>
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="border-b bg-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground">

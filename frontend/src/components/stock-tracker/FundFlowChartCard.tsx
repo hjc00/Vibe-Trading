@@ -10,9 +10,11 @@ import type { SymbolSnapshot } from "@/lib/api";
 interface FundFlowChartCardProps {
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
-export function FundFlowChartCard({ symbol, onHide }: FundFlowChartCardProps) {
+export function FundFlowChartCard({ symbol, onHide, collapsed = false, onToggle }: FundFlowChartCardProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -116,7 +118,7 @@ export function FundFlowChartCard({ symbol, onHide }: FundFlowChartCardProps) {
         ],
       };
     },
-    [data, t],
+    [data, t, collapsed],
   );
 
   const hasData = data != null && data.mainNet.some((v) => v != null);
@@ -127,19 +129,23 @@ export function FundFlowChartCard({ symbol, onHide }: FundFlowChartCardProps) {
         title={t("stockTracker.fundFlowChartTitle")}
         helpText={t("stockTracker.fundFlowExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={onToggle}
         meta={t("stockTracker.dataDate", {
           date: formatDataDate(symbol?.capital?.fund_flow?.trade_date),
         })}
       />
-      <div className="relative h-[240px] w-full">
-        <div ref={ref} className="absolute inset-0" />
-        {!hasData && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <TrendingUp className="h-8 w-8 opacity-40" />
-            <span className="text-xs">{t("stockTracker.fundFlowDataUnavailable")}</span>
-          </div>
-        )}
-      </div>
+      {collapsed ? null : (
+        <div className="relative h-[240px] w-full">
+          <div ref={ref} className="absolute inset-0" />
+          {!hasData && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+              <TrendingUp className="h-8 w-8 opacity-40" />
+              <span className="text-xs">{t("stockTracker.fundFlowDataUnavailable")}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

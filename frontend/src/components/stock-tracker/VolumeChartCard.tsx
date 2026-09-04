@@ -11,6 +11,8 @@ import { ChartCardHeader } from "./ChartCardHeader";
 interface VolumeChartCardProps {
   symbol: SymbolSnapshot | null;
   onHide?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
 }
 
 const WIDTH_KEY = "stockTracker.volumeChart.wide";
@@ -50,7 +52,7 @@ function fmtPrice(value: number | null | undefined): string {
  * volume-only bar chart. The card can be widened to two grid columns from a
  * header toggle (preference persisted).
  */
-export function VolumeChartCard({ symbol, onHide }: VolumeChartCardProps) {
+export function VolumeChartCard({ symbol, onHide, collapsed = false, onToggle }: VolumeChartCardProps) {
   const { t } = useTranslation();
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -314,7 +316,7 @@ export function VolumeChartCard({ symbol, onHide }: VolumeChartCardProps) {
         ],
       };
     },
-    [chartWindow, period, t],
+    [chartWindow, period, t, collapsed],
   );
 
   const hasData = chartWindow != null;
@@ -331,6 +333,8 @@ export function VolumeChartCard({ symbol, onHide }: VolumeChartCardProps) {
         title={t("stockTracker.volumeChartTitle")}
         helpText={t("stockTracker.volumeChartExplanation")}
         onHide={onHide}
+        collapsed={collapsed}
+        onToggle={onToggle}
         actions={
           <button
             type="button"
@@ -343,7 +347,7 @@ export function VolumeChartCard({ symbol, onHide }: VolumeChartCardProps) {
           </button>
         }
       />
-      {!hasData ? (
+      {collapsed ? null : !hasData ? (
         <div className="flex h-[220px] flex-col items-center justify-center gap-2 text-muted-foreground">
           <BarChart3 className="h-8 w-8 opacity-40" />
           <span className="text-xs">{t("stockTracker.volumeNoData")}</span>

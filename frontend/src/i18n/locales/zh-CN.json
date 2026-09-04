@@ -1907,6 +1907,8 @@
     "hideCard": "隐藏",
     "showCard": "恢复显示",
     "hiddenCards": "已隐藏卡片：",
+    "collapsedCards": "已折叠卡片：",
+    "expandCard": "展开",
     "financialReportTitle": "财报速读",
     "financialReportIndicator": "指标",
     "financialReportExplanation": "手动拉取该标的最新已披露财报（年报/中报/一季报/三季报混合口径），按报告期倒序展示核心指标多期对比。同比字段为累计同比；ROE/EPS 为累计口径，中报与年报不可直接横向比较。红旗与 beat/miss 基于最新一期；beat/miss 将最新实际 EPS 与当前快照的一致预期 EPS 对比（±5% 内视为符合预期）。",
