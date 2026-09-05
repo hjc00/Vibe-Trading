@@ -8,6 +8,7 @@ import {
   api,
   type BacktestCondition,
   type BacktestPreset,
+  type BacktestPrimitiveCategory,
   type BacktestPrimitiveMeta,
   type BacktestRule,
   type BacktestSnapshot,
@@ -16,6 +17,7 @@ import {
   type SymbolSnapshot,
 } from "@/lib/api";
 import { ChartCardHeader } from "./ChartCardHeader";
+import { PrimitiveMenu } from "./PrimitiveMenu";
 
 interface BacktestCardProps {
   symbol: SymbolSnapshot | null;
@@ -126,6 +128,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
   const code = symbol?.code;
 
   const [primitives, setPrimitives] = useState<BacktestPrimitiveMeta[]>([]);
+  const [categories, setCategories] = useState<BacktestPrimitiveCategory[]>([]);
   const [presets, setPresets] = useState<BacktestPreset[]>([]);
   const [presetId, setPresetId] = useState("");
   const [label, setLabel] = useState("");
@@ -158,6 +161,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       .then(([primsRes, presetRes]) => {
         if (!alive) return;
         setPrimitives(primsRes.primitives);
+        setCategories(primsRes.categories ?? []);
         setPresets(presetRes.presets);
         const raw = safeGet(BACKTEST_SETTINGS_KEY);
         let saved: BacktestStoredSettings | null = null;
@@ -194,6 +198,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       .catch(() => {
         if (alive) {
           setPrimitives([]);
+          setCategories([]);
           setPresets([]);
         }
       });
@@ -672,21 +677,13 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
                                       <CircleDot className="h-3.5 w-3.5 text-primary" />
                                     )}
                                   </button>
-                                  <select
+                                  <PrimitiveMenu
                                     value={meta ? cond.primitive : ""}
-                                    onChange={(e) => changePrimitive(ruleKey, index, e.target.value)}
+                                    primitives={pickable}
+                                    categories={categories}
                                     disabled={cond.enabled === false}
-                                    className="min-w-[150px] flex-1 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none focus:border-primary disabled:cursor-not-allowed"
-                                  >
-                                    {!meta ? (
-                                      <option value="">—</option>
-                                    ) : null}
-                                    {pickable.map((p) => (
-                                      <option key={p.id} value={p.id}>
-                                        {p.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                                    onSelect={(primitiveId) => changePrimitive(ruleKey, index, primitiveId)}
+                                  />
                                   <select
                                     value={cond.trigger}
                                     onChange={(e) =>

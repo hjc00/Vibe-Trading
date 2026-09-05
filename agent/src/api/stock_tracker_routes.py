@@ -18,6 +18,7 @@ from src.market_data import fetch_market_data
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.backtest_data import (
     list_presets,
+    list_primitive_categories,
     list_primitives,
     run_backtest_for_symbol,
 )
@@ -838,7 +839,11 @@ def register_stock_tracker_routes(
     @app.get("/api/stock-tracker/backtest/primitives")
     async def get_backtest_primitives(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
         """Return the composable signal-primitive catalog for the rule builder."""
-        return {"status": "ok", "primitives": list_primitives()}
+        return {
+            "status": "ok",
+            "primitives": list_primitives(),
+            "categories": list_primitive_categories(),
+        }
 
     @app.get("/api/stock-tracker/backtest/presets")
     async def get_backtest_presets(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001

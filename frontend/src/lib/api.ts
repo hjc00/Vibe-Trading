@@ -629,9 +629,11 @@ export const api = {
     return request<FinancialReportResponse>(url);
   },
   getStockTrackerBacktestPrimitives: () =>
-    request<{ status: string; primitives: BacktestPrimitiveMeta[] }>(
-      "/api/stock-tracker/backtest/primitives",
-    ),
+    request<{
+      status: string;
+      primitives: BacktestPrimitiveMeta[];
+      categories: BacktestPrimitiveCategory[];
+    }>("/api/stock-tracker/backtest/primitives"),
   getStockTrackerBacktestPresets: () =>
     request<{ status: string; presets: BacktestPreset[] }>(
       "/api/stock-tracker/backtest/presets",
@@ -2129,10 +2131,18 @@ export interface BacktestPrimitiveParam {
   max: number;
 }
 
+/** One primitive category: level-1 header of the rule-builder cascade menu. */
+export interface BacktestPrimitiveCategory {
+  id: string;
+  label: string;
+}
+
 /** Self-describing signal primitive returned by the rule-builder catalog. */
 export interface BacktestPrimitiveMeta {
   id: string;
   label: string;
+  /** Category id, matching a `BacktestPrimitiveCategory` in the same response. */
+  category?: string;
   description: string;
   params: BacktestPrimitiveParam[];
   triggers: { id: string; label: string }[];

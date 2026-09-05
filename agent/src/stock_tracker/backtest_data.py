@@ -16,8 +16,13 @@ the indicator ledger.
 - 规则 = 若干 条件(primitive+trigger+参数) 用整条 AND 或 OR 组合。
 - 策略 = 买入规则 + 卖出规则；在买入条件刚满足时开多、卖出条件满足时平仓。
 
-预设（双均线/MACD/KDJ/RSI/布林）只是若干 spec 的「一键填充」，可被用户自由增删
+预设（双均线/MACD/KDJ/RSI/布林/KDJ 背离/KDJ J 超卖钝化）只是若干 spec 的「一键填充」，可被用户自由增删
 条件继续组合。新增原语 = 写一个 ``frame->bool`` 纯函数 + 注册一项，引擎无需改动。
+KDJ 底/顶背离是跨 bar 的事件原语：用因果摆动确认（新低/新高经 ``pivot`` 根 K 线确认后触发），
+只读触发 bar 及其左侧数据，无未来函数。
+KDJ 超卖/超买钝化是状态原语：J 跌破/升破阈值进入超卖/超买区，且价格未顺势破前 N 日低/高点
+（指标走弱但价格不破位 → 下跌衰竭；指标冲高但价格滞涨 → 上涨衰竭）。它不像背离那样等待两次摆动
+确认，比底背离触发更早、噪声更大——直接对应「前一天 J 已极低、次日 J 继续下探但价格未创更低」的形态。
 
 设计原则:
 - 永不抛异常：非法 spec / 网络 / 引擎失败降级为带 ``error`` 的 BacktestSnapshot。
@@ -261,6 +266,127 @@ def _p_kdj_j_below(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
     return j < float(params["threshold"])
 
 
+def _kdj_divergence_state(
+    frame: pd.DataFrame,
+    k: pd.Series,
+    *,
+    which: str,  # "bottom" | "top"
+    pivot: int,
+) -> pd.Series:
+    """Causal KDJ-divergence event series (bottom/top) over a daily frame.
+
+    A turning bar ``s`` only becomes a swing low/high once its ``pivot``-bar
+    neighbourhood to the right is complete, so each confirmed divergence fires
+    on the first confirmable bar ``t = s + pivot`` — never on a bar whose price
+    has not printed yet. The comparison uses the two most recent confirmed
+    swings (mirroring ``indicators.find_divergence``): bottom divergence = the
+    recent swing low is a *lower* low while its K is *higher* than the prior
+    swing low's K (price new low, K no new low); top is the mirror on swing
+    highs. Only bars up to ``t`` are read, so the series is free of lookahead.
+    """
+    out = pd.Series(False, index=frame.index)
+    col = "low" if which == "bottom" else "high"
+    if col not in frame.columns:
+        return out
+    n = len(frame)
+    piv = max(1, int(pivot))
+    if n < 2 * piv + 2:
+        return out
+    prices = frame[col].astype("float64").to_numpy()
+    kvals = k.astype("float64").to_numpy()
+    is_bottom = which == "bottom"
+    swings: List[tuple[int, float, float]] = []  # confirmed (idx, price, K)
+    for s in range(piv, n - piv):
+        center = prices[s]
+        if not math.isfinite(center):
+            continue
+        window = prices[s - piv : s + piv + 1]
+        if is_bottom:
+            is_swing = center == window.min() and center < prices[s - 1] and center <= prices[s + 1]
+        else:
+            is_swing = center == window.max() and center > prices[s - 1] and center >= prices[s + 1]
+        if not is_swing:
+            continue
+        k_at = kvals[s]
+        if not math.isfinite(k_at):
+            continue
+        if swings and math.isfinite(swings[-1][2]):
+            _, prev_price, prev_k = swings[-1]
+            fired = (center < prev_price and k_at > prev_k) if is_bottom else (center > prev_price and k_at < prev_k)
+            if fired:
+                out.iloc[s + piv] = True  # the first bar from which bar s is confirmable
+        swings.append((s, center, k_at))
+    return out
+
+
+def _p_kdj_bottom_divergence(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
+    k, _, _ = compute_kdj(frame, n=int(params["n"]), m1=int(params["m1"]), m2=int(params["m2"]))
+    return _kdj_divergence_state(frame, k, which="bottom", pivot=int(params["pivot"]))
+
+
+def _p_kdj_top_divergence(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
+    k, _, _ = compute_kdj(frame, n=int(params["n"]), m1=int(params["m1"]), m2=int(params["m2"]))
+    return _kdj_divergence_state(frame, k, which="top", pivot=int(params["pivot"]))
+
+
+def _kdj_pin_state(
+    frame: pd.DataFrame,
+    j: pd.Series,
+    *,
+    oversold: bool,
+    threshold: float,
+    lookback: int,
+) -> pd.Series:
+    """KDJ 钝化 state: J pinned past an extreme while price stops following.
+
+    True on bars where J has crossed ``threshold`` into the deep-oversold zone
+    (``j < threshold``, default 0) or overbought zone (``j > threshold``,
+    default 100) AND today's price does NOT extend the move — for the oversold
+    (bottom) form the low is not below the lowest low of the prior ``lookback``
+    bars, for the overbought (top) form the high is not above their highest
+    high. Unlike :func:`_kdj_divergence_state` this needs no confirmed swing
+    pair, so it fires earlier and noisier — the "indicator stays pinned while
+    price refuses to confirm" case (指标走弱但价格不再创新低 / 指标冲高但价格滞涨).
+    No lookahead: each bar reads only itself and the bars before it.
+    """
+    out = pd.Series(False, index=frame.index)
+    col = "low" if oversold else "high"
+    if col not in frame.columns:
+        return out
+    window = max(2, int(lookback))
+    extremes = frame[col].astype("float64")
+    # Bars with no prior reference (the window has nothing left of bar 0) cannot
+    # "hold vs the prior N days" — treat their floor as +inf / ceiling as -inf so
+    # they never fire on a first-bar self-comparison.
+    prior = (
+        extremes.rolling(window).min().shift(1)
+        if oversold
+        else extremes.rolling(window).max().shift(1)
+    )
+    prior = prior.fillna(math.inf if oversold else -math.inf)
+    if oversold:
+        pinned = j < float(threshold)
+        holding = extremes >= prior
+    else:
+        pinned = j > float(threshold)
+        holding = extremes <= prior
+    return (pinned & holding).fillna(False)
+
+
+def _p_kdj_oversold_stagnation(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
+    _, _, j = compute_kdj(frame, n=int(params["n"]), m1=int(params["m1"]), m2=int(params["m2"]))
+    return _kdj_pin_state(
+        frame, j, oversold=True, threshold=float(params["threshold"]), lookback=int(params["lookback"])
+    )
+
+
+def _p_kdj_overbought_stagnation(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
+    _, _, j = compute_kdj(frame, n=int(params["n"]), m1=int(params["m1"]), m2=int(params["m2"]))
+    return _kdj_pin_state(
+        frame, j, oversold=False, threshold=float(params["threshold"]), lookback=int(params["lookback"])
+    )
+
+
 def _p_rsi_above(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
     rsi = compute_rsi(frame["close"], period=int(params["period"]))
     return rsi > float(params["threshold"])
@@ -321,20 +447,34 @@ _KDJ_EXTRA_PARAMS: List[Dict[str, Any]] = [
     {"key": "m1", "label": "K 平滑(M1)", "default": 3, "min": 1, "max": 10},
     {"key": "m2", "label": "D 平滑(M2)", "default": 3, "min": 1, "max": 10},
 ]
+
+# Ordered primitive categories (id + label). Each PRIMITIVES entry references one
+# of these ids; the order here is the display order of the frontend <optgroup>s.
+PRIMITIVE_CATEGORIES: List[Dict[str, str]] = [
+    {"id": "ma", "label": "均线"},
+    {"id": "macd", "label": "MACD"},
+    {"id": "kdj", "label": "KDJ"},
+    {"id": "rsi", "label": "RSI"},
+    {"id": "boll", "label": "布林带"},
+    {"id": "volume", "label": "量能"},
+]
 PRIMITIVES: Dict[str, Dict[str, Any]] = {
     "close_above_ma": {
+        "category": "ma",
         "label": "收盘在 MA 上方",
         "description": "当日收盘价高于其 N 日均线",
         "params": [{"key": "n", "label": "均线周期", "default": 20, "min": 2, "max": 250}],
         "compute": _p_close_above_ma,
     },
     "close_below_ma": {
+        "category": "ma",
         "label": "收盘在 MA 下方",
         "description": "当日收盘价低于其 N 日均线",
         "params": [{"key": "n", "label": "均线周期", "default": 20, "min": 2, "max": 250}],
         "compute": _p_close_below_ma,
     },
     "fast_ma_above_slow": {
+        "category": "ma",
         "label": "快均线在慢均线上方",
         "description": "短期均线高于长期均线（多头排列状态）",
         "params": [
@@ -344,6 +484,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_fast_ma_above_slow,
     },
     "dif_above_dea": {
+        "category": "macd",
         "label": "MACD DIF 在 DEA 上方",
         "description": "MACD 金叉后多头状态（DIF > DEA）",
         "params": [
@@ -354,6 +495,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_dif_above_dea,
     },
     "k_above_d": {
+        "category": "kdj",
         "label": "KDJ K 在 D 上方",
         "description": "KDJ 金叉后多头状态（K > D）",
         "params": [
@@ -363,6 +505,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_k_above_d,
     },
     "kdj_j_above": {
+        "category": "kdj",
         "label": "KDJ J 高于阈值",
         "description": "J 值高于设定阈值（强势/超买区，J=3K-2D，可超过 100）",
         "params": [
@@ -373,6 +516,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_kdj_j_above,
     },
     "kdj_j_below": {
+        "category": "kdj",
         "label": "KDJ J 低于阈值",
         "description": "J 值低于设定阈值（弱势/超卖区，J=3K-2D，可低于 0）",
         "params": [
@@ -382,7 +526,56 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         ],
         "compute": _p_kdj_j_below,
     },
+    "kdj_bottom_divergence": {
+        "category": "kdj",
+        "label": "KDJ 底背离",
+        "description": "价格创出更低的低点、而 K 值未创新低（看涨背离）；摆动确认后触发（买入方向）",
+        "params": [
+            {"key": "n", "label": "周期", "default": 9, "min": 2, "max": 60},
+            *_KDJ_EXTRA_PARAMS,
+            {"key": "pivot", "label": "摆动确认(根)", "default": 3, "min": 1, "max": 10},
+        ],
+        "compute": _p_kdj_bottom_divergence,
+    },
+    "kdj_top_divergence": {
+        "category": "kdj",
+        "label": "KDJ 顶背离",
+        "description": "价格创出更高的高点、而 K 值未创新高（看跌背离）；摆动确认后触发（卖出/离场方向）",
+        "params": [
+            {"key": "n", "label": "周期", "default": 9, "min": 2, "max": 60},
+            *_KDJ_EXTRA_PARAMS,
+            {"key": "pivot", "label": "摆动确认(根)", "default": 3, "min": 1, "max": 10},
+        ],
+        "compute": _p_kdj_top_divergence,
+        "sell_only": True,
+    },
+    "kdj_oversold_stagnation": {
+        "category": "kdj",
+        "label": "KDJ 超卖钝化",
+        "description": "J 跌破阈值进入超卖区(默认 0 以下)且价格未跌破前 N 日低点——指标钝化/走弱但价格未破位（早期抄底形态，比底背离更早、噪声更大）",
+        "params": [
+            {"key": "n", "label": "周期", "default": 9, "min": 2, "max": 60},
+            *_KDJ_EXTRA_PARAMS,
+            {"key": "threshold", "label": "J 超卖阈值", "default": 0, "min": -30, "max": 100},
+            {"key": "lookback", "label": "低点参照(前N日)", "default": 5, "min": 2, "max": 60},
+        ],
+        "compute": _p_kdj_oversold_stagnation,
+    },
+    "kdj_overbought_stagnation": {
+        "category": "kdj",
+        "label": "KDJ 超买钝化",
+        "description": "J 突破阈值进入超买区(默认 100 以上)且价格未突破前 N 日高点——指标钝化/冲高但价格滞涨（离场/超买方向）",
+        "params": [
+            {"key": "n", "label": "周期", "default": 9, "min": 2, "max": 60},
+            *_KDJ_EXTRA_PARAMS,
+            {"key": "threshold", "label": "J 超买阈值", "default": 100, "min": 0, "max": 200},
+            {"key": "lookback", "label": "高点参照(前N日)", "default": 5, "min": 2, "max": 60},
+        ],
+        "compute": _p_kdj_overbought_stagnation,
+        "sell_only": True,
+    },
     "rsi_above": {
+        "category": "rsi",
         "label": "RSI 高于阈值",
         "description": "RSI 高于设定阈值（超买/强势）",
         "params": [
@@ -392,6 +585,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_rsi_above,
     },
     "rsi_below": {
+        "category": "rsi",
         "label": "RSI 低于阈值",
         "description": "RSI 低于设定阈值（超卖/弱势）",
         "params": [
@@ -401,6 +595,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_rsi_below,
     },
     "close_above_boll_mid": {
+        "category": "boll",
         "label": "收盘在布林中轨上方",
         "description": "价格回到布林带中轨（均值）上方",
         "params": [
@@ -410,6 +605,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_close_above_boll_mid,
     },
     "close_below_boll_lower": {
+        "category": "boll",
         "label": "收盘跌破布林下轨",
         "description": "价格跌破布林带下轨",
         "params": [
@@ -419,6 +615,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_close_below_boll_lower,
     },
     "close_above_boll_upper": {
+        "category": "boll",
         "label": "收盘突破布林上轨",
         "description": "价格突破布林带上轨",
         "params": [
@@ -428,6 +625,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_close_above_boll_upper,
     },
     "volume_expansion": {
+        "category": "volume",
         "label": "放量（量≥倍数×前N日均量）",
         "description": "当日成交量不低于其往前 window 个交易日（不含当日）的均量 × mult",
         "params": [
@@ -437,6 +635,7 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_volume_expansion,
     },
     VOLUME_VS_ENTRY: {
+        "category": "volume",
         "label": "量能≥买入当日量×倍数（卖出）",
         "description": "持仓中当日成交量不低于开仓当日量的 mult 倍即卖出（需在卖出规则使用）",
         "params": [
@@ -554,15 +753,32 @@ def _same_day_signal(weights: pd.Series) -> pd.Series:
     return shifted.astype("float64")
 
 
-def _spec_signal(frame: pd.DataFrame, spec: Dict[str, Any]) -> pd.Series:
+def _spec_signal(
+    frame: pd.DataFrame,
+    spec: Dict[str, Any],
+    *,
+    eval_start: Optional[pd.Timestamp] = None,
+) -> pd.Series:
     """Turn a spec's buy/sell rules (plus optional TP/SL) into weights.
 
     Sell conditions whose primitive is ``VOLUME_VS_ENTRY`` (成交量≥买入当日量×N)
     are resolved statefully inside :func:`_simulate_targets` because they need
     the entry bar's volume; every other sell condition is pre-evaluated as a
     static series.
+
+    ``eval_start`` names the first bar of the graded window. Bars before it are
+    indicator warm-up only and must never trade: without this a single-buy spec
+    (``allow_multiple_buys=False``) could consume its one permitted buy on an
+    invisible warm-up bar, then ignore every real in-window signal — leaving the
+    requested window with zero trades. Masking pre-boundary buys keeps the
+    state machine flat until the window actually begins.
     """
     buy = _rule_series(spec.get("buy"), frame)
+    if eval_start is not None:
+        row0 = int(frame.index.searchsorted(eval_start, side="left"))
+        if row0 > 0:
+            buy = buy.copy()
+            buy.iloc[:row0] = False
 
     sell_mode = "and"
     sell_static: Optional[pd.Series] = None
@@ -603,9 +819,15 @@ def _spec_signal(frame: pd.DataFrame, spec: Dict[str, Any]) -> pd.Series:
     return _same_day_signal(weights)
 
 
-def build_signal_engine(spec: Dict[str, Any]) -> _SignalEngine:
-    """Return a ``_SignalEngine`` whose weights come from ``spec`` rules."""
-    return _SignalEngine(lambda frame: _spec_signal(frame, spec))
+def build_signal_engine(
+    spec: Dict[str, Any], eval_start: Optional[pd.Timestamp] = None
+) -> _SignalEngine:
+    """Return a ``_SignalEngine`` whose weights come from ``spec`` rules.
+
+    ``eval_start`` (first graded bar) is forwarded to :func:`_spec_signal` so
+    warm-up bars never consume a single-buy spec's one permitted entry.
+    """
+    return _SignalEngine(lambda frame: _spec_signal(frame, spec, eval_start=eval_start))
 
 
 def _validate_spec(spec: Any) -> str:
@@ -709,6 +931,34 @@ _PRESETS: List[Dict[str, Any]] = [
             },
         },
     },
+    {
+        "id": "kdj_divergence",
+        "label": "KDJ 底背离",
+        "spec": {
+            "buy": {
+                "mode": "and",
+                "conditions": [_cond("kdj_bottom_divergence", TRIGGER_STATE, {"n": 9, "m1": 3, "m2": 3, "pivot": 3})],
+            },
+            "sell": {
+                "mode": "and",
+                "conditions": [_cond("kdj_top_divergence", TRIGGER_STATE, {"n": 9, "m1": 3, "m2": 3, "pivot": 3})],
+            },
+        },
+    },
+    {
+        "id": "kdj_stagnation",
+        "label": "KDJ J 超卖钝化",
+        "spec": {
+            "buy": {
+                "mode": "and",
+                "conditions": [_cond("kdj_oversold_stagnation", TRIGGER_STATE, {"n": 9, "m1": 3, "m2": 3, "threshold": 0, "lookback": 5})],
+            },
+            "sell": {
+                "mode": "and",
+                "conditions": [_cond("kdj_overbought_stagnation", TRIGGER_STATE, {"n": 9, "m1": 3, "m2": 3, "threshold": 100, "lookback": 5})],
+            },
+        },
+    },
 ]
 
 
@@ -720,6 +970,7 @@ def list_primitives() -> List[Dict[str, Any]]:
             {
                 "id": primitive_id,
                 "label": entry["label"],
+                "category": entry["category"],
                 "description": entry["description"],
                 "params": entry["params"],
                 "triggers": TRIGGER_OPTIONS,
@@ -727,6 +978,11 @@ def list_primitives() -> List[Dict[str, Any]]:
             }
         )
     return metas
+
+
+def list_primitive_categories() -> List[Dict[str, str]]:
+    """Return the ordered primitive category catalog (id + label, JSON-safe)."""
+    return list(PRIMITIVE_CATEGORIES)
 
 
 def list_presets() -> List[Dict[str, Any]]:
@@ -924,7 +1180,15 @@ def _indicator_panels(spec: Any, frame: Optional[pd.DataFrame]) -> List[Backtest
             _put("macd", {"fast": fast, "slow": slow, "signal": signal}, title, "dif", "DIF", dif)
             _put("macd", {"fast": fast, "slow": slow, "signal": signal}, title, "dea", "DEA", dea)
             _put("macd", {"fast": fast, "slow": slow, "signal": signal}, title, "hist", "MACD", hist)
-        elif primitive_id in ("k_above_d", "kdj_j_above", "kdj_j_below"):
+        elif primitive_id in (
+            "k_above_d",
+            "kdj_j_above",
+            "kdj_j_below",
+            "kdj_bottom_divergence",
+            "kdj_top_divergence",
+            "kdj_oversold_stagnation",
+            "kdj_overbought_stagnation",
+        ):
             n, m1, m2 = int(params["n"]), int(params["m1"]), int(params["m2"])
             k, d, j = compute_kdj(frame, n=n, m1=m1, m2=m2)
             title = f"KDJ (n={n},m1={m1},m2={m2})"
@@ -1027,7 +1291,7 @@ def run_backtest_for_symbol(
         "evaluation_start_date": start,
     }
 
-    signal_engine = build_signal_engine(clean_spec)
+    signal_engine = build_signal_engine(clean_spec, eval_start=pd.Timestamp(start))
     try:
         from backtest.runner import (
             _AutoLoader,
@@ -1124,6 +1388,7 @@ def run_backtest_for_symbol(
 __all__ = [
     "build_signal_engine",
     "list_primitives",
+    "list_primitive_categories",
     "list_presets",
     "run_backtest_for_symbol",
 ]
