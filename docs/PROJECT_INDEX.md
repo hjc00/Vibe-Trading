@@ -2,7 +2,7 @@
 
 > 深度逐模块索引，按需读取（由根 [CLAUDE.md](../CLAUDE.md) 指向，不随会话自动加载）。
 > 代码改动后请同步更新本文件对应模块（见 CLAUDE.md「文档同步约定」）。
-> 最后更新：2026-09-01
+> 最后更新：2026-09-06（stock-tracker 新增右侧本页目录 SectionNav + 回到顶部）
 
 ## 一、项目总览
 
@@ -169,7 +169,7 @@ Vibe-Trading/
 | 目录 | 说明 |
 |------|------|
 | `src/pages/` | 每路由一文件：`Home/Agent/Portfolio/Runtime/RunDetail/Reports/Compare/Correlation/AlphaZoo/OptionsLab/Scheduled/Settings/StockTracker`（+ `agentToolTimeline.ts`） |
-| `src/components/` | `chat/`(对话/流式/swarm)、`charts/`、`run/`、`portfolio/`、`options/`、`settings/`、`stock-tracker/`、`layout/`、`common/`。`stock-tracker/` 详情卡：`VolumeCard`(量能文本)/`VolumeChartCard`(周期价量K线+量，表头可切换单/双列宽，偏好本地记忆)/`MarginChartCard`/`FundFlowChartCard`/`RpsChartCard`/`RiskMetricsCard`/`ValuationCard`/`EventTimelineCard`/`ConceptHeatCard`(2.15)/`ConsensusCard`(2.17)/`ChipCard`(2.18)/`IndicatorChartCard`(2.20)（`detail_card_count` 控制显示数量，默认 9；各卡头部「隐藏」按钮经 `TrackerConfig.card_visibility` 持久化，隐藏后刷新不再拉取该卡数据，页面上方以「已隐藏卡片」chips 一键恢复；每卡另带「折叠」按钮（中部网格卡折叠即移出网格、其余卡自动补位，折叠卡在详情区顶部「已折叠卡片」处展开恢复原位；全宽卡原位收起仅留标题；`useCardCollapse` 记入 localStorage））；`MarketSentimentBar`(2.16) 全宽市场情绪温度条；`SectorStrengthBoard` 支持「行业|概念」tab（概念 tab 以涨停家数替代景气度）；`TrackerTable` 增「概念」列（最热概念 chip）、「保本价」列（每行内联数字输入，失焦/回车保存到 `config.break_even_prices`，空值清除），表头新增标题行可折叠（收起仅留标题行，`useCardCollapse` 记入 localStorage）；`TrackerAnalyzePanel` 内嵌「AI 分析指标」多选（勾选传给 AI 的指标，改动持久化到 `config.analysis_indicators`，分析请求也携带本次选择） |
+| `src/components/` | `chat/`(对话/流式/swarm)、`charts/`、`run/`、`portfolio/`、`options/`、`settings/`、`stock-tracker/`、`layout/`、`common/`。`stock-tracker/` 详情卡：`VolumeCard`(量能文本)/`VolumeChartCard`(周期价量K线+量，表头可切换单/双列宽，偏好本地记忆)/`MarginChartCard`/`FundFlowChartCard`/`RpsChartCard`/`RiskMetricsCard`/`ValuationCard`/`EventTimelineCard`/`ConceptHeatCard`(2.15)/`ConsensusCard`(2.17)/`ChipCard`(2.18)/`IndicatorChartCard`(2.20)（`detail_card_count` 控制显示数量，默认 9；各卡头部「隐藏」按钮经 `TrackerConfig.card_visibility` 持久化，隐藏后刷新不再拉取该卡数据，页面上方以「已隐藏卡片」chips 一键恢复；每卡另带「折叠」按钮（中部网格卡折叠即移出网格、其余卡自动补位，折叠卡在详情区顶部「已折叠卡片」处展开恢复原位；全宽卡原位收起仅留标题；`useCardCollapse` 记入 localStorage））；`MarketSentimentBar`(2.16) 全宽市场情绪温度条；`SectorStrengthBoard` 支持「行业|概念」tab（概念 tab 以涨停家数替代景气度）；`TrackerTable` 增「概念」列（最热概念 chip）、「保本价」列（每行内联数字输入，失焦/回车保存到 `config.break_even_prices`，空值清除），表头新增标题行可折叠（收起仅留标题行，`useCardCollapse` 记入 localStorage）；`TrackerAnalyzePanel` 内嵌「AI 分析指标」多选（勾选传给 AI 的指标，改动持久化到 `config.analysis_indicators`，分析请求也携带本次选择）；`SectionNav`(右侧 sticky 本页目录：概览/股票列表/策略回测/数据卡片/财报与行业/图表/AI 分析七个逻辑分区锚点，随卡片显隐动态增删，`useSectionSpy`(hooks/)监听滚动容器 `#main` 高亮当前分区，点击经 `scrollIntoView` 平滑跳转，`scroll-mt-6` 定位留白)与 `BackToTopButton`(右下角浮动回到顶部，作用于 `#main`，`scrollTop>400` 才出现，全尺寸可见——`<xl` 目录隐藏后仍可用) |
 | `src/stores/` | Zustand：`agent.ts`、`stockTrackerAnalysis.ts` |
 | `src/hooks/` | `useSSE.ts`(SSE 流式)、`useDarkMode.ts`、`useChartLifecycle.ts` |
 | `src/lib/` | `api.ts`/`apiAuth.ts`(REST 客户端) + 领域助手（formatters/indicators/options/positions/markdown/stockTracker/runReports/navVisibility 等） |

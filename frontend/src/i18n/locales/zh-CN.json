@@ -1979,6 +1979,15 @@
     "financialReportRoe": "ROE（累计）",
     "financialReportOcfRatio": "经营现金流/净利",
     "financialReportDebtToAssets": "资产负债率",
-    "financialReportEps": "EPS"
+    "financialReportEps": "EPS",
+    "navTitle": "本页导航",
+    "navOverview": "概览",
+    "navWatchlist": "股票列表",
+    "navBacktest": "策略回测",
+    "navDetailCards": "数据卡片",
+    "navFinancialSector": "财报与行业",
+    "navCharts": "图表",
+    "navAiAnalysis": "AI 分析",
+    "navBackToTop": "回到顶部"
   }
 }

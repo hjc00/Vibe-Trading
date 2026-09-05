@@ -1979,6 +1979,15 @@
     "financialReportRoe": "ROE (cum.)",
     "financialReportOcfRatio": "OpCF / net profit",
     "financialReportDebtToAssets": "Debt / assets",
-    "financialReportEps": "EPS"
+    "financialReportEps": "EPS",
+    "navTitle": "On this page",
+    "navOverview": "Overview",
+    "navWatchlist": "Watchlist",
+    "navBacktest": "Backtest",
+    "navDetailCards": "Detail cards",
+    "navFinancialSector": "Financial & sector",
+    "navCharts": "Charts",
+    "navAiAnalysis": "AI analysis",
+    "navBackToTop": "Back to top"
   }
 }

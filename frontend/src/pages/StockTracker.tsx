@@ -21,6 +21,7 @@ import {
   isCardCollapsed,
   setCardCollapsed,
 } from "@/hooks/useCardCollapse";
+import { useSectionSpy } from "@/hooks/useSectionSpy";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
 import { Skeleton } from "@/components/common/Skeleton";
 import { TrackerControlBar } from "@/components/stock-tracker/TrackerControlBar";
@@ -45,6 +46,8 @@ import { FinancialReportCard } from "@/components/stock-tracker/FinancialReportC
 import { MarketSentimentBar } from "@/components/stock-tracker/MarketSentimentBar";
 import { SectorStrengthBoard } from "@/components/stock-tracker/SectorStrengthBoard";
 import { TrackerTrackRecord } from "@/components/stock-tracker/TrackerTrackRecord";
+import { SectionNav } from "@/components/stock-tracker/SectionNav";
+import { BackToTopButton } from "@/components/stock-tracker/BackToTopButton";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -453,10 +456,51 @@ export function StockTracker() {
   const expandedDetailCards = detailCards.filter((card) => !collapsedDetailIds.has(card.id));
   const collapsedDetailCards = detailCards.filter((card) => collapsedDetailIds.has(card.id));
 
+  // Logical regions rendered as anchor targets for the right-hand outline.
+  // Kept in DOM reading order (top to bottom); entries that only exist while
+  // data is present / a card is not hidden are omitted so the outline never
+  // points at an absent section.
+  const hasSymbols = !!snapshot && snapshot.symbols.length > 0;
+  const hasAnalysisSection = !!(analyzeOpen || analysisReport || analysisHistory.length > 0);
+  const navSections = useMemo(() => {
+    const sections: { id: string; labelKey: string }[] = [
+      { id: "st-overview", labelKey: "stockTracker.navOverview" },
+    ];
+    if (hasSymbols) {
+      sections.push({ id: "st-watchlist", labelKey: "stockTracker.navWatchlist" });
+      if (isCardVisible("backtest", config?.card_visibility)) {
+        sections.push({ id: "st-backtest", labelKey: "stockTracker.navBacktest" });
+      }
+      sections.push({ id: "st-detail-cards", labelKey: "stockTracker.navDetailCards" });
+      if (
+        isCardVisible("financial_report", config?.card_visibility) ||
+        isCardVisible("sector", config?.card_visibility)
+      ) {
+        sections.push({ id: "st-financial-sector", labelKey: "stockTracker.navFinancialSector" });
+      }
+      sections.push({ id: "st-charts", labelKey: "stockTracker.navCharts" });
+    }
+    if (hasAnalysisSection) {
+      sections.push({ id: "st-analysis", labelKey: "stockTracker.navAiAnalysis" });
+    }
+    return sections;
+  }, [hasSymbols, hasAnalysisSection, config?.card_visibility]);
+
+  const activeNavId = useSectionSpy(navSections.map((s) => s.id));
+
+  const handleNavigate = useCallback((id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const handleBackToTop = useCallback(() => {
+    document.getElementById("main")?.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
   return (
     <div className="min-h-screen p-6 lg:p-8">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="flex flex-col gap-4 border-b pb-6">
+      <div className="flex w-full justify-center gap-6 lg:gap-8">
+      <div className="mx-auto flex min-w-0 w-full max-w-7xl flex-col gap-6">
+        <section id="st-overview" className="flex scroll-mt-6 flex-col gap-4 border-b pb-6">
           <div className="space-y-3">
             <div className="inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium text-muted-foreground">
               <TrendingUp className="h-3.5 w-3.5" />
@@ -554,68 +598,80 @@ export function StockTracker() {
                   </div>
                 ) : null}
 
-                <TrackerTable
-                  symbols={snapshot.symbols}
-                  periods={config?.periods ?? []}
-                  signals={signalMeta}
-                  selectedCode={selectedCode}
-                  onSelectCode={setSelectedCode}
-                  onRemoveSymbol={handleRemoveSymbol}
-                  quotesUpdatedAt={quotesUpdatedAt}
-                  breakEvenPrices={config?.break_even_prices}
-                  onBreakEvenChange={handleBreakEvenChange}
-                />
+                <section id="st-watchlist" className="scroll-mt-6">
+                  <TrackerTable
+                    symbols={snapshot.symbols}
+                    periods={config?.periods ?? []}
+                    signals={signalMeta}
+                    selectedCode={selectedCode}
+                    onSelectCode={setSelectedCode}
+                    onRemoveSymbol={handleRemoveSymbol}
+                    quotesUpdatedAt={quotesUpdatedAt}
+                    breakEvenPrices={config?.break_even_prices}
+                    onBreakEvenChange={handleBreakEvenChange}
+                  />
+                </section>
 
                 {isCardVisible("backtest", config?.card_visibility) ? (
-                  <IndicatorBacktestCard
-                    symbol={selectedSymbol}
-                    onHide={() => handleToggleCard("backtest")}
-                    backtestTrades={
-                      backtestOverlay && backtestOverlay.code === selectedSymbol?.code
-                        ? backtestOverlay.trades
-                        : undefined
-                    }
-                    onBacktestResult={setBacktestOverlay}
-                  />
-                ) : null}
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {expandedDetailCards.map(({ id, Component }) => (
-                    <Component
-                      key={id}
+                  <section id="st-backtest" className="scroll-mt-6">
+                    <IndicatorBacktestCard
                       symbol={selectedSymbol}
-                      onHide={() => handleToggleCard(id)}
-                      collapsed={collapsedDetailIds.has(id)}
-                      onToggle={() => handleToggleCollapse(id)}
+                      onHide={() => handleToggleCard("backtest")}
+                      backtestTrades={
+                        backtestOverlay && backtestOverlay.code === selectedSymbol?.code
+                          ? backtestOverlay.trades
+                          : undefined
+                      }
+                      onBacktestResult={setBacktestOverlay}
                     />
-                  ))}
-                </div>
-
-                {isCardVisible("financial_report", config?.card_visibility) ? (
-                  <FinancialReportCard
-                    symbol={selectedSymbol}
-                    onHide={() => handleToggleCard("financial_report")}
-                  />
+                  </section>
                 ) : null}
 
-                {isCardVisible("sector", config?.card_visibility) ? (
-                  <SectorStrengthBoard
-                    sectors={snapshot.sectors}
-                    concepts={snapshot.concepts}
-                    tradingDate={snapshot.trading_date}
-                    onHide={() => handleToggleCard("sector")}
-                  />
+                <section id="st-detail-cards" className="scroll-mt-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {expandedDetailCards.map(({ id, Component }) => (
+                      <Component
+                        key={id}
+                        symbol={selectedSymbol}
+                        onHide={() => handleToggleCard(id)}
+                        collapsed={collapsedDetailIds.has(id)}
+                        onToggle={() => handleToggleCollapse(id)}
+                      />
+                    ))}
+                  </div>
+                </section>
+
+                {isCardVisible("financial_report", config?.card_visibility) ||
+                isCardVisible("sector", config?.card_visibility) ? (
+                  <section id="st-financial-sector" className="flex scroll-mt-6 flex-col gap-4">
+                    {isCardVisible("financial_report", config?.card_visibility) ? (
+                      <FinancialReportCard
+                        symbol={selectedSymbol}
+                        onHide={() => handleToggleCard("financial_report")}
+                      />
+                    ) : null}
+                    {isCardVisible("sector", config?.card_visibility) ? (
+                      <SectorStrengthBoard
+                        sectors={snapshot.sectors}
+                        concepts={snapshot.concepts}
+                        tradingDate={snapshot.trading_date}
+                        onHide={() => handleToggleCard("sector")}
+                      />
+                    ) : null}
+                  </section>
                 ) : null}
 
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
-                  <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
-                  <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
-                </div>
+                <section id="st-charts" className="scroll-mt-6">
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
+                    <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
+                    <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
+                  </div>
+                </section>
               </section>
             )}
 
             {(analyzeOpen || analysisReport || analysisHistory.length > 0) ? (
-              <section ref={analysisSectionRef} className="flex flex-col gap-4 scroll-mt-6">
+              <section ref={analysisSectionRef} id="st-analysis" className="flex scroll-mt-6 flex-col gap-4">
                 <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-semibold">{t("stockTracker.analyzeTitle")}</h2>
@@ -707,6 +763,14 @@ export function StockTracker() {
           </>
         )}
       </div>
+      <SectionNav
+        sections={navSections}
+        activeId={activeNavId}
+        onNavigate={handleNavigate}
+        onBackToTop={handleBackToTop}
+      />
+      </div>
+      <BackToTopButton />
     </div>
   );
 }
