@@ -628,6 +628,22 @@ export const api = {
     const url = refresh ? appendQueryParam(base, "refresh", "true") : base;
     return request<FinancialReportResponse>(url);
   },
+  getStockTrackerBacktestPrimitives: () =>
+    request<{ status: string; primitives: BacktestPrimitiveMeta[] }>(
+      "/api/stock-tracker/backtest/primitives",
+    ),
+  getStockTrackerBacktestPresets: () =>
+    request<{ status: string; presets: BacktestPreset[] }>(
+      "/api/stock-tracker/backtest/presets",
+    ),
+  getStockTrackerBacktest: (
+    code: string,
+    payload: { spec: BacktestSpec; label?: string; start?: string; end?: string },
+  ) =>
+    request<BacktestResponse>(
+      `/api/stock-tracker/symbols/${encodeURIComponent(code)}/backtest`,
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
 };
 
 // --- Scheduled research types ---
@@ -2102,6 +2118,117 @@ export interface FinancialReportSnapshot {
 export interface FinancialReportResponse {
   status: string;
   report: FinancialReportSnapshot;
+}
+
+/** One numeric parameter descriptor of a signal primitive. */
+export interface BacktestPrimitiveParam {
+  key: string;
+  label: string;
+  default: number;
+  min: number;
+  max: number;
+}
+
+/** Self-describing signal primitive returned by the rule-builder catalog. */
+export interface BacktestPrimitiveMeta {
+  id: string;
+  label: string;
+  description: string;
+  params: BacktestPrimitiveParam[];
+  triggers: { id: string; label: string }[];
+}
+
+export type BacktestTrigger = "state" | "edge_up" | "edge_down";
+
+/** One condition inside a rule: a primitive + trigger + numeric params. */
+export interface BacktestCondition {
+  primitive: string;
+  trigger: BacktestTrigger;
+  params: Record<string, number>;
+}
+
+/** A buy/sell rule: conditions combined with AND or OR. */
+export interface BacktestRule {
+  mode: "and" | "or";
+  conditions: BacktestCondition[];
+}
+
+/** A full composable strategy: independent buy and sell rules. */
+export interface BacktestSpec {
+  buy: BacktestRule;
+  sell: BacktestRule;
+  /** Optional exits, decimals: 0.08 = take-profit at +8% / stop-loss at −8%. */
+  take_profit_pct?: number;
+  stop_loss_pct?: number;
+}
+
+/** One-click preset template (id/label/spec) that fills the rule builder. */
+export interface BacktestPreset {
+  id: string;
+  label: string;
+  spec: BacktestSpec;
+}
+
+export interface BacktestPoint {
+  date: string;
+  equity: number;
+}
+
+export interface BacktestPricePoint {
+  date: string;
+  close: number;
+}
+
+export interface BacktestTradePoint {
+  date: string;
+  side: "buy" | "sell";
+  price: number;
+}
+
+/** One indicator series aligned to the backtest window's price dates. */
+export interface BacktestIndicatorSeries {
+  key: string;
+  label: string;
+  values: (number | null)[];
+}
+
+/** Indicator group: overlaid on price ("ma"/"boll") or a sub-panel below it. */
+export interface BacktestIndicatorPanel {
+  kind: "ma" | "boll" | "macd" | "kdj" | "rsi" | string;
+  title: string;
+  params: Record<string, number>;
+  series: BacktestIndicatorSeries[];
+}
+
+/** Single-symbol strategy backtest result (on-demand). */
+export interface BacktestSnapshot {
+  code: string;
+  label: string;
+  spec: BacktestSpec;
+  start_date?: string | null;
+  end_date?: string | null;
+  bars: number;
+  /** Decimals: total/annual return and max_drawdown are fractions (0.23 = +23%). */
+  total_return?: number | null;
+  annual_return?: number | null;
+  max_drawdown?: number | null;
+  sharpe?: number | null;
+  sortino?: number | null;
+  win_rate?: number | null;
+  profit_factor?: number | null;
+  trade_count: number;
+  equity_curve: BacktestPoint[];
+  benchmark_curve: BacktestPoint[];
+  prices: BacktestPricePoint[];
+  trades: BacktestTradePoint[];
+  indicators: BacktestIndicatorPanel[];
+  source?: string;
+  error?: string | null;
+}
+
+export interface BacktestResponse {
+  status: string;
+  backtest: BacktestSnapshot;
 }
 
 export type EventRiskLevel = "info" | "warning" | "danger";

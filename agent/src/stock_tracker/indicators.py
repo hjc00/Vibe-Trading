@@ -30,12 +30,16 @@ def compute_macd(close: pd.Series, fast: int = 12, slow: int = 26, signal: int =
     return dif, dea, histogram
 
 
-def compute_kdj(df: pd.DataFrame, n: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
-    """Return ``(k, d, j)`` for KDJ with the conventional 1/3 smoothing.
+def compute_kdj(
+    df: pd.DataFrame, n: int = 9, m1: int = 3, m2: int = 3
+) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    """Return ``(k, d, j)`` for KDJ with configurable K/D smoothing.
 
     ``RSV = (close - LLV_n) / (HHV_n - LLV_n) * 100``; flat windows (HHV == LLV)
     map to ``RSV = 50`` to avoid division by zero. ``K``/``D`` are seeded at 50
-    and smoothed recursively.
+    and smoothed recursively with ``K = (m1-1)/m1 * K_prev + RSV/m1`` and
+    ``D = (m2-1)/m2 * D_prev + K/m2``. The conventional KDJ(9,3,3) defaults keep
+    every existing caller byte-identical.
     """
     close = df["close"]
     hhv = df["high"].rolling(n, min_periods=1).max()
@@ -44,13 +48,15 @@ def compute_kdj(df: pd.DataFrame, n: int = 9) -> Tuple[pd.Series, pd.Series, pd.
     rsv = (close - llv) / denom * 100.0
     rsv = rsv.fillna(50.0)
 
+    k_alpha = 1.0 / m1
+    d_alpha = 1.0 / m2
     k = pd.Series(np.nan, index=df.index, dtype="float64")
     d = pd.Series(np.nan, index=df.index, dtype="float64")
     k_val = 50.0
     d_val = 50.0
     for i, r in enumerate(rsv.to_numpy()):
-        k_val = (2.0 / 3.0) * k_val + (1.0 / 3.0) * r
-        d_val = (2.0 / 3.0) * d_val + (1.0 / 3.0) * k_val
+        k_val = (1.0 - k_alpha) * k_val + k_alpha * r
+        d_val = (1.0 - d_alpha) * d_val + d_alpha * k_val
         k.iloc[i] = k_val
         d.iloc[i] = d_val
     j = 3.0 * k - 2.0 * d

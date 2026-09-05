@@ -16,6 +16,11 @@ from pydantic import BaseModel, Field
 
 from src.market_data import fetch_market_data
 from src.stock_tracker.analyzer import run_analysis
+from src.stock_tracker.backtest_data import (
+    list_presets,
+    list_primitives,
+    run_backtest_for_symbol,
+)
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.financial_reports_data import load_financial_report
 from src.stock_tracker.models import (
@@ -225,6 +230,22 @@ class TrackerAnalyzeResponse(BaseModel):
     id: Optional[str] = None
     generated_at: Optional[str] = None
     trading_date: Optional[str] = None
+
+
+class BacktestRunRequest(BaseModel):
+    """Body for running a composable single-symbol strategy backtest.
+
+    ``spec`` is ``{"buy": Rule, "sell": Rule}`` where each Rule is
+    ``{"mode": "and"|"or", "conditions": [{primitive, trigger, params}]}``.
+    Deep validation (unknown primitives / empty buy rule / param clamps) happens
+    in :func:`src.stock_tracker.backtest_data.run_backtest_for_symbol`, which
+    degrades to an error snapshot rather than rejecting here.
+    """
+
+    spec: Dict[str, Any]
+    label: str = ""
+    start: Optional[str] = None
+    end: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -813,6 +834,43 @@ def register_stock_tracker_routes(
             force=refresh,
         )
         return {"status": "ok", "report": report.model_dump(mode="json")}
+
+    @app.get("/api/stock-tracker/backtest/primitives")
+    async def get_backtest_primitives(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
+        """Return the composable signal-primitive catalog for the rule builder."""
+        return {"status": "ok", "primitives": list_primitives()}
+
+    @app.get("/api/stock-tracker/backtest/presets")
+    async def get_backtest_presets(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
+        """Return one-click preset rule templates (id/label/spec)."""
+        return {"status": "ok", "presets": list_presets()}
+
+    @app.post("/api/stock-tracker/symbols/{code}/backtest")
+    async def run_symbol_backtest(
+        request: BacktestRunRequest,
+        code: str,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        """Run a composable buy/sell-rule backtest for one symbol on demand.
+
+        Mirrors the financial-report card: a per-click computation (not part of
+        the daily refresh) that pulls the requested long daily-bar range through
+        the real backtest engine. ``spec`` carries the buy/sell rules built from
+        signal primitives; invalid specs return an error snapshot, never 4xx.
+        """
+        normalized = normalize_a_share_code(code)
+        if normalized is None:
+            raise HTTPException(status_code=422, detail=f"Invalid A-share code: {code}")
+
+        snapshot = await asyncio.to_thread(
+            run_backtest_for_symbol,
+            normalized,
+            request.spec,
+            start_date=request.start,
+            end_date=request.end,
+            label=request.label,
+        )
+        return {"status": "ok", "backtest": snapshot.model_dump(mode="json")}
 
     @app.get("/api/stock-tracker/analyze/history")
     async def get_analysis_history(

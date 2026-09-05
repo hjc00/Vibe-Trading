@@ -81,6 +81,7 @@ HIDEABLE_CARDS: List[str] = [
     "consensus",
     "chip",
     "financial_report",
+    "backtest",
     "sector",
 ]
 
@@ -104,6 +105,7 @@ CARD_DATA_DIMENSIONS: Dict[str, frozenset[str]] = {
     "consensus": frozenset({"consensus"}),
     "chip": frozenset({"chip"}),
     "financial_report": frozenset(),
+    "backtest": frozenset(),
     "sector": frozenset({"industry_ranking", "concept"}),
 }
 
@@ -755,6 +757,98 @@ class FinancialReportSnapshot(BaseModel):
     error: Optional[str] = None
 
 
+class BacktestPoint(BaseModel):
+    """One equity-curve point (strategy or benchmark) for the backtest chart."""
+
+    date: str  # "YYYY-MM-DD"
+    equity: float
+
+
+class BacktestPricePoint(BaseModel):
+    """One daily close of the backtested symbol (for the buy/sell overlay)."""
+
+    date: str  # "YYYY-MM-DD"
+    close: float
+
+
+class BacktestTradePoint(BaseModel):
+    """One executed buy/sell fill of a backtest run.
+
+    ``side`` is the fill side reported by the engine (``"buy"`` opens a long,
+    ``"sell"`` closes it); A 股 ChinaAEngine is long-only so these map directly
+    to 买入点 / 卖出点 on the price overlay.
+    """
+
+    date: str  # "YYYY-MM-DD"
+    side: str  # buy | sell
+    price: float
+
+
+class BacktestIndicatorSeries(BaseModel):
+    """One indicator series aligned to the backtest window's price dates.
+
+    ``values`` is a list the same length as ``BacktestSnapshot.prices``; ``None``
+    marks warm-up bars where the indicator is not yet defined.
+    """
+
+    key: str
+    label: str
+    values: List[Optional[float]] = Field(default_factory=list)
+
+
+class BacktestIndicatorPanel(BaseModel):
+    """One indicator group drawn on (or below) the backtest price chart.
+
+    ``kind`` is ``"ma"`` / ``"boll"`` (overlay on the price grid) or
+    ``"macd"`` / ``"kdj"`` / ``"rsi"`` (each gets its own sub-panel below).
+    ``params`` records the strategy parameters that produced it.
+    """
+
+    kind: str
+    title: str
+    params: Dict[str, Any] = Field(default_factory=dict)
+    series: List[BacktestIndicatorSeries] = Field(default_factory=list)
+
+
+class BacktestSnapshot(BaseModel):
+    """Single-symbol strategy backtest result (单标的回测, on-demand).
+
+    Produced on demand (not part of the daily refresh) by
+    :mod:`src.stock_tracker.backtest_data`, which runs the real ``agent/backtest``
+    engine over an on-demand long daily bar range. Standalone (not attached to
+    ``SymbolSnapshot``) because it is a per-click computation, not a refresh
+    dimension.
+
+    Return/drawdown/win-rate fields are decimals (fractions), matching the
+    engine's own metric semantics; ``total_return=0.23`` means +23%.
+    """
+
+    code: str
+    label: str = ""
+    spec: Dict[str, Any] = Field(default_factory=dict)
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    bars: int = 0  # evaluated trading bars
+    # Fractions: total/annual return (0.23 = +23%), max_drawdown (negative
+    # fraction), win_rate (0-1). ``annual_return`` may be None when the window
+    # is too short to annualize.
+    total_return: Optional[float] = None
+    annual_return: Optional[float] = None
+    max_drawdown: Optional[float] = None
+    sharpe: Optional[float] = None
+    sortino: Optional[float] = None
+    win_rate: Optional[float] = None
+    profit_factor: Optional[float] = None
+    trade_count: int = 0
+    equity_curve: List[BacktestPoint] = Field(default_factory=list)
+    benchmark_curve: List[BacktestPoint] = Field(default_factory=list)
+    prices: List[BacktestPricePoint] = Field(default_factory=list)
+    trades: List[BacktestTradePoint] = Field(default_factory=list)
+    indicators: List[BacktestIndicatorPanel] = Field(default_factory=list)
+    source: str = "backtest"
+    error: Optional[str] = None
+
+
 class VolumePoint(BaseModel):
     """One daily OHLCV observation for charting within the tracker.
 
@@ -1067,6 +1161,12 @@ __all__ = [
     "IndicatorSeries",
     "SymbolSnapshot",
     "TrackerSnapshot",
+    "BacktestPoint",
+    "BacktestPricePoint",
+    "BacktestTradePoint",
+    "BacktestIndicatorSeries",
+    "BacktestIndicatorPanel",
+    "BacktestSnapshot",
     "AnalysisAction",
     "PriceZone",
     "EvidenceItem",

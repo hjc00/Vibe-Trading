@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { TrendingUp } from "lucide-react";
 import { useChartLifecycle } from "@/hooks/useChartLifecycle";
@@ -6,11 +6,51 @@ import { useCardCollapse } from "@/hooks/useCardCollapse";
 import { getChartTheme } from "@/lib/chart-theme";
 import { cn } from "@/lib/utils";
 import { formatDataDate } from "@/lib/stockTracker";
+import { safeGet, safeSet } from "@/lib/storage";
 import { ChartCardHeader } from "./ChartCardHeader";
-import type { IndicatorBar, SymbolSnapshot } from "@/lib/api";
+import type { BacktestTradePoint, IndicatorBar, SymbolSnapshot } from "@/lib/api";
 
 interface IndicatorChartCardProps {
   symbol: SymbolSnapshot | null;
+  /** Recent backtest buy/sell fills to overlay on the price pane (same code). */
+  backtestTrades?: BacktestTradePoint[];
+  /** Render without its own card border/header (for embedding in a shared card). */
+  bare?: boolean;
+}
+
+const INDICATOR_OPTS_KEY = "stockTracker.indicatorChart.options.v1";
+
+interface IndicatorChartOptions {
+  showBoll: boolean;
+  showMa: boolean;
+  showMacd: boolean;
+  showKdj: boolean;
+  showCrosses: boolean;
+}
+
+const DEFAULT_INDICATOR_OPTS: IndicatorChartOptions = {
+  showBoll: true,
+  showMa: true,
+  showMacd: true,
+  showKdj: true,
+  showCrosses: true,
+};
+
+function loadIndicatorOptions(): IndicatorChartOptions {
+  const raw = safeGet(INDICATOR_OPTS_KEY);
+  if (!raw) return { ...DEFAULT_INDICATOR_OPTS };
+  try {
+    const parsed = JSON.parse(raw) as Partial<IndicatorChartOptions>;
+    return {
+      showBoll: typeof parsed.showBoll === "boolean" ? parsed.showBoll : true,
+      showMa: typeof parsed.showMa === "boolean" ? parsed.showMa : true,
+      showMacd: typeof parsed.showMacd === "boolean" ? parsed.showMacd : true,
+      showKdj: typeof parsed.showKdj === "boolean" ? parsed.showKdj : true,
+      showCrosses: typeof parsed.showCrosses === "boolean" ? parsed.showCrosses : true,
+    };
+  } catch {
+    return { ...DEFAULT_INDICATOR_OPTS };
+  }
 }
 
 type NullableSeries = (number | null)[];
@@ -44,14 +84,71 @@ function buildMarkPoints(indices: number[], values: NullableSeries, color: strin
     }));
 }
 
-export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
+/** Map a backtest buy/sell fills onto the indicator bars by trading date. */
+function buildBacktestMarks(
+  bars: IndicatorBar[],
+  trades: BacktestTradePoint[] | undefined,
+  theme: ReturnType<typeof getChartTheme>,
+) {
+  if (!bars.length || !trades || !trades.length) return [];
+  const idxByDate = new Map<string, number>();
+  bars.forEach((bar, i) => {
+    if (bar.trade_date) idxByDate.set(String(bar.trade_date), i);
+  });
+  const marks: {
+    coord: [number, number];
+    symbol: "circle";
+    symbolSize: number;
+    itemStyle: { color: string };
+    label: { show: boolean; formatter: string; color: string; fontWeight: number };
+  }[] = [];
+  for (const trade of trades) {
+    const index = idxByDate.get(String(trade.date));
+    if (index == null) continue;
+    const buy = trade.side === "buy";
+    marks.push({
+      coord: [index, trade.price],
+      symbol: "circle",
+      symbolSize: 13,
+      itemStyle: { color: buy ? theme.upColor : theme.downColor },
+      label: { show: true, formatter: buy ? "B" : "S", color: "#ffffff", fontWeight: 700 },
+    });
+  }
+  return marks;
+}
+
+// Per-pane heights and the matching container height so the chart shrinks when
+// sub-panels (MACD / KDJ) are hidden. Must mirror the pane layout in the builder.
+const TECH_PANE_HEIGHTS: Record<string, number> = { price: 300, volume: 66, macd: 112, kdj: 112 };
+const TECH_PANE_GAP = 10;
+
+function techChartHeight(showMacd: boolean, showKdj: boolean): number {
+  const order = ["price", "volume", ...(showMacd ? ["macd"] : []), ...(showKdj ? ["kdj"] : [])];
+  const height = order.reduce((acc, key) => acc + TECH_PANE_HEIGHTS[key], 0);
+  const gaps = Math.max(order.length - 1, 0) * TECH_PANE_GAP;
+  // 34 = legend/top offset before the first grid; 26 ≈ bottom padding for the
+  // dataZoom slider.
+  return 34 + height + gaps + 26;
+}
+
+export function IndicatorChartCard({ symbol, backtestTrades, bare = false }: IndicatorChartCardProps) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
-  const [showBoll, setShowBoll] = useState(true);
-  const [showMa, setShowMa] = useState(true);
-  const [showMacd, setShowMacd] = useState(true);
-  const [showKdj, setShowKdj] = useState(true);
+  const [initialOpts] = useState(loadIndicatorOptions);
+  const [showBoll, setShowBoll] = useState(initialOpts.showBoll);
+  const [showMa, setShowMa] = useState(initialOpts.showMa);
+  const [showMacd, setShowMacd] = useState(initialOpts.showMacd);
+  const [showKdj, setShowKdj] = useState(initialOpts.showKdj);
+  const [showCrosses, setShowCrosses] = useState(initialOpts.showCrosses);
   const { collapsed, toggle } = useCardCollapse("indicator");
+
+  // Persist sub-panel / cross toggles so the chart view survives reloads.
+  useEffect(() => {
+    safeSet(
+      INDICATOR_OPTS_KEY,
+      JSON.stringify({ showBoll, showMa, showMacd, showKdj, showCrosses }),
+    );
+  }, [showBoll, showMa, showMacd, showKdj, showCrosses]);
 
   const data = useMemo(() => {
     const bars = symbol?.indicators?.bars ?? [];
@@ -175,37 +272,56 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
       const macdDeathPoints = buildMarkPoints(data.macdCross.death, data.dif, theme.downColor, "死叉");
       const kdjGoldenPoints = buildMarkPoints(data.kdjCross.golden, data.k, theme.upColor, "金叉");
       const kdjDeathPoints = buildMarkPoints(data.kdjCross.death, data.k, theme.downColor, "死叉");
+      const backtestMarks = buildBacktestMarks(data.bars, backtestTrades, theme);
+      const macdCrossData = showCrosses ? [...macdGoldenPoints, ...macdDeathPoints] : [];
+      const kdjCrossData = showCrosses ? [...kdjGoldenPoints, ...kdjDeathPoints] : [];
 
-      const xAxes = [0, 1, 2, 3].map((gridIndex) => ({
-        type: "category" as const,
-        gridIndex,
-        data: data.dates,
-        boundaryGap: true,
-        axisLine: { lineStyle: { color: theme.axisColor } },
-        axisTick: { show: false },
-        axisLabel: {
-          show: gridIndex === 3,
-          color: theme.textColor,
-          fontSize: 10,
-        },
-        splitLine: { show: false },
-      }));
+      const paneHeights: Record<string, number> = { price: 300, volume: 66, macd: 112, kdj: 112 };
+      const paneGap = 10;
+      const paneOrder: string[] = [
+        "price",
+        "volume",
+        ...(showMacd ? ["macd"] : []),
+        ...(showKdj ? ["kdj"] : []),
+      ];
+      const gridIndex = new Map(paneOrder.map((key, i) => [key, i] as const));
+      const gi = (key: string) => gridIndex.get(key) ?? 0;
 
-      const valueAxis = (gridIndex: number) => ({
-        type: "value" as const,
-        gridIndex,
-        scale: true,
-        axisLabel: { color: theme.textColor, fontSize: 10 },
-        splitLine: { lineStyle: { color: theme.gridColor } },
-        axisLine: { show: false },
+      const grids: { left: number; right: number; top: number; height: number }[] = [];
+      const xAxes: Record<string, unknown>[] = [];
+      const yAxes: Record<string, unknown>[] = [];
+      let cursor = 34;
+      paneOrder.forEach((key) => {
+        const g = gi(key);
+        const h = paneHeights[key];
+        grids.push({ left: 52, right: 18, top: cursor, height: h });
+        xAxes.push({
+          type: "category",
+          gridIndex: g,
+          data: data.dates,
+          boundaryGap: true,
+          axisLine: { lineStyle: { color: theme.axisColor } },
+          axisTick: { show: false },
+          axisLabel: { show: g === paneOrder.length - 1, color: theme.textColor, fontSize: 10 },
+          splitLine: { show: false },
+        });
+        yAxes.push({
+          type: "value",
+          gridIndex: g,
+          scale: true,
+          axisLabel: { color: theme.textColor, fontSize: 10 },
+          splitLine: { lineStyle: { color: theme.gridColor } },
+          axisLine: { show: false },
+        });
+        cursor += h + paneGap;
       });
 
       const series = [
         {
           name: t("stockTracker.price"),
           type: "candlestick",
-          xAxisIndex: 0,
-          yAxisIndex: 0,
+          xAxisIndex: gi("price"),
+          yAxisIndex: gi("price"),
           data: candleData,
           itemStyle: {
             color: theme.upColor,
@@ -224,38 +340,38 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
             symbolSize: 6,
             itemStyle: { color: theme.warningColor },
             label: { color: theme.warningColor, fontSize: 10, formatter: "{b}", position: "top" },
-            data: priceDivergencePoints,
+            data: [...priceDivergencePoints, ...backtestMarks],
           },
         },
         ...(showMa
           ? [
-              { name: "MA5", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: data.ma5, symbol: "none", lineStyle: { width: 1, color: maColors[0] }, itemStyle: { color: maColors[0] } },
-              { name: "MA10", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: data.ma10, symbol: "none", lineStyle: { width: 1, color: maColors[1] }, itemStyle: { color: maColors[1] } },
-              { name: "MA20", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: data.ma20, symbol: "none", lineStyle: { width: 1, color: maColors[2] }, itemStyle: { color: maColors[2] } },
-              { name: "MA60", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: data.ma60, symbol: "none", lineStyle: { width: 1, color: maColors[3] }, itemStyle: { color: maColors[3] } },
+              { name: "MA5", type: "line", xAxisIndex: gi("price"), yAxisIndex: gi("price"), data: data.ma5, symbol: "none", lineStyle: { width: 1, color: maColors[0] }, itemStyle: { color: maColors[0] } },
+              { name: "MA10", type: "line", xAxisIndex: gi("price"), yAxisIndex: gi("price"), data: data.ma10, symbol: "none", lineStyle: { width: 1, color: maColors[1] }, itemStyle: { color: maColors[1] } },
+              { name: "MA20", type: "line", xAxisIndex: gi("price"), yAxisIndex: gi("price"), data: data.ma20, symbol: "none", lineStyle: { width: 1, color: maColors[2] }, itemStyle: { color: maColors[2] } },
+              { name: "MA60", type: "line", xAxisIndex: gi("price"), yAxisIndex: gi("price"), data: data.ma60, symbol: "none", lineStyle: { width: 1, color: maColors[3] }, itemStyle: { color: maColors[3] } },
             ]
           : []),
         ...(showBoll
           ? [
-              { name: "BOLL上", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: data.bbUpper, symbol: "none", lineStyle: { width: 1, color: bollColor, type: "dashed" }, itemStyle: { color: bollColor } },
-              { name: "BOLL中", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: data.bbMid, symbol: "none", lineStyle: { width: 1, color: bollColor }, itemStyle: { color: bollColor } },
-              { name: "BOLL下", type: "line", xAxisIndex: 0, yAxisIndex: 0, data: data.bbLower, symbol: "none", lineStyle: { width: 1, color: bollColor, type: "dashed" }, itemStyle: { color: bollColor } },
+              { name: "BOLL上", type: "line", xAxisIndex: gi("price"), yAxisIndex: gi("price"), data: data.bbUpper, symbol: "none", lineStyle: { width: 1, color: bollColor, type: "dashed" }, itemStyle: { color: bollColor } },
+              { name: "BOLL中", type: "line", xAxisIndex: gi("price"), yAxisIndex: gi("price"), data: data.bbMid, symbol: "none", lineStyle: { width: 1, color: bollColor }, itemStyle: { color: bollColor } },
+              { name: "BOLL下", type: "line", xAxisIndex: gi("price"), yAxisIndex: gi("price"), data: data.bbLower, symbol: "none", lineStyle: { width: 1, color: bollColor, type: "dashed" }, itemStyle: { color: bollColor } },
             ]
           : []),
-        { name: t("stockTracker.chartVolume"), type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: volumeData, barWidth: "60%" },
+        { name: t("stockTracker.chartVolume"), type: "bar", xAxisIndex: gi("volume"), yAxisIndex: gi("volume"), data: volumeData, barWidth: "60%" },
         ...(showMacd
           ? [
-              { name: "MACD", type: "bar", xAxisIndex: 2, yAxisIndex: 2, data: macdHistData, barWidth: "60%" },
+              { name: "MACD", type: "bar", xAxisIndex: gi("macd"), yAxisIndex: gi("macd"), data: macdHistData, barWidth: "60%" },
               {
                 name: "DIF",
                 type: "line",
-                xAxisIndex: 2,
-                yAxisIndex: 2,
+                xAxisIndex: gi("macd"),
+                yAxisIndex: gi("macd"),
                 data: data.dif,
                 symbol: "none",
                 lineStyle: { width: 1, color: macdDiffColor },
                 itemStyle: { color: macdDiffColor },
-                markPoint: { data: [...macdGoldenPoints, ...macdDeathPoints] },
+                markPoint: { data: macdCrossData },
                 markLine: {
                   symbol: ["none", "none"],
                   lineStyle: { color: theme.warningColor, type: "dashed", width: 1 },
@@ -263,24 +379,14 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
                   data: difDivergenceLines,
                 },
               },
-              { name: "DEA", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: data.dea, symbol: "none", lineStyle: { width: 1, color: macdDeaColor }, itemStyle: { color: macdDeaColor } },
+              { name: "DEA", type: "line", xAxisIndex: gi("macd"), yAxisIndex: gi("macd"), data: data.dea, symbol: "none", lineStyle: { width: 1, color: macdDeaColor }, itemStyle: { color: macdDeaColor } },
             ]
           : []),
         ...(showKdj
           ? [
-              {
-                name: "K",
-                type: "line",
-                xAxisIndex: 3,
-                yAxisIndex: 3,
-                data: data.k,
-                symbol: "none",
-                lineStyle: { width: 1, color: maColors[2] },
-                itemStyle: { color: maColors[2] },
-                markPoint: { data: [...kdjGoldenPoints, ...kdjDeathPoints] },
-              },
-              { name: "D", type: "line", xAxisIndex: 3, yAxisIndex: 3, data: data.d, symbol: "none", lineStyle: { width: 1, color: maColors[0] }, itemStyle: { color: maColors[0] } },
-              { name: "J", type: "line", xAxisIndex: 3, yAxisIndex: 3, data: data.j, symbol: "none", lineStyle: { width: 1, color: maColors[1] }, itemStyle: { color: maColors[1] } },
+              { name: "K", type: "line", xAxisIndex: gi("kdj"), yAxisIndex: gi("kdj"), data: data.k, symbol: "none", lineStyle: { width: 1, color: maColors[2] }, itemStyle: { color: maColors[2] }, markPoint: { data: kdjCrossData } },
+              { name: "D", type: "line", xAxisIndex: gi("kdj"), yAxisIndex: gi("kdj"), data: data.d, symbol: "none", lineStyle: { width: 1, color: maColors[0] }, itemStyle: { color: maColors[0] } },
+              { name: "J", type: "line", xAxisIndex: gi("kdj"), yAxisIndex: gi("kdj"), data: data.j, symbol: "none", lineStyle: { width: 1, color: maColors[1] }, itemStyle: { color: maColors[1] } },
             ]
           : []),
       ];
@@ -325,22 +431,17 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
           textStyle: { color: theme.textColor, fontSize: 10 },
           top: 0,
         },
-        grid: [
-          { left: 52, right: 18, top: 32, height: "40%" },
-          { left: 52, right: 18, top: "50%", height: "9%" },
-          { left: 52, right: 18, top: "62%", height: "14%" },
-          { left: 52, right: 18, top: "79%", height: "12%" },
-        ],
+        grid: grids,
         xAxis: xAxes,
-        yAxis: [valueAxis(0), valueAxis(1), valueAxis(2), valueAxis(3)],
+        yAxis: yAxes,
         dataZoom: [
-          { type: "inside", xAxisIndex: [0, 1, 2, 3], start: 0, end: 100 },
-          { type: "slider", xAxisIndex: [0, 1, 2, 3], bottom: 4, height: 18, start: 0, end: 100 },
+          { type: "inside", xAxisIndex: paneOrder.map((_, i) => i), start: 0, end: 100 },
+          { type: "slider", xAxisIndex: paneOrder.map((_, i) => i), bottom: 4, height: 18, start: 0, end: 100 },
         ],
         series,
       };
     },
-    [data, t, showBoll, showMa, showMacd, showKdj, collapsed],
+    [data, t, showBoll, showMa, showMacd, showKdj, showCrosses, collapsed, backtestTrades],
   );
 
   const hasData = data != null;
@@ -359,6 +460,30 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
     </button>
   );
 
+  const content = (
+    <>
+      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+        {toggleChip(t("stockTracker.bollingerBands"), showBoll, () => setShowBoll((v) => !v))}
+        {toggleChip(t("stockTracker.movingAverage"), showMa, () => setShowMa((v) => !v))}
+        {toggleChip("MACD", showMacd, () => setShowMacd((v) => !v))}
+        {toggleChip("KDJ", showKdj, () => setShowKdj((v) => !v))}
+        {toggleChip("金叉/死叉", showCrosses, () => setShowCrosses((v) => !v))}
+      </div>
+      <div className="relative w-full" style={{ height: techChartHeight(showMacd, showKdj) }}>
+        <div ref={ref} className="absolute inset-0" />
+        {!hasData && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <TrendingUp className="h-8 w-8 opacity-40" />
+            <span className="text-xs">{t("stockTracker.noIndicatorData")}</span>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  // Bare mode: embed inside a shared card (no own border/header).
+  if (bare) return content;
+
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
       <ChartCardHeader
@@ -368,25 +493,7 @@ export function IndicatorChartCard({ symbol }: IndicatorChartCardProps) {
         onToggle={toggle}
         meta={t("stockTracker.dataDate", { date: formatDataDate(lastDate) })}
       />
-      {!collapsed && (
-        <>
-          <div className="mb-2 flex flex-wrap items-center gap-1.5">
-            {toggleChip(t("stockTracker.bollingerBands"), showBoll, () => setShowBoll((v) => !v))}
-            {toggleChip(t("stockTracker.movingAverage"), showMa, () => setShowMa((v) => !v))}
-            {toggleChip("MACD", showMacd, () => setShowMacd((v) => !v))}
-            {toggleChip("KDJ", showKdj, () => setShowKdj((v) => !v))}
-          </div>
-          <div className="relative h-[560px] w-full">
-            <div ref={ref} className="absolute inset-0" />
-            {!hasData && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                <TrendingUp className="h-8 w-8 opacity-40" />
-                <span className="text-xs">{t("stockTracker.noIndicatorData")}</span>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      {!collapsed && content}
     </div>
   );
 }

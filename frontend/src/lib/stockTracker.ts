@@ -59,6 +59,7 @@ export const HIDEABLE_CARD_IDS = [
   "consensus",
   "chip",
   "financial_report",
+  "backtest",
   "sector",
 ] as const;
 
@@ -79,6 +80,7 @@ export const CARD_TITLE_LABEL_KEYS: Record<HideableCardId, string> = {
   consensus: "stockTracker.consensusTitle",
   chip: "stockTracker.chipTitle",
   financial_report: "stockTracker.financialReportTitle",
+  backtest: "stockTracker.backtestTitle",
   sector: "stockTracker.sectorStrengthTitle",
 };
 

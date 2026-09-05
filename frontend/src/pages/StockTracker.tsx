@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType }
 import { useTranslation } from "react-i18next";
 import { ChevronUp, Eye, TrendingUp, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, type SignalMeta, type SymbolSnapshot, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
+import { api, type BacktestTradePoint, type SignalMeta, type SymbolSnapshot, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import {
   ALL_ANALYSIS_INDICATOR_KEYS,
   CARD_TITLE_LABEL_KEYS,
@@ -32,7 +32,7 @@ import { TrackerAnalysisReport } from "@/components/stock-tracker/TrackerAnalysi
 import { MarginChartCard } from "@/components/stock-tracker/MarginChartCard";
 import { FundFlowChartCard } from "@/components/stock-tracker/FundFlowChartCard";
 import { RpsChartCard } from "@/components/stock-tracker/RpsChartCard";
-import { IndicatorChartCard } from "@/components/stock-tracker/IndicatorChartCard";
+import { IndicatorBacktestCard } from "@/components/stock-tracker/IndicatorBacktestCard";
 import { RiskMetricsCard } from "@/components/stock-tracker/RiskMetricsCard";
 import { ValuationCard } from "@/components/stock-tracker/ValuationCard";
 import { EventTimelineCard } from "@/components/stock-tracker/EventTimelineCard";
@@ -80,6 +80,8 @@ export function StockTracker() {
   const [error, setError] = useState<string | null>(null);
   const [quotesUpdatedAt, setQuotesUpdatedAt] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  // Latest backtest buy/sell fills (per code) to overlay on the technical chart.
+  const [backtestOverlay, setBacktestOverlay] = useState<{ code: string; trades: BacktestTradePoint[] } | null>(null);
   const [addCode, setAddCode] = useState("");
   const [signalMeta, setSignalMeta] = useState<SignalMeta[]>([]);
   const [collapsedDetailIds, setCollapsedDetailIds] = useState<Set<HideableCardId>>(() => {
@@ -564,6 +566,19 @@ export function StockTracker() {
                   onBreakEvenChange={handleBreakEvenChange}
                 />
 
+                {isCardVisible("backtest", config?.card_visibility) ? (
+                  <IndicatorBacktestCard
+                    symbol={selectedSymbol}
+                    onHide={() => handleToggleCard("backtest")}
+                    backtestTrades={
+                      backtestOverlay && backtestOverlay.code === selectedSymbol?.code
+                        ? backtestOverlay.trades
+                        : undefined
+                    }
+                    onBacktestResult={setBacktestOverlay}
+                  />
+                ) : null}
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {expandedDetailCards.map(({ id, Component }) => (
                     <Component
@@ -575,8 +590,6 @@ export function StockTracker() {
                     />
                   ))}
                 </div>
-
-                <IndicatorChartCard symbol={selectedSymbol} />
 
                 {isCardVisible("financial_report", config?.card_visibility) ? (
                   <FinancialReportCard
