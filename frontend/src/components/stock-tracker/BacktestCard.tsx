@@ -1,4 +1,4 @@
-import { ChevronDown, LineChart, Loader2, Play, Plus, X } from "lucide-react";
+import { ChevronDown, Circle, CircleDot, LineChart, Loader2, Play, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,7 @@ interface BacktestStoredSettings {
   presetId: string;
   spec: BacktestSpec;
   sellDisabled: boolean;
+  multiBuys: boolean;
   takeProfitPct: string;
   stopLossPct: string;
   start?: string;
@@ -85,7 +86,21 @@ function cloneSpec(spec: BacktestSpec): BacktestSpec {
 function newCondition(primitive: BacktestPrimitiveMeta): BacktestCondition {
   const params: Record<string, number> = {};
   for (const p of primitive.params) params[p.key] = p.default;
-  return { primitive: primitive.id, trigger: "state", params };
+  return { primitive: primitive.id, trigger: "state", params, enabled: true };
+}
+
+/** Serialize the editable spec: drop disabled conditions and the UI-only flag. */
+function serializeRule(rule: BacktestRule): BacktestRule {
+  return {
+    ...rule,
+    conditions: rule.conditions
+      .filter((condition) => condition.enabled !== false)
+      .map((condition) => {
+        const clean = { ...condition };
+        delete (clean as { enabled?: boolean }).enabled;
+        return clean;
+      }),
+  };
 }
 
 interface MetricDef {
@@ -122,6 +137,8 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
   const [stopLossPct, setStopLossPct] = useState("");
   // Disable the sell rule entirely → buy once and hold to the end (长拿观察).
   const [sellDisabled, setSellDisabled] = useState(false);
+  // True: re-open after each exit (multiple buys). False: one buy for the run.
+  const [multiBuys, setMultiBuys] = useState(true);
   const [report, setReport] = useState<BacktestSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const requestSeq = useRef(0);
@@ -162,6 +179,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
           }
           setSpec(cloneSpec(saved.spec));
           setSellDisabled(saved.sellDisabled === true);
+          setMultiBuys(saved.multiBuys !== false);
           setTakeProfitPct(typeof saved.takeProfitPct === "string" ? saved.takeProfitPct : "");
           setStopLossPct(typeof saved.stopLossPct === "string" ? saved.stopLossPct : "");
           if (saved.start) setStart(saved.start);
@@ -191,13 +209,14 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       presetId,
       spec,
       sellDisabled,
+      multiBuys,
       takeProfitPct,
       stopLossPct,
       start,
       end,
     };
     safeSet(BACKTEST_SETTINGS_KEY, JSON.stringify(stored));
-  }, [spec, presetId, sellDisabled, takeProfitPct, stopLossPct, start, end]);
+  }, [spec, presetId, sellDisabled, multiBuys, takeProfitPct, stopLossPct, start, end]);
 
   const markCustom = useCallback(() => {
     setPresetId("");
@@ -257,6 +276,19 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
     [spec, setRule, markCustom],
   );
 
+  const toggleConditionEnabled = useCallback(
+    (ruleKey: RuleKey, index: number) => {
+      if (!spec) return;
+      markCustom();
+      const rule = spec[ruleKey];
+      const conditions = rule.conditions.map((cond, i) =>
+        i === index ? { ...cond, enabled: cond.enabled === false } : cond,
+      );
+      setRule(ruleKey, { ...rule, conditions });
+    },
+    [spec, setRule, markCustom],
+  );
+
   const changePrimitive = useCallback(
     (ruleKey: RuleKey, index: number, primitiveId: string) => {
       if (!spec) return;
@@ -307,7 +339,12 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
     const seq = ++requestSeq.current;
     setLoading(true);
     setReport(null);
-    const payloadSpec: BacktestSpec = cloneSpec(spec);
+    const baseSpec = cloneSpec(spec);
+    const payloadSpec: BacktestSpec = {
+      buy: serializeRule(baseSpec.buy),
+      sell: serializeRule(baseSpec.sell),
+      allow_multiple_buys: multiBuys,
+    };
     if (sellDisabled) payloadSpec.sell = { ...payloadSpec.sell, conditions: [] };
     const takeProfit = Number.parseFloat(takeProfitPct);
     const stopLoss = Number.parseFloat(stopLossPct);
@@ -332,7 +369,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       .finally(() => {
         if (requestSeq.current === seq) setLoading(false);
       });
-  }, [code, spec, label, start, end, takeProfitPct, stopLossPct, sellDisabled, onBacktestResult]);
+  }, [code, spec, label, start, end, takeProfitPct, stopLossPct, sellDisabled, multiBuys, onBacktestResult]);
 
   // Reset the result when the selected symbol changes, then auto-run the
   // default preset once per symbol so the card is never an empty shell.
@@ -530,6 +567,18 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
             <label className="inline-flex items-center gap-1.5 pb-2 text-[11px] text-muted-foreground">
               <input
                 type="checkbox"
+                checked={multiBuys}
+                onChange={(e) => {
+                  markCustom();
+                  setMultiBuys(e.target.checked);
+                }}
+                className="h-3.5 w-3.5 accent-primary"
+              />
+              {t("stockTracker.backtestMultiBuys")}
+            </label>
+            <label className="inline-flex items-center gap-1.5 pb-2 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
                 checked={sellDisabled}
                 onChange={(e) => {
                   markCustom();
@@ -597,23 +646,42 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
                           </p>
                         ) : (
                           rule.conditions.map((cond, index) => {
+                            const pickable = isBuy ? primitives.filter((p) => !p.sell_only) : primitives;
                             const meta = primitiveById.get(cond.primitive);
-                            const options = meta ?? primitives[0];
+                            const options = meta ?? pickable[0];
                             return (
                               <div
                                 key={index}
-                                className="flex flex-col gap-1.5 rounded-md bg-muted/30 px-2 py-1.5"
+                                className={cn(
+                                  "flex flex-col gap-1.5 rounded-md bg-muted/30 px-2 py-1.5",
+                                  cond.enabled === false && "opacity-45",
+                                )}
                               >
                                 <div className="flex flex-wrap items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    aria-pressed={cond.enabled !== false}
+                                    aria-label={cond.enabled === false ? "启用该条件" : "停用该条件"}
+                                    title={cond.enabled === false ? "启用该条件（参与回测）" : "停用该条件（回测时忽略）"}
+                                    onClick={() => toggleConditionEnabled(ruleKey, index)}
+                                    className="rounded-md p-0.5 text-muted-foreground transition hover:text-foreground"
+                                  >
+                                    {cond.enabled === false ? (
+                                      <Circle className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <CircleDot className="h-3.5 w-3.5 text-primary" />
+                                    )}
+                                  </button>
                                   <select
                                     value={meta ? cond.primitive : ""}
                                     onChange={(e) => changePrimitive(ruleKey, index, e.target.value)}
-                                    className="min-w-[150px] flex-1 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none focus:border-primary"
+                                    disabled={cond.enabled === false}
+                                    className="min-w-[150px] flex-1 rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none focus:border-primary disabled:cursor-not-allowed"
                                   >
                                     {!meta ? (
                                       <option value="">—</option>
                                     ) : null}
-                                    {primitives.map((p) => (
+                                    {pickable.map((p) => (
                                       <option key={p.id} value={p.id}>
                                         {p.label}
                                       </option>
@@ -626,7 +694,8 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
                                         trigger: e.target.value as BacktestCondition["trigger"],
                                       })
                                     }
-                                    className="rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none focus:border-primary"
+                                    disabled={cond.enabled === false}
+                                    className="rounded-md border border-border/60 bg-background px-2 py-1 text-[11px] outline-none focus:border-primary disabled:cursor-not-allowed"
                                   >
                                     {options?.triggers.map((trig) => (
                                       <option key={trig.id} value={trig.id}>
@@ -645,7 +714,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
                                   </button>
                                 </div>
                                 {meta && meta.params.length > 0 ? (
-                                  <div className="flex flex-wrap items-center gap-1.5 pl-0.5">
+                                  <div className="flex flex-wrap items-center gap-1.5 pl-6">
                                     {meta.params.map((param) => (
                                       <label
                                         key={param.key}
@@ -658,10 +727,11 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
                                           min={param.min}
                                           max={param.max}
                                           step={param.default % 1 === 0 ? 1 : 0.5}
+                                          disabled={cond.enabled === false}
                                           onChange={(e) =>
                                             setParam(ruleKey, index, param.key, Number(e.target.value))
                                           }
-                                          className="w-16 rounded-md border border-border/60 bg-background px-1.5 py-0.5 text-[11px] tabular-nums outline-none focus:border-primary"
+                                          className="w-16 rounded-md border border-border/60 bg-background px-1.5 py-0.5 text-[11px] tabular-nums outline-none focus:border-primary disabled:cursor-not-allowed"
                                         />
                                       </label>
                                     ))}

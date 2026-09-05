@@ -1955,6 +1955,7 @@
     "backtestExitSettings": "离场设置（可选）",
     "backtestTakeProfit": "止盈 %",
     "backtestStopLoss": "止损 %",
+    "backtestMultiBuys": "允许多次开仓（多笔）",
     "backtestSellDisabled": "禁止卖出 · 长拿到底",
     "backtestSellDisabledNote": "已禁止卖出：按买入信号开仓并一直持有到区间结束",
     "techBacktestTitle": "技术指标 · 回测",

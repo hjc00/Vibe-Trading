@@ -96,36 +96,66 @@ def _cross_down(series: pd.Series) -> pd.Series:
     return (~series & series.shift(1, fill_value=False)).astype(bool)
 
 
+def _combine_rule(mode: str, static_ok: Optional[bool], dynamic_ok: Optional[bool]) -> bool:
+    """Combine static & entry-relative parts of one rule under its AND/OR mode.
+
+    ``None`` means that part has no conditions → it is the operator's identity
+    (True under AND, False under OR) so the surviving part decides alone. If
+    *both* parts are absent there is no sell rule at all → False.
+    """
+    if static_ok is None and dynamic_ok is None:
+        return False
+    identity = mode == "and"
+    static = identity if static_ok is None else static_ok
+    dynamic = identity if dynamic_ok is None else dynamic_ok
+    return (static and dynamic) if mode == "and" else (static or dynamic)
+
+
 def _simulate_targets(
     buy: pd.Series,
-    sell: pd.Series,
+    sell_static: Optional[pd.Series],
     frame: pd.DataFrame,
     take_profit_pct: Optional[float] = None,
     stop_loss_pct: Optional[float] = None,
+    entry_volume_mults: Optional[List[float]] = None,
+    entry_volume_mode: str = "and",
+    allow_multiple_buys: bool = True,
 ) -> pd.Series:
-    """Return a long/flat weight series from buy/sell triggers + optional TP/SL.
+    """Return a long/flat weight series from buy/sell triggers + optional exits.
 
     Flat → long on the first bar where ``buy`` is True (entry priced at that
-    bar's open, close fallback). Long → flat when ``sell`` is True, or when the
-    close has since risen past ``take_profit_pct`` or fallen past
-    ``stop_loss_pct`` measured from entry. A ``buy``+``sell`` on the same bar
-    resolves as long (entry wins). Output is a float Series aligned with the
-    input index.
+    bar's open, close fallback). Long → flat when the (static) sell rule is
+    True, an entry-volume sell condition fires (today's volume >= entry volume ×
+    mult), the close passes ``take_profit_pct`` / ``stop_loss_pct``. A
+    ``buy``+``sell`` on the same bar resolves as long. ``sell_static`` is the
+    pre-evaluated stateless part of the sell rule; entry-volume conditions are
+    resolved statefully inside (they need the entry bar's volume). Output is a
+    float Series aligned with the input index.
     """
     buy_vals = [bool(v) for v in buy.tolist()]
-    sell_vals = [bool(v) for v in sell.tolist()]
+    sell_vals = sell_static.tolist() if sell_static is not None else None
     closes = frame["close"].astype(float).tolist()
     opens = (
         frame["open"].astype(float).tolist()
         if "open" in frame.columns
         else list(closes)
     )
+    volumes = (
+        frame["volume"].astype(float).tolist()
+        if "volume" in frame.columns
+        else None
+    )
+    mults = list(entry_volume_mults or [])
+    mode = entry_volume_mode if entry_volume_mode in {"and", "or"} else "and"
     out = pd.Series(0.0, index=buy.index, dtype="float64")
     state = 0
     entry: float = 0.0
-    for i, (b, s) in enumerate(zip(buy_vals, sell_vals)):
+    entry_volume: float = 0.0
+    bought_any = False
+    for i, b in enumerate(buy_vals):
         if state == 0:
-            if b:
+            if b and (allow_multiple_buys or not bought_any):
+                bought_any = True
                 open_price = opens[i]
                 close_price = closes[i]
                 if math.isfinite(float(open_price)):
@@ -134,10 +164,19 @@ def _simulate_targets(
                     entry = float(close_price)
                 else:
                     entry = 0.0
+                if volumes is not None and math.isfinite(float(volumes[i])):
+                    entry_volume = float(volumes[i])
                 state = 1
         else:
             close_price = closes[i]
-            exit_now = bool(s)
+            static_ok = bool(sell_vals[i]) if sell_vals is not None else None
+            dynamic_ok = None
+            if mults and volumes is not None and entry_volume > 0 and math.isfinite(float(volumes[i])):
+                reached = [volumes[i] >= entry_volume * m for m in mults]
+                dynamic_ok = all(reached) if mode == "and" else any(reached)
+            rule_exit = _combine_rule(mode, static_ok, dynamic_ok)
+
+            exit_now = rule_exit
             if not exit_now and take_profit_pct and math.isfinite(float(close_price)):
                 if close_price >= entry * (1.0 + take_profit_pct):
                     exit_now = True
@@ -248,9 +287,31 @@ def _p_close_above_boll_upper(frame: pd.DataFrame, params: Dict[str, Any]) -> pd
 
 
 def _p_volume_expansion(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
+    """Volume spike vs the *prior* ``window`` days (excludes the current bar).
+
+    ``baseline[i]`` is the mean volume of the ``window`` trading days strictly
+    before ``i``, so a single big day never inflates its own baseline — the
+    conventional meaning of 放量(量≥倍数·前N日均量).
+    """
     volume = frame["volume"]
-    baseline = volume.rolling(int(params["window"]), min_periods=1).mean()
-    return volume >= float(params["mult"]) * baseline
+    prior = volume.shift(1)
+    baseline = prior.rolling(int(params["window"]), min_periods=1).mean()
+    return (volume >= float(params["mult"]) * baseline).fillna(False)
+
+
+def _p_volume_vs_entry(frame: pd.DataFrame, params: Dict[str, Any]) -> pd.Series:
+    """Stateless placeholder for the entry-volume sell condition.
+
+    Real evaluation happens inside :func:`_simulate_targets`, which knows the
+    entry bar's volume per position; here it contributes nothing (never True on
+    its own).
+    """
+    return pd.Series(False, index=frame.index)
+
+
+# Volume-sell condition compared against the ENTRY bar's volume (stateful —
+# evaluated during simulation, not as a plain frame->bool series).
+VOLUME_VS_ENTRY = "volume_vs_entry"
 
 
 # Registry: primitive id -> descriptor. ``compute(frame, params)`` must return a
@@ -367,13 +428,22 @@ PRIMITIVES: Dict[str, Dict[str, Any]] = {
         "compute": _p_close_above_boll_upper,
     },
     "volume_expansion": {
-        "label": "放量（量≥倍数均量）",
-        "description": "当日成交量不低于「均量 × 倍数」（确认信号常用）",
+        "label": "放量（量≥倍数×前N日均量）",
+        "description": "当日成交量不低于其往前 window 个交易日（不含当日）的均量 × mult",
         "params": [
             {"key": "mult", "label": "倍数", "default": 1.5, "min": 1.0, "max": 5.0},
-            {"key": "window", "label": "均量窗口", "default": 20, "min": 5, "max": 60},
+            {"key": "window", "label": "均量窗口(前N日)", "default": 20, "min": 5, "max": 60},
         ],
         "compute": _p_volume_expansion,
+    },
+    VOLUME_VS_ENTRY: {
+        "label": "量能≥买入当日量×倍数（卖出）",
+        "description": "持仓中当日成交量不低于开仓当日量的 mult 倍即卖出（需在卖出规则使用）",
+        "params": [
+            {"key": "mult", "label": "倍数(买入量)", "default": 3, "min": 1, "max": 100},
+        ],
+        "compute": _p_volume_vs_entry,
+        "sell_only": True,
     },
 }
 
@@ -485,15 +555,50 @@ def _same_day_signal(weights: pd.Series) -> pd.Series:
 
 
 def _spec_signal(frame: pd.DataFrame, spec: Dict[str, Any]) -> pd.Series:
-    """Turn a spec's buy/sell rules (plus optional TP/SL) into weights."""
+    """Turn a spec's buy/sell rules (plus optional TP/SL) into weights.
+
+    Sell conditions whose primitive is ``VOLUME_VS_ENTRY`` (成交量≥买入当日量×N)
+    are resolved statefully inside :func:`_simulate_targets` because they need
+    the entry bar's volume; every other sell condition is pre-evaluated as a
+    static series.
+    """
     buy = _rule_series(spec.get("buy"), frame)
-    sell = _rule_series(spec.get("sell"), frame)
+
+    sell_mode = "and"
+    sell_static: Optional[pd.Series] = None
+    entry_volume_mults: List[float] = []
+    sell_rule = spec.get("sell")
+    if isinstance(sell_rule, dict):
+        sell_mode = sell_rule.get("mode", "and")
+        conditions = sell_rule.get("conditions") or []
+        if not isinstance(conditions, list):
+            conditions = []
+        static_conds = [
+            c for c in conditions if not (isinstance(c, dict) and c.get("primitive") == VOLUME_VS_ENTRY)
+        ]
+        dynamic_conds = [
+            c for c in conditions if isinstance(c, dict) and c.get("primitive") == VOLUME_VS_ENTRY
+        ]
+        if static_conds:
+            sell_static = _rule_series({"mode": sell_mode, "conditions": static_conds}, frame)
+        schema = PRIMITIVES[VOLUME_VS_ENTRY]["params"]
+        for condition in dynamic_conds:
+            entry_volume_mults.append(
+                float(_coerce_params_for(schema, condition.get("params")).get("mult", 3.0))
+            )
+
+    raw_allow = spec.get("allow_multiple_buys", True)
+    allow_multiple = bool(raw_allow) if isinstance(raw_allow, bool) else str(raw_allow).lower() not in ("0", "false", "no", "")
+
     weights = _simulate_targets(
         buy,
-        sell,
+        sell_static,
         frame,
         take_profit_pct=_exit_pct(spec, "take_profit_pct"),
         stop_loss_pct=_exit_pct(spec, "stop_loss_pct"),
+        entry_volume_mults=entry_volume_mults,
+        entry_volume_mode=sell_mode,
+        allow_multiple_buys=allow_multiple,
     )
     return _same_day_signal(weights)
 
@@ -618,6 +723,7 @@ def list_primitives() -> List[Dict[str, Any]]:
                 "description": entry["description"],
                 "params": entry["params"],
                 "triggers": TRIGGER_OPTIONS,
+                "sell_only": bool(entry.get("sell_only", False)),
             }
         )
     return metas
@@ -882,6 +988,13 @@ def run_backtest_for_symbol(
             pct = _exit_pct(spec, key)
             if pct is not None:
                 clean_spec[key] = round(pct, 4)
+        if "allow_multiple_buys" in spec:
+            raw_allow = spec.get("allow_multiple_buys", True)
+            clean_spec["allow_multiple_buys"] = (
+                bool(raw_allow)
+                if isinstance(raw_allow, bool)
+                else str(raw_allow).lower() not in ("0", "false", "no", "")
+            )
     snapshot = BacktestSnapshot(
         code=code,
         label=label,
@@ -991,6 +1104,8 @@ def run_backtest_for_symbol(
         equity_csv = run_dir / "artifacts" / "equity.csv"
         snapshot.equity_curve = _read_curve(equity_csv)
         snapshot.benchmark_curve = _read_benchmark_curve(equity_csv)
+        # B/S marks come from the engine's actual fills (S same-day, B only when
+        # the buy signal fires again later) so marks & metrics always agree.
         snapshot.trades = _read_trades(run_dir / "artifacts" / "trades.csv")
         snapshot.bars = max(len(snapshot.equity_curve), 0)
 

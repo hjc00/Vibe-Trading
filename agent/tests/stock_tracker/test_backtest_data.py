@@ -22,6 +22,7 @@ from src.stock_tracker.backtest_data import (
     _read_trades,
     _rule_series,
     _same_day_signal,
+    _simulate_targets,
     _validate_spec,
     PRIMITIVES,
     TRIGGER_EDGE_DOWN,
@@ -215,6 +216,90 @@ def test_same_day_shift_maps_fill_to_trigger_day() -> None:
     signal = _same_day_signal(weights)
     assert signal.iloc[4] == 1.0  # engine pos[5] = signal[4]
     assert signal.iloc[5] == 0.0  # already flat the bar after the trigger
+
+
+@pytest.mark.unit
+def test_entry_volume_exit_triggers() -> None:
+    """卖出规则「量能≥买入当日量×倍数」：持仓中触发即平仓。"""
+    idx = pd.date_range("2026-08-01", periods=12, freq="B")
+    frame = pd.DataFrame(
+        {
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.0,
+            "volume": [100.0] * 12,
+        },
+        index=idx,
+    )
+    frame.iloc[7, frame.columns.get_loc("volume")] = 300.0  # 3× the 100 entry volume
+    buy = pd.Series([True] + [False] * 11, index=idx)
+
+    weights = _simulate_targets(
+        buy,
+        None,
+        frame,
+        entry_volume_mults=[3.0],
+        entry_volume_mode="and",
+    )
+    # Bought bar 0; exit on the volume-spike bar (index 7); flat from then on.
+    assert float(weights.iloc[:7].min()) == 1.0
+    assert float(weights.iloc[7:].sum()) == 0.0
+
+    hold = _simulate_targets(buy, None, frame)  # no entry-volume condition
+    assert float(hold.sum()) == 12.0
+
+
+@pytest.mark.unit
+def test_entry_volume_condition_reaches_engine() -> None:
+    """The volume_vs_entry primitive registered & evaluated via spec/engine."""
+    from src.stock_tracker.backtest_data import build_signal_engine
+
+    spec = {
+        "buy": {
+            "mode": "and",
+            "conditions": [
+                {"primitive": "rsi_above", "trigger": TRIGGER_EDGE_UP, "params": {"period": 14, "threshold": 0}},
+            ],
+        },
+        "sell": {
+            "mode": "and",
+            "conditions": [
+                {"primitive": "volume_vs_entry", "trigger": TRIGGER_STATE, "params": {"mult": 3}},
+            ],
+        },
+    }
+    engine = build_signal_engine(spec)
+    frame = _rising_frame()
+    frame.loc[frame.index[9], "volume"] = 4_000_000.0  # 4× the entry-day volume
+    series = engine.generate({"600519.SH": frame})["600519.SH"]
+    assert (series >= 0.0).all()
+    assert not (series == 0.0).all()  # goes long at some point
+    assert not (series == 1.0).all()  # the volume condition eventually exits
+
+
+@pytest.mark.unit
+def test_allow_multiple_buys_toggle() -> None:
+    """多笔开关：False=整段只买一次；True=平仓后再次满足买入可再开仓。"""
+    idx = pd.date_range("2026-08-01", periods=8, freq="B")
+    frame = pd.DataFrame(
+        {"open": 100.0, "high": 101.0, "low": 99.0, "close": 101.0, "volume": [100.0] * 8},
+        index=idx,
+    )
+    buy = pd.Series([True, False, False, True, False, False, False, False], index=idx)
+    sell = pd.Series([False, False, True, False, False, False, False, False], index=idx)
+
+    multi = _simulate_targets(buy, sell, frame, allow_multiple_buys=True)
+    single = _simulate_targets(buy, sell, frame, allow_multiple_buys=False)
+    # Multi: enter bar0, exit bar2, re-enter bar3.
+    assert float(multi.iloc[0]) == 1.0
+    assert float(multi.iloc[2]) == 0.0
+    assert float(multi.iloc[3]) == 1.0
+    assert float(multi.iloc[-1]) == 1.0
+    # Single: after the first exit it stays flat — the bar-3 signal is ignored.
+    assert float(single.iloc[0]) == 1.0
+    assert float(single.iloc[2]) == 0.0
+    assert float(single.iloc[3:].sum()) == 0.0
 
 
 @pytest.mark.unit

@@ -84,7 +84,7 @@ function buildMarkPoints(indices: number[], values: NullableSeries, color: strin
     }));
 }
 
-/** Map a backtest buy/sell fills onto the indicator bars by trading date. */
+/** Map backtest buy/sell fills onto the indicator bars by trading date. */
 function buildBacktestMarks(
   bars: IndicatorBar[],
   trades: BacktestTradePoint[] | undefined,
@@ -95,6 +95,7 @@ function buildBacktestMarks(
   bars.forEach((bar, i) => {
     if (bar.trade_date) idxByDate.set(String(bar.trade_date), i);
   });
+
   const marks: {
     coord: [number, number];
     symbol: "circle";
@@ -102,16 +103,32 @@ function buildBacktestMarks(
     itemStyle: { color: string };
     label: { show: boolean; formatter: string; color: string; fontWeight: number };
   }[] = [];
+  const byDate = new Map<string, BacktestTradePoint[]>();
   for (const trade of trades) {
-    const index = idxByDate.get(String(trade.date));
-    if (index == null) continue;
-    const buy = trade.side === "buy";
-    marks.push({
-      coord: [index, trade.price],
-      symbol: "circle",
-      symbolSize: 13,
-      itemStyle: { color: buy ? theme.upColor : theme.downColor },
-      label: { show: true, formatter: buy ? "B" : "S", color: "#ffffff", fontWeight: 700 },
+    const key = String(trade.date);
+    if (!idxByDate.has(key)) continue;
+    const list = byDate.get(key) ?? [];
+    list.push(trade);
+    byDate.set(key, list);
+  }
+  // Same-day multiple fills (e.g. S then B) would overlap at one point; fan
+  // them out vertically around the bar so every mark stays visible.
+  for (const [date, fills] of byDate) {
+    const barIdx = idxByDate.get(date)!;
+    const bar = bars[barIdx];
+    const hi = bar.high ?? bar.close ?? 0;
+    const lo = bar.low ?? bar.close ?? 0;
+    const span = Math.max(hi - lo, (bar.close ?? 0) * 0.005, 0.001);
+    fills.forEach((trade, k) => {
+      const buy = trade.side === "buy";
+      const offset = (k - (fills.length - 1) / 2) * span * 0.15;
+      marks.push({
+        coord: [barIdx, trade.price + offset],
+        symbol: "circle",
+        symbolSize: 13,
+        itemStyle: { color: buy ? theme.upColor : theme.downColor },
+        label: { show: true, formatter: buy ? "B" : "S", color: "#ffffff", fontWeight: 700 },
+      });
     });
   }
   return marks;

@@ -2136,6 +2136,8 @@ export interface BacktestPrimitiveMeta {
   description: string;
   params: BacktestPrimitiveParam[];
   triggers: { id: string; label: string }[];
+  /** Sell-only primitives are hidden from the buy-rule picker. */
+  sell_only?: boolean;
 }
 
 export type BacktestTrigger = "state" | "edge_up" | "edge_down";
@@ -2145,6 +2147,8 @@ export interface BacktestCondition {
   primitive: string;
   trigger: BacktestTrigger;
   params: Record<string, number>;
+  /** UI-only: disabled conditions are filtered out before the run is sent. */
+  enabled?: boolean;
 }
 
 /** A buy/sell rule: conditions combined with AND or OR. */
@@ -2160,6 +2164,8 @@ export interface BacktestSpec {
   /** Optional exits, decimals: 0.08 = take-profit at +8% / stop-loss at −8%. */
   take_profit_pct?: number;
   stop_loss_pct?: number;
+  /** False = 整段只买一次（单笔）；True(default) = 平仓后可再次买入。 */
+  allow_multiple_buys?: boolean;
 }
 
 /** One-click preset template (id/label/spec) that fills the rule builder. */

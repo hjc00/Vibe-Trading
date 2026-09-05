@@ -1952,6 +1952,7 @@
     "backtestExitSettings": "Exit settings (optional)",
     "backtestTakeProfit": "Take profit %",
     "backtestStopLoss": "Stop loss %",
+    "backtestMultiBuys": "Allow multiple buys",
     "backtestSellDisabled": "Disable sell · hold to the end",
     "backtestSellDisabledNote": "Sell rule disabled: it buys on the buy signal and holds through the end of the range",
     "techBacktestTitle": "Technical indicators · Backtest",
