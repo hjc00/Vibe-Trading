@@ -56,6 +56,28 @@ function loadIndicatorOptions(): IndicatorChartOptions {
 type NullableSeries = (number | null)[];
 
 /** Detect up/down crosses between two aligned series, returning bar indices. */
+/** Per-bar volume ratio vs the trailing 5-session average (A-share 量比). */
+function computeVolumeRatios(volume: NullableSeries): NullableSeries {
+  const WINDOW = 5;
+  const ratios: NullableSeries = new Array(volume.length).fill(null);
+  for (let i = 0; i < volume.length; i++) {
+    let sum = 0;
+    let count = 0;
+    for (let j = Math.max(0, i - WINDOW); j < i; j++) {
+      const v = volume[j];
+      if (v != null) {
+        sum += v;
+        count++;
+      }
+    }
+    const v = volume[i];
+    if (v != null && count > 0 && sum > 0) {
+      ratios[i] = v / (sum / count);
+    }
+  }
+  return ratios;
+}
+
 function computeCrosses(fast: NullableSeries, slow: NullableSeries): { golden: number[]; death: number[] } {
   const golden: number[] = [];
   const death: number[] = [];
@@ -175,11 +197,13 @@ export function IndicatorChartCard({ symbol, backtestTrades, bare = false }: Ind
     const dea = col("dea");
     const k = col("k");
     const d = col("d");
+    const volume = col("volume");
     return {
       bars,
       dates: bars.map((b) => (b.trade_date ?? "").slice(5)),
       ohlc: bars.map((b) => [b.open ?? 0, b.close ?? 0, b.low ?? 0, b.high ?? 0] as [number, number, number, number]),
-      volume: col("volume"),
+      volume,
+      volumeRatio: computeVolumeRatios(volume),
       ma5: col("ma5"),
       ma10: col("ma10"),
       ma20: col("ma20"),
@@ -425,10 +449,21 @@ export function IndicatorChartCard({ symbol, backtestTrades, bare = false }: Ind
             const bar = data.bars[idx];
             if (!bar) return "";
             const pct = (v: number | null | undefined) => (v == null ? "—" : v.toFixed(2));
+            const volWan = (v: number | null | undefined) => (v == null ? "—" : `${(v / 1e4).toFixed(2)}万`);
+            const ratio = (v: number | null | undefined) => (v == null ? "—" : v.toFixed(2));
+            const prevClose = idx > 0 ? data.bars[idx - 1]?.close : null;
+            const chgPct =
+              prevClose != null && bar.close != null && prevClose > 0
+                ? ((bar.close - prevClose) / prevClose) * 100
+                : null;
+            const fmtChg = (v: number | null | undefined) =>
+              v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(2)}%`;
+            const chgColor = chgPct == null ? "" : chgPct > 0 ? theme.upColor : chgPct < 0 ? theme.downColor : "";
             return `<div style="font-size:12px;line-height:1.7">
               <div style="margin-bottom:4px;font-weight:500">${bar.trade_date ?? ""}</div>
               <div>开 ${pct(bar.open)}　高 ${pct(bar.high)}　低 ${pct(bar.low)}　收 ${pct(bar.close)}</div>
-              <div>量 ${pct(bar.volume)}</div>
+              <div>涨跌 <span style="color:${chgColor}">${fmtChg(chgPct)}</span></div>
+              <div>量 ${volWan(bar.volume)}　量比 ${ratio(data.volumeRatio[idx])}</div>
               <div>DIF ${pct(bar.dif)}　DEA ${pct(bar.dea)}　柱 ${pct(bar.macd_hist)}</div>
               <div>K ${pct(bar.k)}　D ${pct(bar.d)}　J ${pct(bar.j)}</div>
               <div>%B ${pct(bar.pct_b)}　带宽 ${pct(bar.bandwidth)}</div>

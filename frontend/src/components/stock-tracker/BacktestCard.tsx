@@ -6,9 +6,11 @@ import { useCardCollapse } from "@/hooks/useCardCollapse";
 import { safeGet, safeSet } from "@/lib/storage";
 import {
   BACKTEST_SETTINGS_KEY,
+  DEFAULT_SAME_BAR_REENTRY,
   buildBacktestPayload,
   serializeBacktestRule,
   type BacktestStoredSettings,
+  type SameBarReentry,
 } from "@/lib/stockTracker";
 import {
   api,
@@ -124,6 +126,8 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
   const [sellDisabled, setSellDisabled] = useState(false);
   // True: re-open after each exit (multiple buys). False: one buy for the run.
   const [multiBuys, setMultiBuys] = useState(true);
+  // Which exits may re-enter on the same bar when the buy signal is still live.
+  const [sameBarReentry, setSameBarReentry] = useState<SameBarReentry>(DEFAULT_SAME_BAR_REENTRY);
   const [report, setReport] = useState<BacktestSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   // Save-current-rule-as-preset inputs (custom presets persist server-side).
@@ -170,6 +174,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
           setSpec(cloneSpec(saved.spec));
           setSellDisabled(saved.sellDisabled === true);
           setMultiBuys(saved.multiBuys !== false);
+          setSameBarReentry(saved.sameBarReentry ?? DEFAULT_SAME_BAR_REENTRY);
           setTakeProfitPct(typeof saved.takeProfitPct === "string" ? saved.takeProfitPct : "");
           setStopLossPct(typeof saved.stopLossPct === "string" ? saved.stopLossPct : "");
           if (saved.start) setStart(saved.start);
@@ -201,6 +206,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       spec,
       sellDisabled,
       multiBuys,
+      sameBarReentry,
       takeProfitPct,
       stopLossPct,
       start,
@@ -215,7 +221,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       .catch(() => {
         // Non-fatal: alert detection simply keeps the last persisted strategy.
       });
-  }, [spec, presetId, sellDisabled, multiBuys, takeProfitPct, stopLossPct, start, end]);
+  }, [spec, presetId, sellDisabled, multiBuys, sameBarReentry, takeProfitPct, stopLossPct, start, end]);
 
   const markCustom = useCallback(() => {
     setPresetId("");
@@ -405,6 +411,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       spec,
       sellDisabled,
       multiBuys,
+      sameBarReentry,
       takeProfitPct,
       stopLossPct,
       start,
@@ -426,7 +433,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       .finally(() => {
         if (requestSeq.current === seq) setLoading(false);
       });
-  }, [code, spec, presetId, label, start, end, takeProfitPct, stopLossPct, sellDisabled, multiBuys, onBacktestResult]);
+  }, [code, spec, presetId, label, start, end, takeProfitPct, stopLossPct, sellDisabled, multiBuys, sameBarReentry, onBacktestResult]);
 
   // Reset the result when the selected symbol changes, then auto-run the
   // default preset once per symbol so the card is never an empty shell.
@@ -663,6 +670,18 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
                 onChange={(e) => setStopLossPct(e.target.value)}
                 className="w-16 rounded-md border border-border/60 bg-background px-2 py-1 text-xs tabular-nums outline-none focus:border-primary"
               />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+              {t("stockTracker.backtestSameBarReentry")}
+              <select
+                value={sameBarReentry}
+                onChange={(e) => setSameBarReentry(e.target.value as SameBarReentry)}
+                className="rounded-md border border-border/60 bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+              >
+                <option value="off">{t("stockTracker.backtestReentryOff")}</option>
+                <option value="stop_loss">{t("stockTracker.backtestReentryStopLoss")}</option>
+                <option value="all">{t("stockTracker.backtestReentryAll")}</option>
+              </select>
             </label>
             <label className="inline-flex items-center gap-1.5 pb-2 text-[11px] text-muted-foreground">
               <input

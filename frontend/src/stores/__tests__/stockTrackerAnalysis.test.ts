@@ -210,6 +210,7 @@ describe("stockTrackerAnalysis store", () => {
         },
         sell: { mode: "and", conditions: [] },
         allow_multiple_buys: false,
+        same_bar_reentry: "stop_loss",
         take_profit_pct: 0.08,
       },
       trading_date: "2026-08-20",

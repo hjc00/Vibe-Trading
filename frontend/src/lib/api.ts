@@ -2227,6 +2227,9 @@ export interface BacktestSpec {
   stop_loss_pct?: number;
   /** False = 整段只买一次（单笔）；True(default) = 平仓后可再次买入。 */
   allow_multiple_buys?: boolean;
+  /** Same-bar re-entry scope: which exits may re-enter on the same bar when the
+   *  buy signal is still live. "off" | "stop_loss" (default) | "all". */
+  same_bar_reentry?: "off" | "stop_loss" | "all";
 }
 
 /** One-click preset template (id/label/spec) that fills the rule builder. */

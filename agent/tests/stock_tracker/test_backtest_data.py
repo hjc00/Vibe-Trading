@@ -267,6 +267,8 @@ def test_render_strategy_spec_renders_rules_to_chinese() -> None:
     assert "止盈 +8.0%" in text
     assert "止损 -5.0%" in text
     assert "单笔（平仓后不再买入）" in text
+    # Default scope: stop-loss present → note that a stop loss re-enters same-day.
+    assert "止损触发当日若买点仍成立则同日再开仓" in text
 
 
 @pytest.mark.unit
@@ -415,6 +417,89 @@ def test_allow_multiple_buys_toggle() -> None:
     assert float(single.iloc[0]) == 1.0
     assert float(single.iloc[2]) == 0.0
     assert float(single.iloc[3:].sum()) == 0.0
+
+
+@pytest.mark.unit
+def test_same_bar_reentry_when_buy_still_live() -> None:
+    """止损当日若买入信号仍满足，当日洗掉后立即再开仓，不留空仓缺口。
+
+    A stop loss fires on a down bar while the buy signal is still True on that
+    same bar → the exit "washes out" and re-enters at the bar's close, so the
+    weight series never drops to flat on that bar (no one-day gap that would
+    miss a next-day rebound).
+    """
+    idx = pd.date_range("2026-08-01", periods=6, freq="B")
+    frame = pd.DataFrame(
+        {
+            "open": [100.0, 99.0, 98.0, 97.0, 96.0, 95.0],
+            "high": [101.0, 100.0, 99.0, 98.0, 97.0, 96.0],
+            "low": [99.0, 97.0, 96.0, 95.0, 94.0, 93.0],
+            "close": [99.5, 97.0, 96.0, 95.0, 94.0, 93.0],
+            "volume": [100.0] * 6,
+        },
+        index=idx,
+    )
+    buy = pd.Series([True, True, True, True, False, False], index=idx)
+
+    weights = _simulate_targets(buy, None, frame, stop_loss_pct=0.01, allow_multiple_buys=True)
+    # Bought bar0 (open 100). Bar1 close 97 < 99 (1% stop) but buy still True →
+    # same-bar re-entry, never flat on bars 0..3. Flat only once buy turns off.
+    assert float(weights.iloc[0]) == 1.0
+    assert float(weights.iloc[1]) == 1.0
+    assert float(weights.iloc[2]) == 1.0
+    assert float(weights.iloc[3]) == 1.0
+    assert float(weights.iloc[4]) == 0.0
+    assert float(weights.iloc[5]) == 0.0
+
+    # Contrast: with the buy signal off on the stop bar, it does go flat.
+    buy_off = pd.Series([True, False, False, False, False, False], index=idx)
+    weights_off = _simulate_targets(buy_off, None, frame, stop_loss_pct=0.01, allow_multiple_buys=True)
+    assert float(weights_off.iloc[0]) == 1.0
+    assert float(weights_off.iloc[1]) == 0.0  # stop fires and no live buy → flat
+
+
+@pytest.mark.unit
+def test_same_bar_reentry_scope() -> None:
+    """``same_bar_reentry`` scopes which exits may wash out and re-enter.
+
+    Default/``stop_loss`` only re-enters on a stop loss; ``all`` also re-enters
+    on a take-profit; ``off`` never re-enters (the exit always closes the
+    position even when the buy signal is still live on that bar).
+    """
+    idx = pd.date_range("2026-08-01", periods=4, freq="B")
+    frame = pd.DataFrame(
+        {
+            "open": [100.0, 101.0, 102.0, 103.0],
+            "high": [101.0, 102.0, 103.0, 104.0],
+            "low": [99.0, 100.0, 101.0, 102.0],
+            "close": [100.0, 102.0, 104.0, 106.0],
+            "volume": [100.0] * 4,
+        },
+        index=idx,
+    )
+    buy = pd.Series([True, True, True, True], index=idx)
+
+    # Take-profit fires on bar1 (close 102 >= 101) with buy still live.
+    all_w = _simulate_targets(buy, None, frame, take_profit_pct=0.01, same_bar_reentry="all")
+    sl_w = _simulate_targets(buy, None, frame, take_profit_pct=0.01, same_bar_reentry="stop_loss")
+    assert float(all_w.iloc[1]) == 1.0  # "all" washes out the take-profit
+    assert float(sl_w.iloc[1]) == 0.0  # "stop_loss" leaves take-profit as a flat
+
+    # Stop loss fires on a down bar1 with buy still live.
+    down = pd.DataFrame(
+        {
+            "open": [100.0, 99.0, 98.0, 97.0],
+            "high": [101.0, 100.0, 99.0, 98.0],
+            "low": [99.0, 97.0, 96.0, 95.0],
+            "close": [99.5, 97.0, 96.0, 95.0],
+            "volume": [100.0] * 4,
+        },
+        index=idx,
+    )
+    sl_w = _simulate_targets(buy, None, down, stop_loss_pct=0.01, same_bar_reentry="stop_loss")
+    off_w = _simulate_targets(buy, None, down, stop_loss_pct=0.01, same_bar_reentry="off")
+    assert float(sl_w.iloc[1]) == 1.0  # stop loss washes out under "stop_loss"
+    assert float(off_w.iloc[1]) == 0.0  # "off" closes the position instead
 
 
 @pytest.mark.unit

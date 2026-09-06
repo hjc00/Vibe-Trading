@@ -77,6 +77,13 @@ _INITIAL_CASH = 1_000_000
 # single-symbol 择时 presets.
 _POSITION_ADJUSTMENT = "hold"
 
+# Same-bar re-entry scope: which exit kinds may "wash out" and re-enter on the
+# same bar when the buy signal is still live (instead of going flat for a day).
+REENTRY_OFF = "off"              # 触发即平仓（原行为，不洗掉）
+REENTRY_STOP_LOSS = "stop_loss"  # 仅止损触发才同日再买（默认）
+REENTRY_ALL = "all"              # 止损 / 止盈 / 卖出规则统一，触发即同日再买
+_REENTRY_SCOPES = {REENTRY_OFF, REENTRY_STOP_LOSS, REENTRY_ALL}
+
 # Trigger names a condition may use, plus their labels for the frontend.
 TRIGGER_STATE = "state"
 TRIGGER_EDGE_UP = "edge_up"
@@ -127,17 +134,26 @@ def _simulate_targets(
     entry_volume_mults: Optional[List[float]] = None,
     entry_volume_mode: str = "and",
     allow_multiple_buys: bool = True,
+    same_bar_reentry: str = REENTRY_STOP_LOSS,
 ) -> pd.Series:
     """Return a long/flat weight series from buy/sell triggers + optional exits.
 
     Flat → long on the first bar where ``buy`` is True (entry priced at that
     bar's open, close fallback). Long → flat when the (static) sell rule is
     True, an entry-volume sell condition fires (today's volume >= entry volume ×
-    mult), the close passes ``take_profit_pct`` / ``stop_loss_pct``. A
-    ``buy``+``sell`` on the same bar resolves as long. ``sell_static`` is the
-    pre-evaluated stateless part of the sell rule; entry-volume conditions are
-    resolved statefully inside (they need the entry bar's volume). Output is a
-    float Series aligned with the input index.
+    mult), the close passes ``take_profit_pct`` / ``stop_loss_pct`` — unless the
+    buy signal is also live on that same bar *and* ``same_bar_reentry`` allows
+    that exit kind, in which case the exit "washes out" and immediately
+    re-enters at the bar's close, re-anchoring the stop/take-profit bands to the
+    new level (so e.g. a still-oversold J after a stop loss keeps the trade on
+    instead of going flat for a day). ``same_bar_reentry`` is one of
+    ``off`` (never wash out — original behaviour), ``stop_loss`` (default: only
+    a stop loss re-enters), or ``all`` (stop loss / take profit / sell rule all
+    re-enter). A ``buy``+``sell`` on the same bar therefore resolves as long
+    only when the scope permits it. ``sell_static`` is the pre-evaluated
+    stateless part of the sell rule; entry-volume conditions are resolved
+    statefully inside (they need the entry bar's volume). Output is a float
+    Series aligned with the input index.
     """
     buy_vals = [bool(v) for v in buy.tolist()]
     sell_vals = sell_static.tolist() if sell_static is not None else None
@@ -154,6 +170,7 @@ def _simulate_targets(
     )
     mults = list(entry_volume_mults or [])
     mode = entry_volume_mode if entry_volume_mode in {"and", "or"} else "and"
+    reentry = same_bar_reentry if same_bar_reentry in _REENTRY_SCOPES else REENTRY_STOP_LOSS
     out = pd.Series(0.0, index=buy.index, dtype="float64")
     state = 0
     entry: float = 0.0
@@ -183,15 +200,33 @@ def _simulate_targets(
                 dynamic_ok = all(reached) if mode == "and" else any(reached)
             rule_exit = _combine_rule(mode, static_ok, dynamic_ok)
 
-            exit_now = rule_exit
-            if not exit_now and take_profit_pct and math.isfinite(float(close_price)):
-                if close_price >= entry * (1.0 + take_profit_pct):
-                    exit_now = True
-            if not exit_now and stop_loss_pct and math.isfinite(float(close_price)):
-                if close_price <= entry * (1.0 - stop_loss_pct):
-                    exit_now = True
-            if exit_now:
-                state = 0
+            exit_kind: Optional[str] = None
+            if rule_exit:
+                exit_kind = "sell"
+            elif take_profit_pct and math.isfinite(float(close_price)) and close_price >= entry * (1.0 + take_profit_pct):
+                exit_kind = "take_profit"
+            elif stop_loss_pct and math.isfinite(float(close_price)) and close_price <= entry * (1.0 - stop_loss_pct):
+                exit_kind = "stop_loss"
+
+            if exit_kind is not None:
+                # Same-bar re-entry: a still-live buy signal "washes out" the
+                # exit and re-enters at this bar's close, re-anchoring the
+                # stop/take-profit bands to the new level — but only for the
+                # exit kinds the ``same_bar_reentry`` scope allows.
+                reenter = (
+                    b
+                    and (allow_multiple_buys or not bought_any)
+                    and (
+                        reentry == REENTRY_ALL
+                        or (reentry == REENTRY_STOP_LOSS and exit_kind == "stop_loss")
+                    )
+                )
+                if reenter:
+                    if math.isfinite(close_price) and close_price > 0:
+                        entry = close_price
+                    state = 1
+                else:
+                    state = 0
         out.iloc[i] = float(state)
     return out
 
@@ -742,6 +777,19 @@ def _exit_pct(spec: Any, key: str) -> Optional[float]:
     return min(1.0, value)
 
 
+def _reentry_scope(spec: Any) -> str:
+    """Return the same-bar re-entry scope from ``spec`` (default stop-loss only).
+
+    Absent / invalid values fall back to ``REENTRY_STOP_LOSS`` so a spec that
+    predates this parameter keeps the feature the user expects (a still-live buy
+    signal washes out a stop loss) without touching take-profit / sell exits.
+    """
+    if not isinstance(spec, dict):
+        return REENTRY_STOP_LOSS
+    value = spec.get("same_bar_reentry", REENTRY_STOP_LOSS)
+    return value if value in _REENTRY_SCOPES else REENTRY_STOP_LOSS
+
+
 def _same_day_signal(weights: pd.Series) -> pd.Series:
     """Shift weights one bar EARLIER so the engine fills on the signal day.
 
@@ -817,6 +865,7 @@ def _spec_signal(
         entry_volume_mults=entry_volume_mults,
         entry_volume_mode=sell_mode,
         allow_multiple_buys=allow_multiple,
+        same_bar_reentry=_reentry_scope(spec),
     )
     return _same_day_signal(weights)
 
@@ -1379,6 +1428,8 @@ def run_backtest_for_symbol(
                 if isinstance(raw_allow, bool)
                 else str(raw_allow).lower() not in ("0", "false", "no", "")
             )
+        if "same_bar_reentry" in spec:
+            clean_spec["same_bar_reentry"] = _reentry_scope(spec)
     snapshot = BacktestSnapshot(
         code=code,
         label=label,
@@ -1568,6 +1619,11 @@ def render_strategy_spec(spec: Any) -> str:
         else str(raw_allow).lower() not in ("0", "false", "no", "")
     )
     exits.append("平仓后可再次买入" if allow_multiple else "单笔（平仓后不再买入）")
+    scope = _reentry_scope(spec)
+    if scope == REENTRY_ALL:
+        exits.append("止损/止盈/卖出触发当日若买点仍成立则同日再开仓")
+    elif scope == REENTRY_STOP_LOSS and stop_loss is not None:
+        exits.append("止损触发当日若买点仍成立则同日再开仓")
     parts.append("；".join(exits))
     return "\n".join(parts)
 

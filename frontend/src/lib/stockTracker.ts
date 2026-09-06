@@ -542,6 +542,12 @@ export function formatChipPct(value: number | null | undefined): string {
 
 export const BACKTEST_SETTINGS_KEY = "stockTracker.backtestSettings.v1";
 
+/** Same-bar re-entry scope: which exits may re-enter on the same bar when the
+ *  buy signal is still live. Mirrors the backend's ``same_bar_reentry`` enum. */
+export type SameBarReentry = "off" | "stop_loss" | "all";
+
+export const DEFAULT_SAME_BAR_REENTRY: SameBarReentry = "stop_loss";
+
 /** Persisted shape of the rule-builder (spec + dates + exits + disable-sell). */
 export interface BacktestStoredSettings {
   presetId: string;
@@ -550,6 +556,7 @@ export interface BacktestStoredSettings {
   multiBuys: boolean;
   takeProfitPct: string;
   stopLossPct: string;
+  sameBarReentry?: SameBarReentry;
   start?: string;
   end?: string;
 }
@@ -582,6 +589,7 @@ export function buildBacktestPayload(
     buy: serializeBacktestRule(stored.spec.buy),
     sell: serializeBacktestRule(stored.spec.sell),
     allow_multiple_buys: stored.multiBuys !== false,
+    same_bar_reentry: stored.sameBarReentry ?? DEFAULT_SAME_BAR_REENTRY,
   };
   if (stored.sellDisabled) {
     payloadSpec.sell = { ...payloadSpec.sell, conditions: [] };
