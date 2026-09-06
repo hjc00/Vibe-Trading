@@ -37,6 +37,7 @@ from src.stock_tracker.backtest_data import (
     list_presets,
     list_primitive_categories,
     list_primitives,
+    render_strategy_spec,
     run_backtest_for_symbol,
 )
 from src.stock_tracker.models import BacktestSnapshot
@@ -214,6 +215,89 @@ def test_run_invalid_spec_returns_error_snapshot() -> None:
     assert isinstance(snap, BacktestSnapshot)
     assert snap.error is not None
     assert snap.label == ""
+
+
+@pytest.mark.unit
+def test_render_strategy_spec_empty_for_non_dict() -> None:
+    assert render_strategy_spec(None) == ""
+    assert render_strategy_spec("junk") == ""
+    assert render_strategy_spec([]) == ""
+
+
+@pytest.mark.unit
+def test_render_strategy_spec_placeholder_for_empty_dict() -> None:
+    # An empty dict is still a (rule-less) spec → renders the placeholders.
+    text = render_strategy_spec({})
+    assert "买入规则：未配置" in text
+    assert "卖出规则：未配置（禁止卖出·长拿到底）" in text
+
+
+@pytest.mark.unit
+def test_render_strategy_spec_renders_rules_to_chinese() -> None:
+    spec = {
+        "buy": {
+            "mode": "and",
+            "conditions": [
+                {"primitive": "fast_ma_above_slow", "trigger": TRIGGER_EDGE_UP, "params": {"fast": 5, "slow": 20}},
+                {"primitive": "dif_above_dea", "trigger": TRIGGER_STATE, "params": {"fast": 12, "slow": 26, "signal": 9}},
+            ],
+        },
+        "sell": {
+            "mode": "or",
+            "conditions": [
+                {"primitive": "close_above_ma", "trigger": TRIGGER_EDGE_DOWN, "params": {"n": 20}},
+            ],
+        },
+        "take_profit_pct": 0.08,
+        "stop_loss_pct": 0.05,
+        "allow_multiple_buys": False,
+    }
+    text = render_strategy_spec(spec)
+    # Buy side: AND header + translated labels + trigger + params.
+    assert "买入规则（全部满足（AND））" in text
+    assert "快均线在慢均线上方" in text
+    assert "刚满足（金叉/上穿）" in text
+    assert "fast=5" in text and "slow=20" in text
+    assert "MACD DIF 在 DEA 上方" in text
+    assert "持续满足" in text
+    # Sell side: OR header + translated label.
+    assert "卖出规则（满足其一（OR））" in text
+    assert "收盘在 MA 上方" in text
+    # Exits: TP/SL + single-buy wording.
+    assert "止盈 +8.0%" in text
+    assert "止损 -5.0%" in text
+    assert "单笔（平仓后不再买入）" in text
+
+
+@pytest.mark.unit
+def test_render_strategy_spec_empty_sell_marks_hold_to_end() -> None:
+    spec = {
+        "buy": {
+            "mode": "and",
+            "conditions": [{"primitive": "close_above_ma", "trigger": TRIGGER_STATE, "params": {"n": 20}}],
+        },
+        "sell": {"mode": "and", "conditions": []},
+    }
+    text = render_strategy_spec(spec)
+    assert "买入规则（全部满足（AND））" in text
+    assert "禁止卖出·长拿到底" in text
+
+
+@pytest.mark.unit
+def test_render_strategy_spec_skips_unknown_primitives() -> None:
+    spec = {
+        "buy": {
+            "mode": "and",
+            "conditions": [
+                {"primitive": "does_not_exist", "trigger": TRIGGER_STATE, "params": {}},
+                {"primitive": "close_above_ma", "trigger": TRIGGER_STATE, "params": {"n": 20}},
+            ],
+        },
+        "sell": {"mode": "and", "conditions": []},
+    }
+    text = render_strategy_spec(spec)
+    assert "收盘在 MA 上方" in text
+    assert "does_not_exist" not in text
 
 
 @pytest.mark.unit

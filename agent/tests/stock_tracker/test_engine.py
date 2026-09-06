@@ -808,6 +808,54 @@ def _snapshot_with_boards_and_sectors(
     )
 
 
+def test_build_technical_snapshot_reconstructs_technical_only(monkeypatch):
+    """Historical reconstruction returns price/technical blocks and leaves
+    the non-reconstructable external blocks None, reusing the live analysis path.
+    """
+    code = "000001.SZ"
+    df = _make_df(rows=120)
+    records = [
+        {
+            "date": idx.date().isoformat(),
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "volume": float(row["volume"]),
+        }
+        for idx, row in df.iterrows()
+    ]
+    config = TrackerConfig(watchlist=[code], periods=[10])
+    engine = StockTrackerEngine(config)
+
+    monkeypatch.setattr(engine, "_fetch_data", lambda codes, start, end: {code: records})
+    monkeypatch.setattr(
+        "src.stock_tracker.engine.fetch_a_share_names", lambda codes: {code: "平安银行"}
+    )
+    monkeypatch.setattr(engine, "_fetch_benchmark_data", lambda start, end: df.copy())
+
+    snapshot = engine.build_technical_snapshot(date(2026, 8, 31))
+
+    assert snapshot.as_of_date == date(2026, 8, 31)
+    assert len(snapshot.symbols) == 1
+    sym = snapshot.symbols[0]
+    assert sym.code == code
+    assert sym.name == "平安银行"
+    # Technical blocks are reconstructed.
+    assert sym.period_signals
+    assert sym.indicators is not None
+    assert sym.risk is not None
+    # Non-reconstructable external blocks stay None.
+    assert sym.capital is None
+    assert sym.valuation is None
+    assert sym.events is None
+    assert sym.concept is None
+    assert sym.consensus is None
+    assert sym.chip is None
+    # Cross-sectional ranking still attaches for the single symbol.
+    assert snapshot.rankings.get("return_10") == [code]
+
+
 def test_resolve_sector_boards_reuses_previous_same_day(monkeypatch):
     trading_date = date(2026, 8, 31)
     config = TrackerConfig(watchlist=["000001.SZ", "000002.SZ"], periods=[10])

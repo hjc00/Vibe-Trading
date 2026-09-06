@@ -1385,10 +1385,78 @@ def run_backtest_for_symbol(
     return snapshot
 
 
+def render_strategy_spec(spec: Any) -> str:
+    """Render a composable strategy spec into a concise Chinese description.
+
+    Translates the machine-level primitive/trigger ids into plain language using
+    ``PRIMITIVES`` labels and ``TRIGGER_OPTIONS`` labels, so the AI-analysis
+    prompt can read the user's own entry/exit rules instead of raw ids. Returns
+    an empty string when ``spec`` is absent or not a dict (nothing to describe).
+    Unknown primitives are silently skipped so a stale spec degrades gracefully.
+    """
+    if not isinstance(spec, dict):
+        return ""
+    trigger_labels = {item["id"]: item["label"] for item in TRIGGER_OPTIONS}
+
+    def _params_text(descriptor: Dict[str, Any], raw_params: Any) -> str:
+        params = _coerce_params_for(descriptor["params"], raw_params)
+        if not params:
+            return ""
+        return "，".join(f"{key}={value}" for key, value in params.items())
+
+    def _render_rule(rule: Any, name: str) -> str:
+        if not isinstance(rule, dict):
+            return ""
+        conditions = rule.get("conditions") or []
+        if not isinstance(conditions, list):
+            conditions = []
+        mode = "全部满足（AND）" if rule.get("mode", "and") == "and" else "满足其一（OR）"
+        lines = [f"{name}（{mode}）："]
+        idx = 1
+        for cond in conditions:
+            if not isinstance(cond, dict):
+                continue
+            primitive_id = cond.get("primitive")
+            descriptor = PRIMITIVES.get(primitive_id) if isinstance(primitive_id, str) else None
+            if descriptor is None:
+                continue
+            trigger = cond.get("trigger") or TRIGGER_STATE
+            trigger_label = trigger_labels.get(trigger, trigger)
+            params_text = _params_text(descriptor, cond.get("params"))
+            suffix = f"（{params_text}）" if params_text else ""
+            lines.append(f"  {idx}. {descriptor['label']}（{trigger_label}）{suffix}")
+            idx += 1
+        return "\n".join(lines) if idx > 1 else ""
+
+    parts: List[str] = []
+    buy = _render_rule(spec.get("buy"), "买入规则")
+    parts.append(buy or "买入规则：未配置")
+    sell = _render_rule(spec.get("sell"), "卖出规则")
+    parts.append(sell or "卖出规则：未配置（禁止卖出·长拿到底）")
+
+    exits: List[str] = []
+    take_profit = _exit_pct(spec, "take_profit_pct")
+    stop_loss = _exit_pct(spec, "stop_loss_pct")
+    if take_profit is not None:
+        exits.append(f"止盈 +{take_profit * 100.0:.1f}%")
+    if stop_loss is not None:
+        exits.append(f"止损 -{stop_loss * 100.0:.1f}%")
+    raw_allow = spec.get("allow_multiple_buys", True)
+    allow_multiple = (
+        bool(raw_allow)
+        if isinstance(raw_allow, bool)
+        else str(raw_allow).lower() not in ("0", "false", "no", "")
+    )
+    exits.append("平仓后可再次买入" if allow_multiple else "单笔（平仓后不再买入）")
+    parts.append("；".join(exits))
+    return "\n".join(parts)
+
+
 __all__ = [
     "build_signal_engine",
     "list_primitives",
     "list_primitive_categories",
     "list_presets",
+    "render_strategy_spec",
     "run_backtest_for_symbol",
 ]

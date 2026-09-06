@@ -1,4 +1,6 @@
 import type {
+  BacktestRule,
+  BacktestSpec,
   RecommendationAction,
   SignalMeta,
   SignalType,
@@ -530,4 +532,67 @@ export function getChipTrendToneClass(trend: string | null | undefined): string 
 export function formatChipPct(value: number | null | undefined): string {
   if (value === undefined || value === null) return "—";
   return `${value.toFixed(2)}%`;
+}
+
+// ---------------------------------------------------------------------------
+// Backtest rule-builder persistence + serialization (shared by BacktestCard and
+// the analyze store). A single global strategy lives in localStorage so it
+// survives reloads; the analyze store reads the same key to inject it.
+// ---------------------------------------------------------------------------
+
+export const BACKTEST_SETTINGS_KEY = "stockTracker.backtestSettings.v1";
+
+/** Persisted shape of the rule-builder (spec + dates + exits + disable-sell). */
+export interface BacktestStoredSettings {
+  presetId: string;
+  spec: BacktestSpec;
+  sellDisabled: boolean;
+  multiBuys: boolean;
+  takeProfitPct: string;
+  stopLossPct: string;
+  start?: string;
+  end?: string;
+}
+
+/** Drop disabled conditions and the UI-only ``enabled`` flag before sending. */
+export function serializeBacktestRule(rule: BacktestRule): BacktestRule {
+  return {
+    ...rule,
+    conditions: rule.conditions
+      .filter((condition) => condition.enabled !== false)
+      .map((condition) => {
+        const clean = { ...condition };
+        delete (clean as { enabled?: boolean }).enabled;
+        return clean;
+      }),
+  };
+}
+
+/**
+ * Build the backend payload spec from persisted rule-builder settings, or null
+ * when there is no usable strategy. Shared by BacktestCard (run) and the analyze
+ * store (strategy_spec injection), so the two can never drift on TP/SL rounding
+ * or the disable-sell → empty-sell transform.
+ */
+export function buildBacktestPayload(
+  stored: BacktestStoredSettings | null | undefined,
+): BacktestSpec | null {
+  if (!stored?.spec?.buy?.conditions || !stored?.spec?.sell?.conditions) return null;
+  const payloadSpec: BacktestSpec = {
+    buy: serializeBacktestRule(stored.spec.buy),
+    sell: serializeBacktestRule(stored.spec.sell),
+    allow_multiple_buys: stored.multiBuys !== false,
+  };
+  if (stored.sellDisabled) {
+    payloadSpec.sell = { ...payloadSpec.sell, conditions: [] };
+  }
+  const takeProfit = Number.parseFloat(stored.takeProfitPct);
+  const stopLoss = Number.parseFloat(stored.stopLossPct);
+  if (Number.isFinite(takeProfit) && takeProfit > 0) {
+    payloadSpec.take_profit_pct = Math.round((takeProfit / 100) * 1e4) / 1e4;
+  }
+  if (Number.isFinite(stopLoss) && stopLoss > 0) {
+    payloadSpec.stop_loss_pct = Math.round((stopLoss / 100) * 1e4) / 1e4;
+  }
+  return payloadSpec;
 }

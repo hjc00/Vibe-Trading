@@ -5,6 +5,11 @@ import { cn } from "@/lib/utils";
 import { useCardCollapse } from "@/hooks/useCardCollapse";
 import { safeGet, safeSet } from "@/lib/storage";
 import {
+  BACKTEST_SETTINGS_KEY,
+  buildBacktestPayload,
+  type BacktestStoredSettings,
+} from "@/lib/stockTracker";
+import {
   api,
   type BacktestCondition,
   type BacktestPreset,
@@ -35,18 +40,8 @@ type RuleKey = "buy" | "sell";
 
 // Persisted rule-builder settings (spec + dates + exits + disable-sell), so a
 // strategy the user built survives reloads, matching the other tracker config.
-const BACKTEST_SETTINGS_KEY = "stockTracker.backtestSettings.v1";
-
-interface BacktestStoredSettings {
-  presetId: string;
-  spec: BacktestSpec;
-  sellDisabled: boolean;
-  multiBuys: boolean;
-  takeProfitPct: string;
-  stopLossPct: string;
-  start?: string;
-  end?: string;
-}
+// The key, shape and payload serialization live in ``@/lib/stockTracker`` and are
+// shared with the analyze store (strategy_spec injection).
 
 function isBacktestSpec(value: unknown): value is BacktestSpec {
   const spec = value as Partial<BacktestSpec> | null;
@@ -89,20 +84,6 @@ function newCondition(primitive: BacktestPrimitiveMeta): BacktestCondition {
   const params: Record<string, number> = {};
   for (const p of primitive.params) params[p.key] = p.default;
   return { primitive: primitive.id, trigger: "state", params, enabled: true };
-}
-
-/** Serialize the editable spec: drop disabled conditions and the UI-only flag. */
-function serializeRule(rule: BacktestRule): BacktestRule {
-  return {
-    ...rule,
-    conditions: rule.conditions
-      .filter((condition) => condition.enabled !== false)
-      .map((condition) => {
-        const clean = { ...condition };
-        delete (clean as { enabled?: boolean }).enabled;
-        return clean;
-      }),
-  };
 }
 
 interface MetricDef {
@@ -344,21 +325,17 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
     const seq = ++requestSeq.current;
     setLoading(true);
     setReport(null);
-    const baseSpec = cloneSpec(spec);
-    const payloadSpec: BacktestSpec = {
-      buy: serializeRule(baseSpec.buy),
-      sell: serializeRule(baseSpec.sell),
-      allow_multiple_buys: multiBuys,
-    };
-    if (sellDisabled) payloadSpec.sell = { ...payloadSpec.sell, conditions: [] };
-    const takeProfit = Number.parseFloat(takeProfitPct);
-    const stopLoss = Number.parseFloat(stopLossPct);
-    if (Number.isFinite(takeProfit) && takeProfit > 0) {
-      payloadSpec.take_profit_pct = Math.round((takeProfit / 100) * 1e4) / 1e4;
-    }
-    if (Number.isFinite(stopLoss) && stopLoss > 0) {
-      payloadSpec.stop_loss_pct = Math.round((stopLoss / 100) * 1e4) / 1e4;
-    }
+    const payloadSpec = buildBacktestPayload({
+      presetId,
+      spec,
+      sellDisabled,
+      multiBuys,
+      takeProfitPct,
+      stopLossPct,
+      start,
+      end,
+    });
+    if (!payloadSpec) return;
     api
       .getStockTrackerBacktest(code, { spec: payloadSpec, label, start, end })
       .then((res) => {
@@ -374,7 +351,7 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       .finally(() => {
         if (requestSeq.current === seq) setLoading(false);
       });
-  }, [code, spec, label, start, end, takeProfitPct, stopLossPct, sellDisabled, multiBuys, onBacktestResult]);
+  }, [code, spec, presetId, label, start, end, takeProfitPct, stopLossPct, sellDisabled, multiBuys, onBacktestResult]);
 
   // Reset the result when the selected symbol changes, then auto-run the
   // default preset once per symbol so the card is never an empty shell.

@@ -99,6 +99,7 @@ export function StockTracker() {
     selectedSymbols,
     userPrompt,
     historyLimit,
+    tradingDate,
     loading: analysisLoading,
     report: analysisReport,
     error: analysisError,
@@ -109,6 +110,7 @@ export function StockTracker() {
     setSelectedSymbols,
     setUserPrompt,
     setHistoryLimit,
+    setTradingDate,
     setError: setAnalysisError,
     run: runAnalysis,
     loadLatest,
@@ -723,6 +725,8 @@ export function StockTracker() {
                     onUserPromptChange={setUserPrompt}
                     historyLimit={historyLimit}
                     onHistoryLimitChange={setHistoryLimit}
+                    tradingDate={tradingDate}
+                    onTradingDateChange={setTradingDate}
                     analysisIndicators={config?.analysis_indicators}
                     onAnalysisIndicatorsChange={handleAnalysisIndicatorsChange}
                     analysisFocus={config?.analysis_focus ?? "balanced"}

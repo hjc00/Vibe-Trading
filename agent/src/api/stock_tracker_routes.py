@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from src.market_data import fetch_market_data
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.backtest_data import (
+    _validate_spec,
     list_presets,
     list_primitive_categories,
     list_primitives,
@@ -221,6 +222,12 @@ class TrackerAnalyzeRequest(BaseModel):
     # Per-run analysis emphasis; None falls back to the persisted config.
     # When present it must be one of ANALYSIS_FOCUS_OPTIONS.
     analysis_focus: Optional[str] = None
+    # Composable backtest strategy ({"buy": Rule, "sell": Rule, ...}) to inject
+    # into the prompt; None means no strategy. Validated via ``_validate_spec``.
+    strategy_spec: Optional[Dict[str, Any]] = None
+    # Historical analysis date (YYYY-MM-DD). When set, a technical-only snapshot
+    # is reconstructed on demand; None/absent uses the latest full snapshot.
+    trading_date: Optional[str] = None
 
 
 class TrackerAnalyzeResponse(BaseModel):
@@ -709,27 +716,65 @@ def register_stock_tracker_routes(
         principal=Depends(require_auth),  # noqa: ARG001
     ) -> TrackerAnalyzeResponse:
         store = _get_store()
-        snapshot = store.get_latest_snapshot()
-        if snapshot is None:
-            raise HTTPException(status_code=404, detail="No snapshot available. Refresh first.")
+        current_config = store.get_settings().config
+
+        # Resolve the target snapshot. An explicit historical date (strictly
+        # earlier than today) rebuilds a technical-only snapshot on demand; today
+        # (or empty) uses the latest full snapshot.
+        technical_only = False
+        if request.trading_date:
+            try:
+                target_date = date.fromisoformat(request.trading_date)
+            except ValueError:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Invalid trading_date (expected YYYY-MM-DD).",
+                )
+            if target_date > date.today():
+                raise HTTPException(
+                    status_code=422,
+                    detail="trading_date cannot be in the future.",
+                )
+            if target_date < date.today():
+                snapshot = await asyncio.to_thread(
+                    StockTrackerEngine(config=current_config).build_technical_snapshot,
+                    target_date,
+                )
+                technical_only = True
+            else:
+                # Today means "latest" — keep the full-dimension snapshot (a
+                # same-day technical rebuild would drop fund/valuation/sentiment).
+                snapshot = store.get_latest_snapshot()
+                if snapshot is None:
+                    raise HTTPException(status_code=404, detail="No snapshot available. Refresh first.")
+        else:
+            snapshot = store.get_latest_snapshot()
+            if snapshot is None:
+                raise HTTPException(status_code=404, detail="No snapshot available. Refresh first.")
 
         selected = _select_symbols(snapshot, request.symbols)
         if not selected.symbols:
             raise HTTPException(status_code=422, detail="No valid symbols selected for analysis.")
 
         logger.info(
-            "Analyze request: %d/%d symbol(s) selected, trading_date=%s",
+            "Analyze request: %d/%d symbol(s) selected, trading_date=%s, technical_only=%s",
             len(selected.symbols),
             len(request.symbols),
             snapshot.trading_date,
+            technical_only,
         )
-        # Price each analyzed symbol at the freshest live quote (现价), not the
-        # persisted snapshot close which can lag the live feed by a session. The
-        # same feed drives the /quotes endpoint the frontend polls. Best-effort:
-        # symbols without a live quote keep their snapshot price.
         codes = [symbol.code for symbol in selected.symbols]
-        live_prices = await asyncio.to_thread(_fetch_live_close_map, codes)
-        analysis_symbols = _with_live_price(selected.symbols, live_prices)
+        if technical_only:
+            # Historical: keep the snapshot's own close (no live repricing) so the
+            # analysis is as-of the target date, not the current session.
+            analysis_symbols = selected.symbols
+        else:
+            # Price each analyzed symbol at the freshest live quote (现价), not the
+            # persisted snapshot close which can lag the live feed by a session. The
+            # same feed drives the /quotes endpoint the frontend polls. Best-effort:
+            # symbols without a live quote keep their snapshot price.
+            live_prices = await asyncio.to_thread(_fetch_live_close_map, codes)
+            analysis_symbols = _with_live_price(selected.symbols, live_prices)
 
         # Feed the model its recent conclusions per symbol (count is
         # user-configurable via history_limit; 0 opts out) so each run is an
@@ -740,21 +785,40 @@ def register_stock_tracker_routes(
         history = {}
         if history_limit > 0:
             closes = {symbol.code: symbol.close for symbol in snapshot.symbols}
-            for code, quote in live_prices.items():
-                if quote.get("close") is not None:
-                    closes[code] = quote["close"]
+            if not technical_only:
+                for code, quote in live_prices.items():
+                    if quote.get("close") is not None:
+                        closes[code] = quote["close"]
+            envelopes = store.list_analysis_envelopes(limit=200)
+            if technical_only:
+                # As-if-then: only feed conclusions known on/before the target date.
+                as_of_iso = snapshot.trading_date.isoformat() if snapshot.trading_date else None
+                envelopes = [
+                    env
+                    for env in envelopes
+                    if as_of_iso is None
+                    or (env.get("trading_date") and str(env["trading_date"]) <= as_of_iso)
+                ]
             history = select_symbol_history(
-                store.list_analysis_envelopes(limit=200),
+                envelopes,
                 closes,
                 codes=codes,
                 limit=history_limit,
             )
+        strategy_spec = request.strategy_spec or None
+        if strategy_spec is not None:
+            spec_error = _validate_spec(strategy_spec)
+            if spec_error:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Invalid strategy_spec: {spec_error}",
+                )
+
         try:
             # The indicator selection and break-even map are prompt organization,
             # not snapshot computation. Both come from the *current* settings
             # (not the snapshot-embedded config) so a config change applies
             # without a refresh first.
-            current_config = _get_store().get_settings().config
             indicator_selection = request.analysis_indicators
             if indicator_selection is None:
                 indicator_selection = current_config.analysis_indicators
@@ -782,6 +846,8 @@ def register_stock_tracker_routes(
                 analysis_indicators=indicator_selection,
                 break_even_prices=current_config.break_even_prices,
                 analysis_focus=analysis_focus,
+                strategy_spec=strategy_spec,
+                technical_only=technical_only,
             )
         except Exception as exc:  # surface provider/LLM failures as readable errors
             hint = _friendly_provider_error(exc)

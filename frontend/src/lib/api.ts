@@ -2384,6 +2384,10 @@ export interface TrackerAnalyzeRequest {
   analysis_indicators?: string[] | null;
   /** Per-run emphasis preset ("balanced"|"technical"); undefined falls back to persisted config. */
   analysis_focus?: string | null;
+  /** User's composable backtest strategy to inject into the prompt; null = none. */
+  strategy_spec?: BacktestSpec | null;
+  /** Historical analysis date (YYYY-MM-DD); null/absent = latest full snapshot. */
+  trading_date?: string | null;
 }
 
 export interface PriceZone {

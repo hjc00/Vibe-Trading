@@ -20,6 +20,9 @@ interface TrackerAnalyzePanelProps {
   onClose: () => void;
   historyLimit?: number;
   onHistoryLimitChange?: (value: number) => void;
+  /** Historical analysis date (YYYY-MM-DD); empty/undefined = latest snapshot. */
+  tradingDate?: string | null;
+  onTradingDateChange?: (value: string | null) => void;
   /** Indicator blocks to feed the LLM; toggling persists via onAnalysisIndicatorsChange. */
   analysisIndicators?: string[];
   onAnalysisIndicatorsChange?: (keys: string[]) => void;
@@ -39,6 +42,8 @@ export function TrackerAnalyzePanel({
   onClose,
   historyLimit = 5,
   onHistoryLimitChange = () => {},
+  tradingDate = null,
+  onTradingDateChange = () => {},
   analysisIndicators = [...ALL_ANALYSIS_INDICATOR_KEYS],
   onAnalysisIndicatorsChange = () => {},
   analysisFocus = "balanced",
@@ -46,6 +51,7 @@ export function TrackerAnalyzePanel({
 }: TrackerAnalyzePanelProps) {
   const { t } = useTranslation();
   const [indicatorsOpen, setIndicatorsOpen] = useState(true);
+  const today = new Date().toISOString().slice(0, 10);
 
   const allCodes = symbols.map((s) => s.code);
   const allSelected = symbols.length > 0 && symbols.every((s) => selectedSymbols.includes(s.code));
@@ -142,6 +148,22 @@ export function TrackerAnalyzePanel({
           placeholder={t("stockTracker.customPromptPlaceholder")}
           className="w-full rounded-md border bg-background px-3 py-2 text-xs outline-none focus:border-primary disabled:opacity-60"
         />
+      </div>
+
+      <div className="mb-4 flex items-center gap-2">
+        <label className="shrink-0 text-xs text-muted-foreground" htmlFor="tracker-analyze-date">
+          {t("stockTracker.analyzeDateLabel")}
+        </label>
+        <input
+          id="tracker-analyze-date"
+          type="date"
+          max={today}
+          value={tradingDate ?? today}
+          onChange={(e) => onTradingDateChange(e.target.value || null)}
+          disabled={loading}
+          className="rounded-md border bg-background px-2 py-1 text-xs outline-none focus:border-primary disabled:opacity-60"
+        />
+        <span className="text-[11px] text-muted-foreground">{t("stockTracker.analyzeDateHint")}</span>
       </div>
 
       <div className="mb-4 flex items-center gap-2">

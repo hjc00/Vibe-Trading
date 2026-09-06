@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrackerAnalyzeReport } from "@/lib/api";
+import { BACKTEST_SETTINGS_KEY } from "@/lib/stockTracker";
 import { useStockTrackerAnalysisStore } from "../stockTrackerAnalysis";
 
 const apiMock = vi.hoisted(() => ({
@@ -29,6 +30,7 @@ function report(): TrackerAnalyzeReport {
 }
 
 beforeEach(() => {
+  localStorage.clear();
   useStockTrackerAnalysisStore.getState().reset();
   apiMock.analyzeStockTracker.mockReset();
   apiMock.getStockTrackerAnalysis.mockReset();
@@ -100,6 +102,10 @@ describe("stockTrackerAnalysis store", () => {
       symbols: ["600519.SH"],
       user_prompt: null,
       history_limit: 5,
+      analysis_indicators: null,
+      analysis_focus: null,
+      strategy_spec: null,
+      trading_date: null,
     });
     expect(apiMock.getStockTrackerTrackRecord).toHaveBeenCalled();
   });
@@ -123,6 +129,10 @@ describe("stockTrackerAnalysis store", () => {
       symbols: ["600519.SH"],
       user_prompt: "重点看均线多头排列",
       history_limit: 5,
+      analysis_indicators: null,
+      analysis_focus: null,
+      strategy_spec: null,
+      trading_date: null,
     });
   });
 
@@ -145,7 +155,84 @@ describe("stockTrackerAnalysis store", () => {
       symbols: ["600519.SH"],
       user_prompt: null,
       history_limit: 0,
+      analysis_indicators: null,
+      analysis_focus: null,
+      strategy_spec: null,
+      trading_date: null,
     });
+  });
+
+  it("run injects the persisted strategy and historical date", async () => {
+    localStorage.setItem(
+      BACKTEST_SETTINGS_KEY,
+      JSON.stringify({
+        presetId: "ma_golden_cross",
+        spec: {
+          buy: {
+            mode: "and",
+            conditions: [
+              { primitive: "fast_ma_above_slow", trigger: "edge_up", params: { fast: 5, slow: 20 } },
+            ],
+          },
+          sell: { mode: "and", conditions: [] },
+        },
+        sellDisabled: true,
+        multiBuys: false,
+        takeProfitPct: "8",
+        stopLossPct: "",
+      }),
+    );
+    apiMock.analyzeStockTracker.mockResolvedValue({
+      status: "ok",
+      report: report(),
+      id: "20260831T101500000000",
+    });
+    apiMock.getStockTrackerAnalysisHistory.mockResolvedValue({ status: "ok", items: [] });
+
+    const store = useStockTrackerAnalysisStore.getState();
+    store.setSelectedSymbols(["600519.SH"]);
+    store.setTradingDate("2026-08-20");
+
+    await store.run();
+
+    expect(apiMock.analyzeStockTracker).toHaveBeenCalledWith({
+      symbols: ["600519.SH"],
+      user_prompt: null,
+      history_limit: 5,
+      analysis_indicators: null,
+      analysis_focus: null,
+      strategy_spec: {
+        buy: {
+          mode: "and",
+          conditions: [
+            { primitive: "fast_ma_above_slow", trigger: "edge_up", params: { fast: 5, slow: 20 } },
+          ],
+        },
+        sell: { mode: "and", conditions: [] },
+        allow_multiple_buys: false,
+        take_profit_pct: 0.08,
+      },
+      trading_date: "2026-08-20",
+    });
+  });
+
+  it("run degrades to no strategy when settings are corrupt", async () => {
+    localStorage.setItem(BACKTEST_SETTINGS_KEY, "{not valid json");
+    apiMock.analyzeStockTracker.mockResolvedValue({
+      status: "ok",
+      report: report(),
+      id: "20260831T101500000000",
+    });
+    apiMock.getStockTrackerAnalysisHistory.mockResolvedValue({ status: "ok", items: [] });
+
+    const store = useStockTrackerAnalysisStore.getState();
+    store.setSelectedSymbols(["600519.SH"]);
+
+    await store.run();
+
+    expect(apiMock.analyzeStockTracker).toHaveBeenCalledWith(
+      expect.objectContaining({ strategy_spec: null }),
+    );
   });
 
   it("run stores an error on failure", async () => {

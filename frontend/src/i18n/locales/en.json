@@ -1738,6 +1738,8 @@
     "customPromptPlaceholder": "e.g. Focus on symbols with bullish MA alignment",
     "historyLimitLabel": "Recent analyses to reference",
     "historyLimitHint": "(0 = none, default 5)",
+    "analyzeDateLabel": "Analysis date",
+    "analyzeDateHint": "(default today = latest; historical dates include price/volume & technicals only)",
     "runAnalysis": "Run analysis",
     "analyzing": "Analyzing...",
     "analysisReport": "Analysis report",

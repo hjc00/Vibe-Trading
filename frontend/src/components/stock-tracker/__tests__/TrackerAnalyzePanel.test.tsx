@@ -91,4 +91,28 @@ describe("TrackerAnalyzePanel", () => {
     fireEvent.change(input, { target: { value: "3" } });
     expect(onHistoryLimitChange).toHaveBeenCalledWith(3);
   });
+
+  it("renders the analysis-date input and reports changes", () => {
+    const onTradingDateChange = vi.fn();
+    render(
+      <TrackerAnalyzePanel
+        {...baseProps}
+        tradingDate="2026-08-20"
+        onTradingDateChange={onTradingDateChange}
+      />,
+    );
+    const input = screen.getByLabelText(/analysis date/i) as HTMLInputElement;
+    expect(input.value).toBe("2026-08-20");
+    expect(input.max).toBeTruthy(); // capped at today
+    fireEvent.change(input, { target: { value: "" } });
+    expect(onTradingDateChange).toHaveBeenCalledWith(null);
+    fireEvent.change(input, { target: { value: "2026-08-21" } });
+    expect(onTradingDateChange).toHaveBeenCalledWith("2026-08-21");
+  });
+
+  it("defaults the analysis date to today", () => {
+    render(<TrackerAnalyzePanel {...baseProps} />);
+    const input = screen.getByLabelText(/analysis date/i) as HTMLInputElement;
+    expect(input.value).toBe(new Date().toISOString().slice(0, 10));
+  });
 });

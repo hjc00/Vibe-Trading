@@ -5,6 +5,12 @@ import {
   type TrackerAnalyzeReport,
   type TrackerTrackRecordItem,
 } from "@/lib/api";
+import { safeGet } from "@/lib/storage";
+import {
+  BACKTEST_SETTINGS_KEY,
+  buildBacktestPayload,
+  type BacktestStoredSettings,
+} from "@/lib/stockTracker";
 
 /**
  * Analysis state for the A-share stock tracker.
@@ -21,6 +27,8 @@ interface StockTrackerAnalysisState {
   userPrompt: string;
   // How many of the model's most recent per-symbol records to reference (0 = none).
   historyLimit: number;
+  // Optional historical date (YYYY-MM-DD) to analyze; null = latest snapshot.
+  tradingDate: string | null;
   loading: boolean;
   report: TrackerAnalyzeReport | null;
   error: string | null;
@@ -32,6 +40,7 @@ interface StockTrackerAnalysisState {
   setSelectedSymbols: (codes: string[]) => void;
   setUserPrompt: (value: string) => void;
   setHistoryLimit: (value: number) => void;
+  setTradingDate: (value: string | null) => void;
   setReport: (report: TrackerAnalyzeReport | null) => void;
   setError: (error: string | null) => void;
   reset: () => void;
@@ -53,6 +62,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
     selectedSymbols: [],
     userPrompt: "",
     historyLimit: 5,
+    tradingDate: null,
     loading: false,
     report: null,
     error: null,
@@ -64,6 +74,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
     setSelectedSymbols: (selectedSymbols) => set({ selectedSymbols }),
     setUserPrompt: (userPrompt) => set({ userPrompt }),
     setHistoryLimit: (historyLimit) => set({ historyLimit }),
+    setTradingDate: (tradingDate) => set({ tradingDate }),
     setReport: (report) => set({ report }),
     setError: (error) => set({ error }),
     reset: () =>
@@ -72,6 +83,7 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
         selectedSymbols: [],
         userPrompt: "",
         historyLimit: 5,
+        tradingDate: null,
         loading: false,
         report: null,
         error: null,
@@ -135,8 +147,23 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
       analysisIndicators?: string[] | null,
       analysisFocus?: string | null,
     ) => {
-      const { selectedSymbols, userPrompt, historyLimit } = get();
+      const { selectedSymbols, userPrompt, historyLimit, tradingDate } = get();
       if (selectedSymbols.length === 0) return;
+
+      // The rule-builder's strategy is global and lives in localStorage (not the
+      // backend TrackerConfig), so read it here and inject it on every analysis.
+      let strategySpec = null;
+      try {
+        const raw = safeGet(BACKTEST_SETTINGS_KEY);
+        if (raw) {
+          const stored = JSON.parse(raw) as BacktestStoredSettings;
+          strategySpec = buildBacktestPayload(stored);
+        }
+      } catch {
+        // Corrupt/absent settings — degrade to "no strategy injected".
+        strategySpec = null;
+      }
+
       set({ loading: true, error: null, report: null, selectedId: null });
       try {
         const response = await api.analyzeStockTracker({
@@ -145,6 +172,8 @@ export const useStockTrackerAnalysisStore = create<StockTrackerAnalysisState>(
           history_limit: historyLimit,
           analysis_indicators: analysisIndicators && analysisIndicators.length > 0 ? analysisIndicators : null,
           analysis_focus: analysisFocus || null,
+          strategy_spec: strategySpec,
+          trading_date: tradingDate || null,
         });
         set({ report: response.report, selectedId: response.id ?? null });
         await Promise.all([get().loadHistory(), get().loadTrackRecord()]);

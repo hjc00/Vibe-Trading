@@ -164,6 +164,52 @@ def test_build_analysis_prompt_technical_focus_reads_from_config():
     assert "以技术面为主" in prompt
 
 
+def test_build_analysis_prompt_injects_strategy_block():
+    snapshot = _snapshot()
+    spec = {
+        "buy": {
+            "mode": "and",
+            "conditions": [
+                {"primitive": "fast_ma_above_slow", "trigger": "edge_up", "params": {"fast": 5, "slow": 20}},
+            ],
+        },
+        "sell": {"mode": "and", "conditions": []},
+        "take_profit_pct": 0.08,
+    }
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols, strategy_spec=spec)
+    assert '"strategy"' in prompt
+    assert "买入规则（全部满足（AND））" in prompt
+    assert "止盈 +8.0%" in prompt
+    # The strategy directive reframes the run around the user's own timing rules.
+    assert "策略买入条件已满足" in prompt
+    assert "择时口径" in prompt
+
+
+def test_build_analysis_prompt_omits_strategy_when_absent():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols)
+    assert '"strategy"' not in prompt
+    assert "策略买入条件已满足" not in prompt
+
+
+def test_build_analysis_prompt_technical_only_narrows_indicators():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols, technical_only=True)
+    # The historical note is present, and the missing dimensions are warned about.
+    assert "技术面回看" in prompt
+    # Non-technical directive bullets are dropped from the narrowed directive.
+    assert "资金面·主力资金" not in prompt
+    assert "融资融券" not in prompt
+    assert "事件日历" not in prompt
+
+
+def test_build_analysis_prompt_technical_only_keeps_technical_blocks():
+    snapshot = _snapshot()
+    prompt = build_analysis_prompt(snapshot, snapshot.symbols, technical_only=True)
+    assert "技术面" in prompt
+    assert "技术指标" in prompt
+
+
 def test_normalize_report_carries_structured_basis():
     parsed = {
         "symbols": [

@@ -15,6 +15,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from src.providers.chat import ChatLLM
+from src.stock_tracker.backtest_data import render_strategy_spec
 from src.stock_tracker.models import (
     ANALYSIS_FOCUS_BALANCED,
     ANALYSIS_FOCUS_TECHNICAL,
@@ -34,6 +35,11 @@ logger = logging.getLogger(__name__)
 # Every known analysis indicator block; the default enabled set when a config
 # or caller does not restrict the prompt to a subset.
 _ALL_INDICATORS = frozenset(ANALYSIS_INDICATORS)
+
+# The price/technical-only subset a historical reconstruction can provide. When
+# ``technical_only`` is set the prompt is restricted to these blocks so the model
+# never weighs dimensions whose data was not retroactively rebuilt.
+_TECHNICAL_ONLY_KEYS = ["period_signals", "technical_indicators", "risk"]
 
 # How many of the most recent per-bar technical-indicator rows (``indicators``)
 # are fed to the model per symbol. The engine keeps ~130 bars of MACD/KDJ/
@@ -103,6 +109,22 @@ _ANALYSIS_TAIL = """\
 不要套用一个固定模板，按每个标的实际的数据特点给出差异化判断；用 structured 的
 action 与价位区间把结论表达清楚，让报告可直接被跟踪验证。
 """
+
+# Appended to the directive when the input carries a user-configured backtest
+# strategy (``strategy`` block) — reframes the run as "does my own strategy fire
+# here" instead of a generic quant read.
+_STRATEGY_DIRECTIVE = """\
+上方 strategy 字段是用户自己配置的回测策略（买入/卖出规则与止盈止损），是用户的
+择时口径而非新数据维度：若某标的当前量价/技术状态满足其买入规则，须在 rationale
+中明确指出「策略买入条件已满足」并据此倾向；若不满足，说明还差哪个条件。当策略
+信号与其它数据维度冲突时，指出冲突并给出你的判断。"""
+
+# Appended when the snapshot is a price/technical-only historical reconstruction:
+# the model must not assume or invent the missing fundamental/flow dimensions.
+_TECHNICAL_ONLY_NOTE = """\
+本次为历史日期的技术面回看，输入仅含量价与技术指标（period_signals/indicators/
+risk），资金/估值/事件/题材/一致预期/筹码/行业/市场情绪等维度在该历史日期不可用，
+不要臆造或假设这些维度的读数。"""
 
 
 def _build_analysis_directive(enabled: "set[str]", focus: str = ANALYSIS_FOCUS_BALANCED) -> str:
@@ -557,6 +579,8 @@ def build_analysis_prompt(
     analysis_indicators: Optional[List[str]] = None,
     break_even_prices: Optional[Dict[str, float]] = None,
     analysis_focus: Optional[str] = None,
+    strategy_spec: Optional[Dict[str, Any]] = None,
+    technical_only: bool = False,
 ) -> str:
     """Build the user prompt from a snapshot and the selected symbols.
 
@@ -578,8 +602,19 @@ def build_analysis_prompt(
 
     ``analysis_focus`` optionally overrides the emphasis preset persisted on
     ``snapshot.config`` (balanced|technical); see :func:`_build_analysis_directive`.
+
+    ``strategy_spec`` optionally supplies the user's composable backtest strategy
+    (``{"buy": Rule, "sell": Rule, ...}``); it is rendered to a readable Chinese
+    ``strategy`` block and a directive that reframes the run around the user's own
+    entry/exit rules.
+
+    ``technical_only`` marks the snapshot as a price/technical-only historical
+    reconstruction: the enabled indicator set is forced to the technical subset
+    and a note warns the model not to assume the missing fundamental/flow blocks.
     """
     enabled = _resolve_indicator_set(snapshot, analysis_indicators)
+    if technical_only:
+        enabled = frozenset(_TECHNICAL_ONLY_KEYS) & _ALL_INDICATORS
     focus = (
         analysis_focus
         or getattr(snapshot.config, "analysis_focus", None)
@@ -602,6 +637,8 @@ def build_analysis_prompt(
                 (close - break_even_price) / break_even_price * 100.0, 2
             )
         symbols_data.append(serialized)
+
+    strategy_text = render_strategy_spec(strategy_spec) if strategy_spec else ""
 
     context: Dict[str, Any] = {
         "trading_date": snapshot.trading_date.isoformat() if snapshot.trading_date else None,
@@ -627,10 +664,18 @@ def build_analysis_prompt(
         )
     if history:
         context["history"] = history
+    if strategy_text:
+        context["strategy"] = strategy_text
     extra = f"\n用户补充指令：{user_prompt}" if user_prompt else ""
 
+    directive = _build_analysis_directive(enabled, focus)
+    if technical_only:
+        directive += "\n\n" + _TECHNICAL_ONLY_NOTE
+    if strategy_text:
+        directive += "\n\n" + _STRATEGY_DIRECTIVE
+
     text = (
-        f"{_build_analysis_directive(enabled, focus)}{extra}\n\n"
+        f"{directive}{extra}\n\n"
         f"追踪快照数据（JSON）：\n"
         f"{json.dumps(context, ensure_ascii=False, indent=2)}\n\n"
     )
@@ -694,6 +739,8 @@ def run_analysis(
     analysis_indicators: Optional[List[str]] = None,
     break_even_prices: Optional[Dict[str, float]] = None,
     analysis_focus: Optional[str] = None,
+    strategy_spec: Optional[Dict[str, Any]] = None,
+    technical_only: bool = False,
 ) -> Dict[str, Any]:
     """Call the configured LLM and return a normalized report dict.
 
@@ -714,6 +761,8 @@ def run_analysis(
         analysis_indicators=analysis_indicators,
         break_even_prices=break_even_prices,
         analysis_focus=focus,
+        strategy_spec=strategy_spec,
+        technical_only=technical_only,
     )
     llm = ChatLLM()
     logger.info(

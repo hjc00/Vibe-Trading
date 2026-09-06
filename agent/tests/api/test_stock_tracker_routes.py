@@ -463,6 +463,115 @@ def test_analyze_returns_report(client, isolated_tracker_store):
     assert data["report"]["summary"] == "综述"
 
 
+def test_analyze_rejects_invalid_trading_date(client, isolated_tracker_store):
+    response = client.post(
+        "/api/stock-tracker/analyze",
+        json={"symbols": ["600519.SH"], "trading_date": "not-a-date"},
+    )
+    assert response.status_code == 422
+
+
+def test_analyze_rejects_future_trading_date(client, isolated_tracker_store):
+    response = client.post(
+        "/api/stock-tracker/analyze",
+        json={"symbols": ["600519.SH"], "trading_date": "2999-01-01"},
+    )
+    assert response.status_code == 422
+
+
+def test_analyze_today_trading_date_uses_latest_full_snapshot(client, isolated_tracker_store):
+    """Today means 'latest' — a same-day technical rebuild must NOT be triggered."""
+    _saved_snapshot(isolated_tracker_store)
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    today = date.today().isoformat()
+    with patch("src.api.stock_tracker_routes.StockTrackerEngine") as engine_cls, patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "trading_date": today},
+        )
+    assert response.status_code == 200
+    engine_cls.assert_not_called()
+    assert mocked.call_args.kwargs["technical_only"] is False
+
+
+def test_analyze_rejects_invalid_strategy_spec(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    response = client.post(
+        "/api/stock-tracker/analyze",
+        json={
+            "symbols": ["600519.SH"],
+            "strategy_spec": {"buy": {"mode": "and", "conditions": []}, "sell": {"conditions": []}},
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_analyze_injects_valid_strategy_spec(client, isolated_tracker_store):
+    _saved_snapshot(isolated_tracker_store)
+    spec = {
+        "buy": {
+            "mode": "and",
+            "conditions": [{"primitive": "close_above_ma", "trigger": "state", "params": {"n": 20}}],
+        },
+        "sell": {"mode": "and", "conditions": []},
+    }
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch("src.api.stock_tracker_routes.run_analysis", return_value=fake_report) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "strategy_spec": spec},
+        )
+    assert response.status_code == 200
+    assert mocked.call_args.kwargs["strategy_spec"] == spec
+    assert mocked.call_args.kwargs["technical_only"] is False
+
+
+def test_analyze_historical_date_reconstructs_technical_only(client, isolated_tracker_store):
+    historical = TrackerSnapshot(
+        generated_at=datetime.now(timezone.utc),
+        trading_date=date(2026, 8, 20),
+        as_of_date=date(2026, 8, 20),
+        config=TrackerConfig(),
+        symbols=[SymbolSnapshot(code="600519.SH", name="贵州茅台", close=1400.0)],
+    )
+
+    class _FakeEngine:
+        def __init__(self, config):
+            self.config = config
+
+        def build_technical_snapshot(self, target_date, codes=None):
+            return historical
+
+    fake_report = {
+        "summary": "综述",
+        "symbols": [],
+        "portfolio": {"theme": "", "top_pick": None, "cautions": []},
+        "caveats": [],
+    }
+    with patch("src.api.stock_tracker_routes.StockTrackerEngine", _FakeEngine), patch(
+        "src.api.stock_tracker_routes.run_analysis", return_value=fake_report
+    ) as mocked:
+        response = client.post(
+            "/api/stock-tracker/analyze",
+            json={"symbols": ["600519.SH"], "trading_date": "2026-08-20"},
+        )
+    assert response.status_code == 200
+    assert mocked.call_args.kwargs["technical_only"] is True
+    assert mocked.call_args.kwargs["strategy_spec"] is None
+
+
 def test_analyze_uses_live_price_not_stale_snapshot_close(
     client, isolated_tracker_store
 ):

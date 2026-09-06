@@ -416,6 +416,103 @@ class StockTrackerEngine:
             data_gaps=data_gaps,
         )
 
+    def build_technical_snapshot(
+        self,
+        target_date: date | str,
+        codes: List[str] | None = None,
+    ) -> TrackerSnapshot:
+        """Reconstruct a price/technical-only snapshot for an arbitrary date.
+
+        Fetches OHLCV up to ``target_date`` (plus the leading warm-up the
+        configured periods need) and runs only the price-derived computations —
+        risk, period metrics/signals, the volume series, technical indicators and
+        cross-sectional RPS — reusing the exact same ``_analyze_symbol`` path the
+        live ``refresh`` uses, so the numbers match the standalone technical
+        chart/backtest口径. External blocks (capital/valuation/events/chip/concept/
+        consensus/sector/market sentiment) are left ``None`` because their
+        sources are not retroactively reconstructable; callers feed this into the
+        analyzer with ``technical_only=True`` so the model does not expect them.
+        """
+        if isinstance(target_date, str):
+            target_date = date.fromisoformat(target_date)
+        symbol_codes = list(codes) if codes else list(self.config.watchlist)
+        start_date = target_date - timedelta(days=max(self.config.periods) + _BUFFER_DAYS)
+
+        raw_data = self._fetch_data(
+            symbol_codes, start_date.isoformat(), target_date.isoformat()
+        )
+
+        try:
+            names = fetch_a_share_names(symbol_codes)
+        except Exception:  # noqa: BLE001
+            logger.exception("Name resolution failed")
+            names = {}
+
+        benchmark_df: Optional[pd.DataFrame] = None
+        try:
+            benchmark_df = self._fetch_benchmark_data(
+                start_date.isoformat(), target_date.isoformat()
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception("Benchmark data fetch failed")
+
+        symbol_snapshots: List[SymbolSnapshot] = []
+        unresolved: List[str] = []
+        data_gaps: List[Dict[str, Any]] = []
+        trading_date = target_date
+
+        for code in symbol_codes:
+            if code in raw_data.get("_unresolved", []):
+                unresolved.append(code)
+                data_gaps.append({"code": code, "reason": "unresolved_symbol"})
+                continue
+            records = raw_data.get(code)
+            if records is None:
+                data_gaps.append({"code": code, "reason": "no_data"})
+                continue
+            try:
+                df = self._records_to_dataframe(records)
+                if df.empty:
+                    data_gaps.append({"code": code, "reason": "empty_frame"})
+                    continue
+                snapshot = self._analyze_symbol(
+                    code,
+                    df,
+                    name=names.get(code),
+                    benchmark_df=benchmark_df,
+                )
+                # Use the latest available trading date from actual data, so a
+                # weekend/holiday target lands on the last real session.
+                if snapshot.period_signals:
+                    latest = max(
+                        ps.metrics.end_date
+                        for ps in snapshot.period_signals.values()
+                        if ps.metrics.end_date
+                    )
+                    if latest and latest < trading_date:
+                        trading_date = latest
+                symbol_snapshots.append(snapshot)
+            except Exception as exc:  # noqa: BLE001 — per-symbol failure must not kill the run
+                logger.exception("Failed to analyze %s", code)
+                data_gaps.append({"code": code, "reason": f"analysis_error: {exc}"})
+
+        self._compute_and_attach_rps(symbol_snapshots, benchmark_df)
+        rankings = self._compute_rankings(symbol_snapshots)
+
+        return TrackerSnapshot(
+            generated_at=datetime.now().astimezone(),
+            trading_date=trading_date,
+            as_of_date=target_date,
+            config=self.config,
+            symbols=symbol_snapshots,
+            rankings=rankings,
+            sectors=[],
+            concepts=[],
+            market_sentiment=None,
+            unresolved=unresolved,
+            data_gaps=data_gaps,
+        )
+
     def _needed_data_dimensions(self) -> frozenset[str]:
         """Union of refresh-time data dimensions the currently visible cards need.
 
