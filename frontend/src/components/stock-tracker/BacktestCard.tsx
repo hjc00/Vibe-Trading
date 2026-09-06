@@ -1,4 +1,4 @@
-import { ChevronDown, Circle, CircleDot, LineChart, Loader2, Play, Plus, X } from "lucide-react";
+import { ChevronDown, Circle, CircleDot, LineChart, Loader2, Play, Plus, Save, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -7,6 +7,7 @@ import { safeGet, safeSet } from "@/lib/storage";
 import {
   BACKTEST_SETTINGS_KEY,
   buildBacktestPayload,
+  serializeBacktestRule,
   type BacktestStoredSettings,
 } from "@/lib/stockTracker";
 import {
@@ -125,6 +126,10 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
   const [multiBuys, setMultiBuys] = useState(true);
   const [report, setReport] = useState<BacktestSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
+  // Save-current-rule-as-preset inputs (custom presets persist server-side).
+  const [presetName, setPresetName] = useState("");
+  const [savingPreset, setSavingPreset] = useState(false);
+  const [deletingPreset, setDeletingPreset] = useState(false);
   const requestSeq = useRef(0);
   const autoRanCode = useRef<string | null>(null);
 
@@ -202,6 +207,14 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       end,
     };
     safeSet(BACKTEST_SETTINGS_KEY, JSON.stringify(stored));
+    // Mirror the strategy to the backend config so the buy-signal alert watcher
+    // detects against the same rules built here (strategy_spec persists
+    // server-side and survives reloads even when the alert toggle is enabled).
+    void api
+      .updateStockTrackerSettings({ strategy_spec: buildBacktestPayload(stored) })
+      .catch(() => {
+        // Non-fatal: alert detection simply keeps the last persisted strategy.
+      });
   }, [spec, presetId, sellDisabled, multiBuys, takeProfitPct, stopLossPct, start, end]);
 
   const markCustom = useCallback(() => {
@@ -320,6 +333,68 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
     [],
   );
 
+  const refreshPresets = useCallback(async () => {
+    try {
+      const res = await api.getStockTrackerBacktestPresets();
+      setPresets(res.presets);
+      return res.presets;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Persist the current buy/sell rules as a new custom preset (disabled
+  // conditions and the UI-only ``enabled`` flag are stripped before saving so
+  // the preset holds exactly what a run would execute).
+  const saveAsPreset = useCallback(async () => {
+    if (!spec) return;
+    const name = presetName.trim();
+    if (!name) return;
+    const payloadSpec: BacktestSpec = {
+      buy: serializeBacktestRule(spec.buy),
+      sell: serializeBacktestRule(spec.sell),
+    };
+    if (payloadSpec.buy.conditions.length === 0) return;
+    setSavingPreset(true);
+    try {
+      const res = await api.saveStockTrackerBacktestPreset({ label: name, spec: payloadSpec });
+      const fresh = await refreshPresets();
+      if (res.preset) {
+        setPresetId(res.preset.id);
+        setLabel(res.preset.label);
+        setSpec(cloneSpec(res.preset.spec));
+      }
+      if (fresh) setPresets(fresh);
+      setPresetName("");
+    } catch {
+      // Non-fatal: keep the current rule builder unchanged.
+    } finally {
+      setSavingPreset(false);
+    }
+  }, [spec, presetName, refreshPresets]);
+
+  const deletePreset = useCallback(async () => {
+    if (!presetId) return;
+    setDeletingPreset(true);
+    try {
+      await api.deleteStockTrackerBacktestPreset(presetId);
+      const fresh = await refreshPresets();
+      if (fresh) setPresets(fresh);
+      // Reset to an unselected/custom state; the current spec is kept.
+      setPresetId("");
+      setLabel(t("stockTracker.backtestCustom"));
+    } catch {
+      // Non-fatal: the preset stays.
+    } finally {
+      setDeletingPreset(false);
+    }
+  }, [presetId, refreshPresets, t]);
+
+  const isCustomPresetSelected = useMemo(
+    () => presets.some((preset) => preset.id === presetId && preset.custom === true),
+    [presets, presetId],
+  );
+
   const runBacktest = useCallback(() => {
     if (!code || !spec) return;
     const seq = ++requestSeq.current;
@@ -395,6 +470,9 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
     : [];
 
   const canRun = Boolean(code && spec && spec.buy.conditions.length > 0);
+  const canSavePreset = Boolean(
+    spec && presetName.trim() && spec.buy.conditions.some((cond) => cond.enabled !== false),
+  );
   const headerMeta =
     report && !report.error
       ? `${report.label || label} · ${report.bars} ${t("stockTracker.backtestBars")}`
@@ -493,6 +571,46 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
                 ))}
               </select>
             </label>
+            <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+              {t("stockTracker.backtestPresetName")}
+              <input
+                type="text"
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder={t("stockTracker.backtestPresetNamePlaceholder")}
+                className="w-28 rounded-md border border-border/60 bg-background px-2 py-1 text-xs outline-none focus:border-primary"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={saveAsPreset}
+              disabled={!canSavePreset || savingPreset}
+              title={t("stockTracker.backtestSavePreset")}
+              className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {savingPreset ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Save className="h-3 w-3" />
+              )}
+              {t("stockTracker.backtestSavePreset")}
+            </button>
+            {isCustomPresetSelected ? (
+              <button
+                type="button"
+                onClick={deletePreset}
+                disabled={deletingPreset}
+                aria-label={t("stockTracker.backtestDeletePreset")}
+                title={t("stockTracker.backtestDeletePreset")}
+                className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-[11px] text-muted-foreground transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deletingPreset ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3" />
+                )}
+              </button>
+            ) : null}
             <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
               {t("stockTracker.backtestStart")}
               <input

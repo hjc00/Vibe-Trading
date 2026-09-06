@@ -6,6 +6,7 @@ import asyncio
 import logging
 import sys as _sys
 import threading
+import time
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
@@ -15,13 +16,17 @@ from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from src.market_data import fetch_market_data
+from src.stock_tracker.alerts import AlertStore
 from src.stock_tracker.analyzer import run_analysis
 from src.stock_tracker.backtest_data import (
     _validate_spec,
-    list_presets,
+    delete_custom_preset,
+    list_all_presets,
     list_primitive_categories,
     list_primitives,
     run_backtest_for_symbol,
+    save_custom_preset,
+    short_strategy_label,
 )
 from src.stock_tracker.engine import StockTrackerEngine
 from src.stock_tracker.financial_reports_data import load_financial_report
@@ -67,6 +72,12 @@ _REFRESH_STATE: Dict[str, Any] = {
 }
 
 _store: Optional[TrackerStore] = None
+_alert_store: Optional[AlertStore] = None
+# Background buy-signal watcher state: single-flight scan lock, one-shot startup
+# guard, and a failure counter for exponential backoff.
+_ALERT_SCAN_LOCK = threading.Lock()
+_ALERT_SCHEDULER_STARTED = False
+_ALERT_FAILURES = 0
 
 
 def _get_store() -> TrackerStore:
@@ -75,6 +86,14 @@ def _get_store() -> TrackerStore:
     if _store is None:
         _store = TrackerStore()
     return _store
+
+
+def _get_alert_store() -> AlertStore:
+    """Return the singleton buy-signal alert store."""
+    global _alert_store
+    if _alert_store is None:
+        _alert_store = AlertStore()
+    return _alert_store
 
 
 # (message keywords, friendly hint). Keyword matching is case-insensitive and
@@ -168,6 +187,24 @@ class TrackerSettingsRequest(BaseModel):
         description="Per-symbol break-even price (key: normalized code). "
         "Sent as the full map; a cleared entry is a missing key.",
     )
+    strategy_spec: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Composable backtest strategy for buy-signal alerts (None disables).",
+    )
+    alert_enabled: Optional[bool] = Field(
+        default=None,
+        description="Detect buy signals on refresh/interval and notify.",
+    )
+    alert_interval_seconds: Optional[int] = Field(
+        default=None,
+        ge=10,
+        le=3600,
+        description="Background buy-signal scan interval in seconds.",
+    )
+    alert_session_only: Optional[bool] = Field(
+        default=None,
+        description="Only scan during A-share trading sessions (excl. close confirm).",
+    )
 
 
 class TrackerConfigResponse(BaseModel):
@@ -183,6 +220,10 @@ class TrackerConfigResponse(BaseModel):
     analysis_focus: str
     card_visibility: Dict[str, bool]
     break_even_prices: Dict[str, float]
+    strategy_spec: Optional[Dict[str, Any]] = None
+    alert_enabled: bool
+    alert_interval_seconds: int
+    alert_session_only: bool
 
 
 class TrackerSettingsResponse(BaseModel):
@@ -256,6 +297,19 @@ class BacktestRunRequest(BaseModel):
     end: Optional[str] = None
 
 
+class AlertAckRequest(BaseModel):
+    """Mark buy-signal alerts as read; omit ``ids`` to acknowledge all."""
+
+    ids: Optional[List[str]] = None
+
+
+class BacktestPresetSaveRequest(BaseModel):
+    """Body for saving the current rule builder as a custom preset."""
+
+    label: str = Field(..., min_length=1, max_length=64)
+    spec: Dict[str, Any]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -291,6 +345,15 @@ def _config_from_request(request: TrackerSettingsRequest) -> TrackerConfig:
     if request.break_even_prices is not None:
         # Replace the whole map (the frontend sends the full per-symbol state).
         kwargs["break_even_prices"] = request.break_even_prices
+    if "strategy_spec" in request.model_fields_set:
+        # Explicitly present (including null) -> set/clear the alert strategy.
+        kwargs["strategy_spec"] = request.strategy_spec
+    if request.alert_enabled is not None:
+        kwargs["alert_enabled"] = request.alert_enabled
+    if request.alert_interval_seconds is not None:
+        kwargs["alert_interval_seconds"] = request.alert_interval_seconds
+    if request.alert_session_only is not None:
+        kwargs["alert_session_only"] = request.alert_session_only
 
     # Merge with current config so omitted fields keep their defaults, then
     # reconstruct to re-run Pydantic validators (model_copy skips them).
@@ -309,10 +372,109 @@ def _refresh_snapshot_sync(end_date: Optional[date] = None) -> Dict[str, Any]:
     snapshot = engine.refresh(end_date=end_date, previous=previous)
     store.save_snapshot(snapshot)
 
+    # A successful refresh is also a buy-signal detection opportunity: evaluate
+    # the watcher over the engine's cached frames (zero extra network) so a manual
+    # refresh produces alerts without waiting for the background timer.
+    _emit_buy_alerts_from_engine(settings.config, engine)
+
     return {
         "status": "ok",
         "snapshot": snapshot.model_dump(mode="json"),
     }
+
+
+def _in_trading_session(now: datetime | None = None) -> bool:
+    """True during A-share trading sessions (Mon-Fri, 9:15-11:30 / 13:00-15:00)."""
+    current = now or datetime.now().astimezone()
+    if current.weekday() >= 5:
+        return False
+    minutes = current.hour * 60 + current.minute
+    morning = (9 * 60 + 15) <= minutes <= (11 * 60 + 30)
+    afternoon = (13 * 60) <= minutes <= (15 * 60)
+    return morning or afternoon
+
+
+def _emit_buy_alerts_from_engine(config: TrackerConfig, engine: StockTrackerEngine) -> None:
+    """Emit buy-signal alerts from an engine's cached frames, if enabled."""
+    spec = config.strategy_spec
+    if not config.alert_enabled or not spec:
+        return
+    if _validate_spec(spec):
+        logger.warning("Alert strategy_spec invalid; skipping detection")
+        return
+    hits = engine.evaluate_buy_alerts(spec)
+    emitted = _get_alert_store().emit(
+        hits, spec, source="intraday", strategy_label=short_strategy_label(spec)
+    )
+    if emitted:
+        logger.info(
+            "Emitted %d buy-signal alert(s) on refresh: %s",
+            len(emitted),
+            [a.code for a in emitted],
+        )
+
+
+def _run_alert_check(source: str = "intraday") -> int:
+    """Scan for buy signals and persist new alerts. Returns the new-alert count."""
+    config = _get_store().get_settings().config
+    spec = config.strategy_spec
+    if not config.alert_enabled or not spec:
+        return 0
+    if _validate_spec(spec):
+        logger.warning("Alert strategy_spec invalid; skipping detection")
+        return 0
+    engine = StockTrackerEngine(config=config)
+    hits = engine.scan_buy_signals(spec)
+    emitted = _get_alert_store().emit(
+        hits, spec, source=source, strategy_label=short_strategy_label(spec)
+    )
+    if emitted:
+        logger.info(
+            "Emitted %d buy-signal alert(s) (%s): %s",
+            len(emitted),
+            source,
+            [a.code for a in emitted],
+        )
+    return len(emitted)
+
+
+def _alert_scheduler_loop() -> None:
+    """Background buy-signal watcher: scan periodically during trading hours."""
+    global _ALERT_FAILURES
+    while True:
+        config = _get_store().get_settings().config
+        interval = max(10, int(config.alert_interval_seconds or 60))
+        time.sleep(interval)
+        try:
+            if not config.alert_enabled or not config.strategy_spec:
+                continue
+            if config.alert_session_only and not _in_trading_session():
+                continue
+            if not _ALERT_SCAN_LOCK.acquire(blocking=False):
+                continue  # a scan is already in flight
+            try:
+                _run_alert_check("intraday")
+                _ALERT_FAILURES = 0
+            finally:
+                _ALERT_SCAN_LOCK.release()
+        except Exception as exc:  # noqa: BLE001 - keep the watcher alive
+            logger.exception("Buy-signal alert scan failed: %s", exc)
+            _ALERT_FAILURES += 1
+            backoff = min(interval * (2 ** min(_ALERT_FAILURES, 5)), 600)
+            time.sleep(backoff)
+
+
+def _start_alert_scheduler() -> None:
+    """Start the background alert watcher once per process."""
+    global _ALERT_SCHEDULER_STARTED
+    if _ALERT_SCHEDULER_STARTED:
+        return
+    _ALERT_SCHEDULER_STARTED = True
+    threading.Thread(
+        target=_alert_scheduler_loop,
+        name="stock-tracker-alerts",
+        daemon=True,
+    ).start()
 
 
 def _set_refresh_progress(code: str, status: str, error: Optional[str] = None) -> None:
@@ -913,8 +1075,43 @@ def register_stock_tracker_routes(
 
     @app.get("/api/stock-tracker/backtest/presets")
     async def get_backtest_presets(principal=Depends(require_auth)) -> Dict[str, Any]:  # noqa: ARG001
-        """Return one-click preset rule templates (id/label/spec)."""
-        return {"status": "ok", "presets": list_presets()}
+        """Return one-click preset rule templates (id/label/spec).
+
+        Built-in presets come first, then user-saved custom presets (marked
+        ``"custom": true``) persisted under the tracker data root.
+        """
+        return {"status": "ok", "presets": list_all_presets()}
+
+    @app.post("/api/stock-tracker/backtest/presets")
+    async def save_backtest_preset(
+        request: BacktestPresetSaveRequest,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        """Persist the current rule builder as a new custom preset."""
+        label = (request.label or "").strip()
+        if not label:
+            raise HTTPException(status_code=422, detail="Preset label is required.")
+        spec_error = _validate_spec(request.spec)
+        if spec_error:
+            raise HTTPException(status_code=422, detail=f"Invalid preset spec: {spec_error}")
+        try:
+            preset = save_custom_preset(label, request.spec)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        return {"status": "ok", "preset": preset}
+
+    @app.delete("/api/stock-tracker/backtest/presets/{preset_id}")
+    async def delete_backtest_preset(
+        preset_id: str,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        """Delete a user-saved custom preset (built-in presets are immutable)."""
+        if not preset_id.startswith("custom_"):
+            raise HTTPException(status_code=400, detail="Built-in presets cannot be deleted.")
+        deleted = delete_custom_preset(preset_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Preset not found.")
+        return {"status": "ok", "deleted": preset_id}
 
     @app.post("/api/stock-tracker/symbols/{code}/backtest")
     async def run_symbol_backtest(
@@ -1011,6 +1208,28 @@ def register_stock_tracker_routes(
             "trading_date": analysis.get("trading_date"),
             "generated_at": analysis.get("generated_at"),
         }
+
+    @app.get("/api/stock-tracker/alerts")
+    async def get_alerts(
+        limit: int = 50,
+        unread_only: bool = False,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        """Return persisted buy-signal alerts, newest first."""
+        alerts = _get_alert_store().list(limit=limit, unread_only=unread_only)
+        return {"status": "ok", "alerts": [a.model_dump(mode="json") for a in alerts]}
+
+    @app.post("/api/stock-tracker/alerts/ack")
+    async def acknowledge_alerts(
+        request: AlertAckRequest | None = None,
+        principal=Depends(require_auth),  # noqa: ARG001
+    ) -> Dict[str, Any]:
+        """Mark alerts read (omit body/ids to acknowledge all)."""
+        ids = request.ids if request else None
+        updated = _get_alert_store().acknowledge(ids)
+        return {"status": "ok", "updated": updated}
+
+    _start_alert_scheduler()
 
 
 def _run_refresh_background() -> None:

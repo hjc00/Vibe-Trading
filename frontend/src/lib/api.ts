@@ -597,6 +597,18 @@ export const api = {
     request<StockTrackerApiResponse>("/api/stock-tracker/refresh", { method: "POST" }),
   getStockTrackerRefreshStatus: () =>
     request<{ status: string; refresh: StockTrackerRefreshState }>("/api/stock-tracker/refresh-status"),
+  getStockTrackerAlerts: (opts?: { limit?: number; unread_only?: boolean }) => {
+    const qs = new URLSearchParams();
+    if (opts?.limit != null) qs.set("limit", String(opts.limit));
+    if (opts?.unread_only) qs.set("unread_only", "1");
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<StockTrackerAlertsResponse>(`/api/stock-tracker/alerts${suffix}`);
+  },
+  ackStockTrackerAlerts: (ids?: string[]) =>
+    request<{ status: string; updated: number }>("/api/stock-tracker/alerts/ack", {
+      method: "POST",
+      body: JSON.stringify(ids && ids.length ? { ids } : {}),
+    }),
   getStockTrackerHistory: (limit = 30) =>
     request<{ status: string; snapshots: TrackerSnapshot[] }>(
       `/api/stock-tracker/history?limit=${encodeURIComponent(String(limit))}`,
@@ -637,6 +649,16 @@ export const api = {
   getStockTrackerBacktestPresets: () =>
     request<{ status: string; presets: BacktestPreset[] }>(
       "/api/stock-tracker/backtest/presets",
+    ),
+  saveStockTrackerBacktestPreset: (payload: { label: string; spec: BacktestSpec }) =>
+    request<{ status: string; preset: BacktestPreset }>(
+      "/api/stock-tracker/backtest/presets",
+      { method: "POST", body: JSON.stringify(payload) },
+    ),
+  deleteStockTrackerBacktestPreset: (id: string) =>
+    request<{ status: string; deleted: string }>(
+      `/api/stock-tracker/backtest/presets/${encodeURIComponent(id)}`,
+      { method: "DELETE" },
     ),
   getStockTrackerBacktest: (
     code: string,
@@ -1805,6 +1827,17 @@ export interface TrackerConfig {
    * break-even is set; used as the user's cost basis in AI analysis.
    */
   break_even_prices: Record<string, number>;
+  /**
+   * Composable backtest strategy for buy-signal alerts. Pushed from the rule
+   * builder; null disables detection even when alert_enabled is true.
+   */
+  strategy_spec?: BacktestSpec | null;
+  /** Master switch: detect buy signals on refresh/interval and notify. */
+  alert_enabled?: boolean;
+  /** Background buy-signal scan interval in seconds. */
+  alert_interval_seconds?: number;
+  /** Only scan during A-share trading sessions. */
+  alert_session_only?: boolean;
 }
 
 export interface StockTrackerQuote {
@@ -1822,6 +1855,24 @@ export interface StockTrackerQuotesResponse {
   status: string;
   quotes: StockTrackerQuote[];
   data_gaps: Array<Record<string, unknown>>;
+}
+
+/** One persisted buy-signal notification. */
+export interface StockTrackerAlert {
+  id: string;
+  code: string;
+  name?: string | null;
+  price?: number | null;
+  signal_date: string;
+  strategy_label: string;
+  source: string;
+  triggered_at: string;
+  acknowledged: boolean;
+}
+
+export interface StockTrackerAlertsResponse {
+  status: string;
+  alerts: StockTrackerAlert[];
 }
 
 export interface TrackerSettingsResponse {
@@ -2183,6 +2234,8 @@ export interface BacktestPreset {
   id: string;
   label: string;
   spec: BacktestSpec;
+  /** True for a user-saved preset (deletable); false/absent for built-ins. */
+  custom?: boolean;
 }
 
 export interface BacktestPoint {

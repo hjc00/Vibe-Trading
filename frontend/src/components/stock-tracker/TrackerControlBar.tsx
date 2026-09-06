@@ -1,7 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { Loader2, Plus, RefreshCw, Sparkles } from "lucide-react";
 import { TrackerConfigPanel } from "./TrackerConfigPanel";
-import type { SignalMeta, TrackerConfig } from "@/lib/api";
+import { AlertBell } from "./AlertBell";
+import type { SignalMeta, StockTrackerAlert, TrackerConfig } from "@/lib/api";
 
 interface TrackerControlBarProps {
   addCode: string;
@@ -16,6 +17,10 @@ interface TrackerControlBarProps {
   analyzeDisabled: boolean;
   onRefresh: () => void;
   refreshing: boolean;
+  alerts: StockTrackerAlert[];
+  unreadCount: number;
+  onAckAllAlerts: () => void;
+  onSelectAlert: (code: string) => void;
 }
 
 export function TrackerControlBar({
@@ -31,6 +36,10 @@ export function TrackerControlBar({
   analyzeDisabled,
   onRefresh,
   refreshing,
+  alerts,
+  unreadCount,
+  onAckAllAlerts,
+  onSelectAlert,
 }: TrackerControlBarProps) {
   const { t } = useTranslation();
 
@@ -63,6 +72,12 @@ export function TrackerControlBar({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <AlertBell
+          alerts={alerts}
+          unreadCount={unreadCount}
+          onAckAll={onAckAllAlerts}
+          onSelect={onSelectAlert}
+        />
         <TrackerConfigPanel
           config={settingsConfig}
           onSave={onSaveConfig}

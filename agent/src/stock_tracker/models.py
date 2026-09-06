@@ -193,6 +193,32 @@ class TrackerConfig(BaseModel):
         default_factory=dict,
         description="Per-symbol user break-even price, keyed by normalized code.",
     )
+    # Composable backtest strategy ({"buy": Rule, "sell": Rule, ...}) used by the
+    # buy-signal alert watcher. None disables detection; the frontend pushes the
+    # same spec it feeds the backtest/analyze endpoints so the watcher and the
+    # backtest card can never drift.
+    strategy_spec: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Composable backtest strategy for buy-signal alerts.",
+    )
+    # Buy-signal alert watcher switches. ``alert_enabled`` is the master switch;
+    # ``alert_interval_seconds`` the background scan cadence; ``alert_session_only``
+    # gates intraday scans to A-share trading sessions (the close-confirm pass
+    # still runs once after 15:00 regardless of this flag).
+    alert_enabled: bool = Field(
+        default=False,
+        description="Detect buy signals on refresh/interval and notify.",
+    )
+    alert_interval_seconds: int = Field(
+        default=60,
+        ge=10,
+        le=3600,
+        description="Background buy-signal scan interval in seconds.",
+    )
+    alert_session_only: bool = Field(
+        default=True,
+        description="Only scan during A-share trading sessions (excl. close confirm).",
+    )
 
     @field_validator("watchlist")
     @classmethod

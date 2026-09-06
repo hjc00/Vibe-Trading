@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronUp, Eye, TrendingUp, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { ChevronDown, ChevronUp, Eye, TrendingUp, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { api, type BacktestTradePoint, type SignalMeta, type SymbolSnapshot, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
+import { api, type BacktestTradePoint, type SignalMeta, type StockTrackerAlert, type SymbolSnapshot, type TrackerConfig, type TrackerSnapshot } from "@/lib/api";
 import {
   ALL_ANALYSIS_INDICATOR_KEYS,
   CARD_TITLE_LABEL_KEYS,
@@ -20,6 +21,7 @@ import {
   cardCollapseKey,
   isCardCollapsed,
   setCardCollapsed,
+  useCardCollapse,
 } from "@/hooks/useCardCollapse";
 import { useSectionSpy } from "@/hooks/useSectionSpy";
 import { useStockTrackerAnalysisStore } from "@/stores/stockTrackerAnalysis";
@@ -87,6 +89,10 @@ export function StockTracker() {
   const [backtestOverlay, setBacktestOverlay] = useState<{ code: string; trades: BacktestTradePoint[] } | null>(null);
   const [addCode, setAddCode] = useState("");
   const [signalMeta, setSignalMeta] = useState<SignalMeta[]>([]);
+  const [alerts, setAlerts] = useState<StockTrackerAlert[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevUnreadRef = useRef(0);
+  const notifPermRef = useRef<NotificationPermission>("default");
   const [collapsedDetailIds, setCollapsedDetailIds] = useState<Set<HideableCardId>>(() => {
     const ids = new Set<HideableCardId>();
     for (const { id } of DETAIL_CARDS) {
@@ -94,6 +100,10 @@ export function StockTracker() {
     }
     return ids;
   });
+  // Whole "data cards" region (market sentiment + detail grid + financial/sector)
+  // collapses to just its header; persisted via the same useCardCollapse hook.
+  const { collapsed: detailSectionCollapsed, toggle: toggleDetailSection } =
+    useCardCollapse("detailCardsSection");
   const {
     open: analyzeOpen,
     selectedSymbols,
@@ -191,6 +201,30 @@ export function StockTracker() {
     }
   }, []);
 
+  const loadAlerts = useCallback(async () => {
+    try {
+      const response = await api.getStockTrackerAlerts({ limit: 50 });
+      const list = response.alerts ?? [];
+      setAlerts(list);
+      setUnreadCount(list.filter((a) => !a.acknowledged).length);
+    } catch {
+      // Non-fatal: keep the last successful alert list visible.
+    }
+  }, []);
+
+  const handleAckAllAlerts = useCallback(async () => {
+    try {
+      await api.ackStockTrackerAlerts();
+      await loadAlerts();
+    } catch {
+      // Non-fatal: leave the list as-is on failure.
+    }
+  }, [loadAlerts]);
+
+  const handleSelectAlert = useCallback((code: string) => {
+    setSelectedCode(code);
+  }, []);
+
   const stopQuotePolling = useCallback(() => {
     if (quoteTimerRef.current) {
       clearInterval(quoteTimerRef.current);
@@ -252,8 +286,14 @@ export function StockTracker() {
   const handleSaveConfig = useCallback(
     async (newConfig: TrackerConfig) => {
       try {
-        await api.updateStockTrackerSettings(newConfig);
-        setConfig(newConfig);
+        // The backtest card owns ``strategy_spec`` (mirrored to the backend on
+        // every strategy edit); the settings panel must not clobber it with a
+        // stale copy, so drop it here and let the backend keep its latest value.
+        const { strategy_spec: _strategySpec, ...configWithoutSpec } = newConfig;
+        await api.updateStockTrackerSettings(configWithoutSpec);
+        setConfig((prev) =>
+          prev ? { ...configWithoutSpec, strategy_spec: prev.strategy_spec } : configWithoutSpec,
+        );
         await refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -423,6 +463,54 @@ export function StockTracker() {
     };
   }, [config, loading, startQuotePolling, stopQuotePolling]);
 
+  // Poll buy-signal alerts while detection is enabled. Interval mirrors the
+  // backend scheduler (alert_interval_seconds); a floor of 5s keeps it responsive.
+  useEffect(() => {
+    if (!config?.alert_enabled) {
+      setAlerts([]);
+      setUnreadCount(0);
+      return undefined;
+    }
+    void loadAlerts();
+    const intervalMs = Math.max(5000, (config.alert_interval_seconds ?? 60) * 1000);
+    const timer = setInterval(() => void loadAlerts(), intervalMs);
+    return () => clearInterval(timer);
+  }, [config?.alert_enabled, config?.alert_interval_seconds, loadAlerts]);
+
+  // Surface new unread alerts as a toast + system notification. The system
+  // notification body is intentionally minimal ("有新提示"); details live in the
+  // bell dropdown. Permission is requested lazily on the first new alert.
+  useEffect(() => {
+    const prev = prevUnreadRef.current;
+    if (unreadCount > prev && unreadCount > 0) {
+      toast(t("stockTracker.newAlerts"), {
+        description: t("stockTracker.newAlertsHint", { count: unreadCount }),
+      });
+      if (typeof Notification !== "undefined") {
+        const perm = notifPermRef.current;
+        const notify = () => {
+          try {
+            new Notification(t("stockTracker.title"), {
+              body: t("stockTracker.newAlerts"),
+              tag: "stock-tracker-alert",
+            });
+          } catch {
+            // Notification constructor can throw on unsupported environments.
+          }
+        };
+        if (perm === "granted") {
+          notify();
+        } else if (perm === "default") {
+          void Notification.requestPermission().then((p) => {
+            notifPermRef.current = p;
+            if (p === "granted") notify();
+          });
+        }
+      }
+    }
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount, t]);
+
   const selectedSymbol = snapshot?.symbols.find((s) => s.code === selectedCode) ?? null;
   const settingsConfig = useMemo(
     () =>
@@ -437,6 +525,10 @@ export function StockTracker() {
         analysis_focus: "balanced",
         card_visibility: {},
         break_even_prices: {},
+        strategy_spec: null,
+        alert_enabled: false,
+        alert_interval_seconds: 60,
+        alert_session_only: true,
       },
     [config],
   );
@@ -474,12 +566,6 @@ export function StockTracker() {
         sections.push({ id: "st-backtest", labelKey: "stockTracker.navBacktest" });
       }
       sections.push({ id: "st-detail-cards", labelKey: "stockTracker.navDetailCards" });
-      if (
-        isCardVisible("financial_report", config?.card_visibility) ||
-        isCardVisible("sector", config?.card_visibility)
-      ) {
-        sections.push({ id: "st-financial-sector", labelKey: "stockTracker.navFinancialSector" });
-      }
       sections.push({ id: "st-charts", labelKey: "stockTracker.navCharts" });
     }
     if (hasAnalysisSection) {
@@ -528,6 +614,10 @@ export function StockTracker() {
           analyzeDisabled={loading || refreshing || !snapshot || snapshot.symbols.length === 0}
           onRefresh={refresh}
           refreshing={refreshing}
+          alerts={alerts}
+          unreadCount={unreadCount}
+          onAckAllAlerts={handleAckAllAlerts}
+          onSelectAlert={handleSelectAlert}
         />
 
         {error ? (
@@ -557,31 +647,6 @@ export function StockTracker() {
               </section>
             ) : (
               <section className="flex flex-col gap-4">
-                {collapsedDetailCards.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-xs">
-                    <span className="text-muted-foreground">{t("stockTracker.collapsedCards")}</span>
-                    {collapsedDetailCards.map(({ id }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => handleToggleCollapse(id)}
-                        title={t("stockTracker.expandCard")}
-                        className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
-                      >
-                        <ChevronUp className="h-3 w-3" />
-                        {t(CARD_TITLE_LABEL_KEYS[id] as never)}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-
-                {isCardVisible("market_sentiment", config?.card_visibility) ? (
-                  <MarketSentimentBar
-                    sentiment={snapshot.market_sentiment}
-                    onHide={() => handleToggleCard("market_sentiment")}
-                  />
-                ) : null}
-
                 {hiddenIds.length > 0 ? (
                   <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-xs">
                     <span className="text-muted-foreground">{t("stockTracker.hiddenCards")}</span>
@@ -629,39 +694,88 @@ export function StockTracker() {
                   </section>
                 ) : null}
 
-                <section id="st-detail-cards" className="scroll-mt-6">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {expandedDetailCards.map(({ id, Component }) => (
-                      <Component
-                        key={id}
-                        symbol={selectedSymbol}
-                        onHide={() => handleToggleCard(id)}
-                        collapsed={collapsedDetailIds.has(id)}
-                        onToggle={() => handleToggleCollapse(id)}
+                <section id="st-detail-cards" className="scroll-mt-6 overflow-hidden rounded-xl border border-border/60 bg-card/40 shadow-sm">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={toggleDetailSection}
+                      aria-expanded={!detailSectionCollapsed}
+                      className="flex items-center gap-2 text-left"
+                    >
+                      <h2 className="text-sm font-semibold">{t("stockTracker.navDetailCards")}</h2>
+                      <span className="text-[10px] text-muted-foreground">
+                        {t("stockTracker.visibleCardCount", { count: expandedDetailCards.length })}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleDetailSection}
+                      aria-expanded={!detailSectionCollapsed}
+                      aria-label={t("stockTracker.navDetailCards")}
+                      className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    >
+                      <ChevronDown
+                        className={cn("h-4 w-4 transition-transform", detailSectionCollapsed && "rotate-180")}
                       />
-                    ))}
+                    </button>
                   </div>
-                </section>
 
-                {isCardVisible("financial_report", config?.card_visibility) ||
-                isCardVisible("sector", config?.card_visibility) ? (
-                  <section id="st-financial-sector" className="flex scroll-mt-6 flex-col gap-4">
-                    {isCardVisible("financial_report", config?.card_visibility) ? (
-                      <FinancialReportCard
-                        symbol={selectedSymbol}
-                        onHide={() => handleToggleCard("financial_report")}
-                      />
-                    ) : null}
-                    {isCardVisible("sector", config?.card_visibility) ? (
-                      <SectorStrengthBoard
-                        sectors={snapshot.sectors}
-                        concepts={snapshot.concepts}
-                        tradingDate={snapshot.trading_date}
-                        onHide={() => handleToggleCard("sector")}
-                      />
-                    ) : null}
-                  </section>
-                ) : null}
+                  {detailSectionCollapsed ? null : (
+                    <div className="flex flex-col gap-4 border-t border-border/60 p-4">
+                      {collapsedDetailCards.length > 0 ? (
+                        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-dashed border-border/60 bg-muted/20 px-3 py-2 text-xs">
+                          <span className="text-muted-foreground">{t("stockTracker.collapsedCards")}</span>
+                          {collapsedDetailCards.map(({ id }) => (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => handleToggleCollapse(id)}
+                              title={t("stockTracker.expandCard")}
+                              className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2 py-0.5 font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                            >
+                              <ChevronUp className="h-3 w-3" />
+                              {t(CARD_TITLE_LABEL_KEYS[id] as never)}
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {isCardVisible("market_sentiment", config?.card_visibility) ? (
+                        <MarketSentimentBar
+                          sentiment={snapshot.market_sentiment}
+                          onHide={() => handleToggleCard("market_sentiment")}
+                        />
+                      ) : null}
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {expandedDetailCards.map(({ id, Component }) => (
+                          <Component
+                            key={id}
+                            symbol={selectedSymbol}
+                            onHide={() => handleToggleCard(id)}
+                            collapsed={collapsedDetailIds.has(id)}
+                            onToggle={() => handleToggleCollapse(id)}
+                          />
+                        ))}
+                      </div>
+
+                      {isCardVisible("financial_report", config?.card_visibility) ? (
+                        <FinancialReportCard
+                          symbol={selectedSymbol}
+                          onHide={() => handleToggleCard("financial_report")}
+                        />
+                      ) : null}
+                      {isCardVisible("sector", config?.card_visibility) ? (
+                        <SectorStrengthBoard
+                          sectors={snapshot.sectors}
+                          concepts={snapshot.concepts}
+                          tradingDate={snapshot.trading_date}
+                          onHide={() => handleToggleCard("sector")}
+                        />
+                      ) : null}
+                    </div>
+                  )}
+                </section>
 
                 <section id="st-charts" className="scroll-mt-6">
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">

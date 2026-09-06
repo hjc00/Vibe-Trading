@@ -171,6 +171,20 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
     setDraft((prev) => ({ ...prev, detail_card_count: Math.max(1, num) }));
   };
 
+  const toggleAlertEnabled = () => {
+    setDraft((prev) => ({ ...prev, alert_enabled: !prev.alert_enabled }));
+  };
+
+  const toggleAlertSessionOnly = () => {
+    setDraft((prev) => ({ ...prev, alert_session_only: !prev.alert_session_only }));
+  };
+
+  const updateAlertInterval = (value: string) => {
+    const num = parseInt(value, 10);
+    if (Number.isNaN(num)) return;
+    setDraft((prev) => ({ ...prev, alert_interval_seconds: Math.max(10, Math.min(3600, num)) }));
+  };
+
   const saveDisabled =
     watchlistInput.trim().length === 0 ||
     draft.signals.length === 0 ||
@@ -296,6 +310,41 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
               <p className="text-[10px] text-muted-foreground">{t("stockTracker.detailCardCountHint")}</p>
             </div>
 
+            <div className="space-y-1.5 rounded-md border border-border/60 p-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-muted-foreground">
+                  {t("stockTracker.alertEnabled")}
+                </label>
+                <ToggleButton on={!!draft.alert_enabled} onToggle={toggleAlertEnabled} />
+              </div>
+              {draft.alert_enabled && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="alert-interval">
+                    {t("stockTracker.alertInterval")}
+                  </label>
+                  <input
+                    id="alert-interval"
+                    type="number"
+                    min={10}
+                    max={3600}
+                    value={draft.alert_interval_seconds ?? 60}
+                    onChange={(e) => updateAlertInterval(e.target.value)}
+                    className={cn(
+                      "w-full rounded-md border bg-background px-3 py-2 text-xs outline-none",
+                      "focus:border-primary focus:ring-2 focus:ring-primary/20",
+                    )}
+                  />
+                  <p className="text-[10px] text-muted-foreground">{t("stockTracker.alertIntervalHint")}</p>
+                  <div className="flex items-center justify-between pt-1">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {t("stockTracker.alertSessionOnly")}
+                    </label>
+                    <ToggleButton on={!!draft.alert_session_only} onToggle={toggleAlertSessionOnly} />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {allParams.length > 0 && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-muted-foreground">{t("stockTracker.thresholds")}</label>
@@ -337,6 +386,28 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
         </div>
       )}
     </div>
+  );
+}
+
+function ToggleButton({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={onToggle}
+      className={cn(
+        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition",
+        on ? "bg-primary" : "bg-muted",
+      )}
+    >
+      <span
+        className={cn(
+          "inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition",
+          on ? "translate-x-[18px]" : "translate-x-1",
+        )}
+      />
+    </button>
   );
 }
 

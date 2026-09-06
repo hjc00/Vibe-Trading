@@ -17,7 +17,8 @@ from src.stock_tracker.models import (
     TrackerSnapshot,
 )
 from src.stock_tracker.store import TrackerStore
-from src.api.stock_tracker_routes import _with_live_price
+from src.stock_tracker.alerts import AlertStore
+from src.api.stock_tracker_routes import _in_trading_session, _with_live_price
 
 
 @pytest.fixture
@@ -1082,6 +1083,64 @@ def test_update_settings_serializes_without_int_float_warning(client, isolated_t
     assert response.status_code == 200
     pydantic_warnings = [w for w in caught if "PydanticSerializationUnexpectedValue" in str(w.message)]
     assert pydantic_warnings == []
+
+
+def test_get_alerts_empty(client, isolated_tracker_store):
+    response = client.get("/api/stock-tracker/alerts")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["alerts"] == []
+
+
+def test_ack_alerts_none_marks_all(client, isolated_tracker_store, tmp_path):
+    store = AlertStore(root=tmp_path)
+    store.emit(
+        [{"code": "600519.SH", "signal_date": "2026-09-05"}],
+        {"buy": {"mode": "and", "conditions": []}},
+    )
+    with patch("src.api.stock_tracker_routes._alert_store", store):
+        response = client.post("/api/stock-tracker/alerts/ack", json={})
+    assert response.status_code == 200
+    assert response.json()["updated"] == 1
+
+
+def test_update_settings_roundtrips_alert_fields(client, isolated_tracker_store):
+    spec = {"buy": {"mode": "and", "conditions": []}}
+    response = client.put(
+        "/api/stock-tracker/settings",
+        json={
+            "strategy_spec": spec,
+            "alert_enabled": True,
+            "alert_interval_seconds": 30,
+            "alert_session_only": False,
+        },
+    )
+    assert response.status_code == 200
+    config = response.json()["config"]
+    assert config["alert_enabled"] is True
+    assert config["alert_interval_seconds"] == 30
+    assert config["alert_session_only"] is False
+    assert config["strategy_spec"] == spec
+
+    refetched = client.get("/api/stock-tracker/settings").json()["config"]
+    assert refetched["alert_enabled"] is True
+    assert refetched["strategy_spec"] == spec
+
+
+def test_in_trading_session_weekday_and_weekend():
+    # Tuesday during the morning session -> True.
+    tuesday_morning = datetime(2026, 9, 8, 10, 0, tzinfo=timezone.utc)
+    assert _in_trading_session(tuesday_morning) is True
+    # Sunday -> False.
+    sunday = datetime(2026, 9, 6, 10, 0, tzinfo=timezone.utc)
+    assert _in_trading_session(sunday) is False
+    # Tuesday during lunch break (11:31) -> False.
+    lunch = datetime(2026, 9, 8, 11, 31, tzinfo=timezone.utc)
+    assert _in_trading_session(lunch) is False
+    # Tuesday after close (15:01) -> False.
+    after_close = datetime(2026, 9, 8, 15, 1, tzinfo=timezone.utc)
+    assert _in_trading_session(after_close) is False
 
 
 if __name__ == "__main__":

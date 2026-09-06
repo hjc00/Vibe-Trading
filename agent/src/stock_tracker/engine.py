@@ -9,6 +9,7 @@ from typing import Any, Callable, Dict, List, Optional
 import pandas as pd
 
 from src.market_data import fetch_market_data
+from src.stock_tracker.backtest_data import evaluate_buy_signal
 from src.stock_tracker.capital_data import _FUND_FLOW_LOOKBACK, CapitalDataCache, load_capital_data
 from src.stock_tracker.chip_data import ChipDataCache, load_chip_data
 from src.stock_tracker.concept_data import load_concept_data
@@ -150,6 +151,10 @@ class StockTrackerEngine:
         # Populated by ``refresh`` for same-day runs; merged into wide symbol and
         # benchmark series so the newest snapshot bar is the live session.
         self._current_day_live_rows: Dict[str, List[Dict[str, Any]]] = {}
+        # Per-symbol OHLCV frames and resolved names cached by ``refresh`` so the
+        # buy-signal watcher can evaluate the strategy with zero extra network.
+        self._last_frames: Dict[str, pd.DataFrame] = {}
+        self._names: Dict[str, Optional[str]] = {}
 
     def refresh(
         self,
@@ -175,6 +180,7 @@ class StockTrackerEngine:
         # a refresh does not re-request throttled/blocked Eastmoney sources.
         self._seed_caches_from_previous(previous, trading_date)
         start_date = end_date - timedelta(days=max(self.config.periods) + _BUFFER_DAYS)
+        self._last_frames = {}
 
         # Tencent's daily kline only serves the current session's bar for an
         # exact single-day window — a wide finalized window can lag "today" until
@@ -206,6 +212,7 @@ class StockTrackerEngine:
         except Exception:  # noqa: BLE001
             logger.exception("Name resolution failed")
             names = {}
+        self._names = names
 
         # Resolve sector boards, reusing the prior same-trading-day mapping so a
         # repeat refresh skips the throttled Eastmoney membership calls; only
@@ -356,6 +363,7 @@ class StockTrackerEngine:
                 if df.empty:
                     data_gaps.append({"code": code, "reason": "empty_frame"})
                     continue
+                self._last_frames[code] = df
                 sector_board = sector_boards.get(code)
                 snapshot = self._analyze_symbol(
                     code,
@@ -512,6 +520,87 @@ class StockTrackerEngine:
             unresolved=unresolved,
             data_gaps=data_gaps,
         )
+
+    def _detect_from_frames(
+        self,
+        frames: Dict[str, pd.DataFrame],
+        spec: Optional[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        """Evaluate a strategy's buy rule over per-symbol frames.
+
+        Returns raw hits (``code/name/price/signal_date``) for the alert store to
+        de-dupe and persist. Reuses :func:`evaluate_buy_signal` so the boolean is
+        identical to the backtest engine's buy-signal semantics.
+        """
+        if not spec:
+            return []
+        hits: List[Dict[str, Any]] = []
+        for code in self.config.watchlist:
+            df = frames.get(code)
+            if df is None or df.empty:
+                continue
+            try:
+                triggered = evaluate_buy_signal(spec, df)
+            except Exception as exc:  # noqa: BLE001 - per-symbol failure is non-fatal
+                logger.warning("buy-signal check failed for %s: %s", code, exc)
+                continue
+            if not triggered:
+                continue
+            last = df.iloc[-1]
+            hits.append(
+                {
+                    "code": code,
+                    "name": self._names.get(code),
+                    "price": _as_float(last.get("close")),
+                    "signal_date": df.index[-1].date().isoformat(),
+                }
+            )
+        return hits
+
+    def evaluate_buy_alerts(self, spec: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Detect buy signals from the frames cached by the last ``refresh``.
+
+        Called after a successful refresh so the watcher runs with zero extra
+        network requests; frames include the merged current-day live bar.
+        """
+        return self._detect_from_frames(self._last_frames, spec)
+
+    def scan_buy_signals(self, spec: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Fetch fresh OHLCV and detect buy signals (background watcher path).
+
+        A standalone, lightweight fetch — only OHLCV + names, none of the heavy
+        capital/valuation/sentiment dimensions the full refresh pulls — so the
+        periodic watcher stays cheap. Reuses ``_fetch_data`` / ``_merge_current_day``
+        so the newest bar is the live session, matching the refresh口径.
+        """
+        if not spec:
+            return []
+        end_date = date.today()
+        start_date = end_date - timedelta(days=max(self.config.periods) + _BUFFER_DAYS)
+        self._current_day_live_rows = self._fetch_current_day_rows(
+            list(self.config.watchlist), end_date
+        )
+        raw_data = self._fetch_data(
+            self.config.watchlist, start_date.isoformat(), end_date.isoformat()
+        )
+        try:
+            names = fetch_a_share_names(self.config.watchlist)
+        except Exception:  # noqa: BLE001 - name resolution failure is non-fatal
+            names = {}
+        self._names = names
+
+        frames: Dict[str, pd.DataFrame] = {}
+        for code in self.config.watchlist:
+            records = raw_data.get(code)
+            if not isinstance(records, list):
+                continue
+            try:
+                df = self._records_to_dataframe(records)
+                if not df.empty:
+                    frames[code] = df
+            except Exception:  # noqa: BLE001 - per-symbol failure is non-fatal
+                continue
+        return self._detect_from_frames(frames, spec)
 
     def _needed_data_dimensions(self) -> frozenset[str]:
         """Union of refresh-time data dimensions the currently visible cards need.

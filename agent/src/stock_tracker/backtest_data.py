@@ -31,10 +31,11 @@ KDJ 超卖/超买钝化是状态原语：J 跌破/升破阈值进入超卖/超�
 
 from __future__ import annotations
 
+import json
 import logging
 import math
 import tempfile
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -54,6 +55,7 @@ from src.stock_tracker.models import (
     BacktestTradePoint,
 )
 from src.stock_tracker.signals import compute_rsi
+from src.stock_tracker.store import atomic_write_json, tracker_data_root
 
 logger = logging.getLogger(__name__)
 
@@ -985,12 +987,130 @@ def list_primitive_categories() -> List[Dict[str, str]]:
     return list(PRIMITIVE_CATEGORIES)
 
 
+# File under the tracker data root holding user-saved custom presets. Written
+# as ``{"presets": [{id, label, spec}, ...]}`` so it matches ``atomic_write_json``
+# (which takes a dict) and leaves room for a schema_version later.
+_CUSTOM_PRESETS_FILENAME = "backtest_presets.json"
+
+
+class BacktestPresetStore:
+    """JSON-file store for user-saved backtest rule presets.
+
+    Built-in presets live in code (``_PRESETS``); this store only holds the
+    user's own saved strategies so they survive restarts, mirroring the
+    ``AlertStore`` / ``financial_reports_data`` persistence pattern. Writes are
+    atomic (temp file + ``os.replace`` + fsync) via :func:`atomic_write_json`.
+    """
+
+    def __init__(self, root: Path | str | None = None) -> None:
+        self.path = (
+            Path(root) / _CUSTOM_PRESETS_FILENAME
+            if root
+            else tracker_data_root() / _CUSTOM_PRESETS_FILENAME
+        )
+
+    def list(self) -> List[Dict[str, Any]]:
+        """Return the persisted custom presets (id/label/spec), newest last."""
+        if not self.path.exists():
+            return []
+        try:
+            with self.path.open("r", encoding="utf-8") as f:
+                raw = json.load(f)
+        except Exception as exc:  # noqa: BLE001 - corrupt file degrades to empty
+            logger.warning("Failed to load custom backtest presets from %s: %s", self.path, exc)
+            return []
+        if not isinstance(raw, dict):
+            return []
+        items = raw.get("presets")
+        if not isinstance(items, list):
+            return []
+        presets: List[Dict[str, Any]] = []
+        for item in items:
+            if (
+                isinstance(item, dict)
+                and item.get("id")
+                and isinstance(item.get("label"), str)
+                and isinstance(item.get("spec"), dict)
+            ):
+                presets.append(
+                    {"id": item["id"], "label": item["label"], "spec": item["spec"]}
+                )
+        return presets
+
+    def save(self, label: str, spec: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate and persist one custom preset; returns ``{id, label, spec}``.
+
+        Raises ``ValueError`` on an empty label or an invalid spec (checked with
+        :func:`_validate_spec`) so a bad save is rejected rather than persisted.
+        """
+        clean_label = (label or "").strip()
+        if not clean_label:
+            raise ValueError("preset label must not be empty")
+        clean_label = clean_label[:64]
+        error = _validate_spec(spec)
+        if error:
+            raise ValueError(f"invalid spec: {error}")
+
+        presets = self.list()
+        preset_id = "custom_" + datetime.now().astimezone().strftime("%Y%m%dT%H%M%S%f")
+        preset = {"id": preset_id, "label": clean_label, "spec": spec}
+        presets.append(preset)
+        atomic_write_json(self.path, {"presets": presets})
+        return preset
+
+    def delete(self, preset_id: str) -> bool:
+        """Remove one custom preset by id. Returns True if it existed."""
+        presets = self.list()
+        remaining = [p for p in presets if p["id"] != preset_id]
+        if len(remaining) == len(presets):
+            return False
+        atomic_write_json(self.path, {"presets": remaining})
+        return True
+
+
+# Module-level singleton so every caller (routes, alerts) shares one store and
+# one backing file, matching the ``TrackerStore`` / ``AlertStore`` pattern.
+_preset_store: Optional[BacktestPresetStore] = None
+
+
+def _get_preset_store() -> BacktestPresetStore:
+    global _preset_store
+    if _preset_store is None:
+        _preset_store = BacktestPresetStore()
+    return _preset_store
+
+
 def list_presets() -> List[Dict[str, Any]]:
-    """Return the one-click preset templates (id/label/spec)."""
+    """Return the built-in one-click preset templates (id/label/spec)."""
     return [
-        {"id": preset["id"], "label": preset["label"], "spec": preset["spec"]}
+        {"id": preset["id"], "label": preset["label"], "spec": preset["spec"], "custom": False}
         for preset in _PRESETS
     ]
+
+
+def list_all_presets() -> List[Dict[str, Any]]:
+    """Return built-in presets followed by user-saved custom presets.
+
+    Custom presets carry ``"custom": True`` so the frontend can offer delete
+    (built-ins are immutable). Built-ins come first to keep the one-click order
+    stable regardless of how many presets the user later saves.
+    """
+    custom = [
+        {"id": p["id"], "label": p["label"], "spec": p["spec"], "custom": True}
+        for p in _get_preset_store().list()
+    ]
+    return list_presets() + custom
+
+
+def save_custom_preset(label: str, spec: Dict[str, Any]) -> Dict[str, Any]:
+    """Persist a new custom preset; returns ``{id, label, spec, custom: True}``."""
+    preset = _get_preset_store().save(label, spec)
+    return {**preset, "custom": True}
+
+
+def delete_custom_preset(preset_id: str) -> bool:
+    """Delete a user-saved custom preset by id. Returns True if it existed."""
+    return _get_preset_store().delete(preset_id)
 
 
 # ---------------------------------------------------------------------------
@@ -1452,11 +1572,65 @@ def render_strategy_spec(spec: Any) -> str:
     return "\n".join(parts)
 
 
+def evaluate_buy_signal(spec: Any, frame: pd.DataFrame) -> bool:
+    """Return True when the buy rule is currently triggered on the latest bar.
+
+    Reuses :func:`_rule_series` so the boolean matches the backtest engine's
+    buy-signal semantics (state / edge_up / edge_down triggers included). Safe
+    to call on an empty frame or an absent/invalid spec — returns False rather
+    than raising, so the alert watcher never hard-fails on a bad strategy.
+    """
+    if frame is None or len(frame) == 0:
+        return False
+    if not isinstance(spec, dict):
+        return False
+    buy = spec.get("buy")
+    if not isinstance(buy, dict) or not buy.get("conditions"):
+        return False
+    try:
+        series = _rule_series(buy, frame)
+    except Exception as exc:  # noqa: BLE001 - a broken rule degrades to "no signal"
+        logger.warning("buy-signal evaluation failed: %s", exc)
+        return False
+    if not len(series):
+        return False
+    return bool(series.iloc[-1])
+
+
+def short_strategy_label(spec: Any) -> str:
+    """Return a compact strategy label for notifications.
+
+    Matches the buy rule against the one-click presets; a hit returns the preset
+    label (e.g. "MACD 金叉"), otherwise "自定义策略". Full detail is available
+    via :func:`render_strategy_spec` when a longer description is wanted.
+    """
+    if not isinstance(spec, dict):
+        return "自定义策略"
+    buy = spec.get("buy")
+    if not isinstance(buy, dict):
+        return "自定义策略"
+    buy_conditions = buy.get("conditions") or []
+    for preset in _PRESETS:
+        preset_buy = preset.get("spec", {}).get("buy")
+        if not isinstance(preset_buy, dict):
+            continue
+        preset_conditions = preset_buy.get("conditions") or []
+        if preset_conditions and preset_conditions == buy_conditions:
+            return str(preset.get("label") or "自定义策略")
+    return "自定义策略"
+
+
 __all__ = [
+    "BacktestPresetStore",
     "build_signal_engine",
+    "delete_custom_preset",
+    "evaluate_buy_signal",
+    "list_all_presets",
+    "list_presets",
     "list_primitives",
     "list_primitive_categories",
-    "list_presets",
     "render_strategy_spec",
     "run_backtest_for_symbol",
+    "save_custom_preset",
+    "short_strategy_label",
 ]
