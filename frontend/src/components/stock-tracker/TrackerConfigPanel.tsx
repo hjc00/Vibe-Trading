@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { X, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getSignalLabelKey, normalizeAShareCode } from "@/lib/stockTracker";
+import { useClampedIntInput } from "@/hooks/useClampedIntInput";
 import type { SignalMeta, TrackerConfig } from "@/lib/api";
 
 interface TrackerConfigPanelProps {
@@ -159,17 +160,24 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
     }));
   };
 
-  const updateRefreshInterval = (value: string) => {
-    const num = parseInt(value, 10);
-    if (Number.isNaN(num)) return;
-    setDraft((prev) => ({ ...prev, refresh_interval_seconds: Math.max(5, num) }));
-  };
-
-  const updateDetailCardCount = (value: string) => {
-    const num = parseInt(value, 10);
-    if (Number.isNaN(num)) return;
-    setDraft((prev) => ({ ...prev, detail_card_count: Math.max(1, num) }));
-  };
+  // Numeric inputs clamp only on commit (blur), not per keystroke — otherwise
+  // an intermediate value below min (e.g. "3" of "300") snaps back mid-edit.
+  const refreshIntervalInput = useClampedIntInput(
+    draft.refresh_interval_seconds,
+    (next) => setDraft((prev) => ({ ...prev, refresh_interval_seconds: next })),
+    5,
+  );
+  const detailCardCountInput = useClampedIntInput(
+    draft.detail_card_count,
+    (next) => setDraft((prev) => ({ ...prev, detail_card_count: next })),
+    1,
+  );
+  const alertIntervalInput = useClampedIntInput(
+    draft.alert_interval_seconds ?? 60,
+    (next) => setDraft((prev) => ({ ...prev, alert_interval_seconds: next })),
+    10,
+    3600,
+  );
 
   const toggleAlertEnabled = () => {
     setDraft((prev) => ({ ...prev, alert_enabled: !prev.alert_enabled }));
@@ -177,12 +185,6 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
 
   const toggleAlertSessionOnly = () => {
     setDraft((prev) => ({ ...prev, alert_session_only: !prev.alert_session_only }));
-  };
-
-  const updateAlertInterval = (value: string) => {
-    const num = parseInt(value, 10);
-    if (Number.isNaN(num)) return;
-    setDraft((prev) => ({ ...prev, alert_interval_seconds: Math.max(10, Math.min(3600, num)) }));
   };
 
   const saveDisabled =
@@ -281,8 +283,9 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
                 id="refresh-interval"
                 type="number"
                 min={5}
-                value={draft.refresh_interval_seconds}
-                onChange={(e) => updateRefreshInterval(e.target.value)}
+                value={refreshIntervalInput.value}
+                onChange={(e) => refreshIntervalInput.onChange(e.target.value)}
+                onBlur={refreshIntervalInput.onBlur}
                 className={cn(
                   "w-full rounded-md border bg-background px-3 py-2 text-xs outline-none",
                   "focus:border-primary focus:ring-2 focus:ring-primary/20",
@@ -300,8 +303,9 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
                 type="number"
                 min={1}
                 step={1}
-                value={draft.detail_card_count}
-                onChange={(e) => updateDetailCardCount(e.target.value)}
+                value={detailCardCountInput.value}
+                onChange={(e) => detailCardCountInput.onChange(e.target.value)}
+                onBlur={detailCardCountInput.onBlur}
                 className={cn(
                   "w-full rounded-md border bg-background px-3 py-2 text-xs outline-none",
                   "focus:border-primary focus:ring-2 focus:ring-primary/20",
@@ -327,8 +331,9 @@ export function TrackerConfigPanel({ config, onSave, disabled, signalMeta }: Tra
                     type="number"
                     min={10}
                     max={3600}
-                    value={draft.alert_interval_seconds ?? 60}
-                    onChange={(e) => updateAlertInterval(e.target.value)}
+                    value={alertIntervalInput.value}
+                    onChange={(e) => alertIntervalInput.onChange(e.target.value)}
+                    onBlur={alertIntervalInput.onBlur}
                     className={cn(
                       "w-full rounded-md border bg-background px-3 py-2 text-xs outline-none",
                       "focus:border-primary focus:ring-2 focus:ring-primary/20",
