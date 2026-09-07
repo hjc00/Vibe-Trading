@@ -100,10 +100,13 @@ export function StockTracker() {
     }
     return ids;
   });
-  // Whole "data cards" region (market sentiment + detail grid + financial/sector)
+  // Whole "data cards" region (market sentiment + detail grid + financial/sector/charts)
   // collapses to just its header; persisted via the same useCardCollapse hook.
   const { collapsed: detailSectionCollapsed, toggle: toggleDetailSection } =
     useCardCollapse("detailCardsSection");
+  // AI 分析 region collapses to just its header, same as the detail-cards region.
+  const { collapsed: analysisSectionCollapsed, toggle: toggleAnalysisSection } =
+    useCardCollapse("analysisSection");
   const {
     open: analyzeOpen,
     selectedSymbols,
@@ -438,10 +441,20 @@ export function StockTracker() {
     setSelectedSymbols(codes);
     setAnalysisError(null);
     setAnalyzeOpen(true);
+    if (analysisSectionCollapsed) toggleAnalysisSection();
     requestAnimationFrame(() => {
-      analysisSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      requestAnimationFrame(() => {
+        analysisSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     });
-  }, [snapshot, setSelectedSymbols, setAnalysisError, setAnalyzeOpen]);
+  }, [
+    snapshot,
+    setSelectedSymbols,
+    setAnalysisError,
+    setAnalyzeOpen,
+    analysisSectionCollapsed,
+    toggleAnalysisSection,
+  ]);
 
   useEffect(() => {
     let mounted = true;
@@ -576,9 +589,33 @@ export function StockTracker() {
 
   const activeNavId = useSectionSpy(navSections.map((s) => s.id));
 
-  const handleNavigate = useCallback((id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  const handleNavigate = useCallback(
+    (id: string) => {
+      // Anchors inside collapsible regions (charts zone in detail-cards, AI
+      // analysis): expand the region first when navigating there while
+      // collapsed, then scroll after the DOM commits.
+      const regionCollapsed =
+        (id === "st-charts" && detailSectionCollapsed) ||
+        (id === "st-analysis" && analysisSectionCollapsed);
+      if (regionCollapsed) {
+        if (id === "st-charts") toggleDetailSection();
+        else toggleAnalysisSection();
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        });
+        return;
+      }
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+    [
+      detailSectionCollapsed,
+      analysisSectionCollapsed,
+      toggleDetailSection,
+      toggleAnalysisSection,
+    ],
+  );
 
   const handleBackToTop = useCallback(() => {
     document.getElementById("main")?.scrollTo({ top: 0, behavior: "smooth" });
@@ -773,95 +810,126 @@ export function StockTracker() {
                           onHide={() => handleToggleCard("sector")}
                         />
                       ) : null}
+
+                      {/* Charts zone sits inside the collapsible detail-cards
+                          region so the section head governs it too. The
+                          "st-charts" anchor is kept for the right-hand outline. */}
+                      <section id="st-charts" className="scroll-mt-6">
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
+                          <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
+                          <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
+                        </div>
+                      </section>
                     </div>
                   )}
-                </section>
-
-                <section id="st-charts" className="scroll-mt-6">
-                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
-                    <SymbolDetail symbol={selectedSymbol} updatedAt={quotesUpdatedAt} />
-                    <TrackerCharts symbol={selectedSymbol} signals={signalMeta} />
-                  </div>
                 </section>
               </section>
             )}
 
             {(analyzeOpen || analysisReport || analysisHistory.length > 0) ? (
-              <section ref={analysisSectionRef} id="st-analysis" className="flex scroll-mt-6 flex-col gap-4">
-                <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2">
+              <section
+                ref={analysisSectionRef}
+                id="st-analysis"
+                className="scroll-mt-6 overflow-hidden rounded-xl border border-border/60 bg-card/40 shadow-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={toggleAnalysisSection}
+                    aria-expanded={!analysisSectionCollapsed}
+                    className="flex items-center gap-2 text-left"
+                  >
                     <h2 className="text-sm font-semibold">{t("stockTracker.analyzeTitle")}</h2>
                     {analysisReport ? (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         {t("stockTracker.analysisReport")}
                       </span>
                     ) : null}
-                  </div>
+                  </button>
                   <div className="flex flex-wrap items-center gap-2">
-                    <label className="text-xs text-muted-foreground">{t("stockTracker.analysisHistory")}</label>
-                    {analysisHistory.length === 0 ? (
-                      <span className="text-xs text-muted-foreground/70">{t("stockTracker.analysisHistoryEmpty")}</span>
-                    ) : (
-                      <div className="flex items-center gap-1.5">
-                        <select
-                          value={selectedId ?? ""}
-                          onChange={(e) => selectAnalysis(e.target.value)}
-                          disabled={analysisLoading}
-                          className="max-w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
-                        >
-                          {analysisHistory.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {formatAnalysisTimestamp(item.generated_at)} — {(item.summary ?? "").slice(0, 40)}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={handleDeleteAnalysis}
-                          disabled={!selectedId || analysisLoading}
-                          aria-label={t("stockTracker.deleteAnalysis")}
-                          title={t("stockTracker.deleteAnalysis")}
-                          className="rounded-md p-1.5 text-muted-foreground transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                    {analysisSectionCollapsed ? null : (
+                      <>
+                        <label className="text-xs text-muted-foreground">{t("stockTracker.analysisHistory")}</label>
+                        {analysisHistory.length === 0 ? (
+                          <span className="text-xs text-muted-foreground/70">{t("stockTracker.analysisHistoryEmpty")}</span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={selectedId ?? ""}
+                              onChange={(e) => selectAnalysis(e.target.value)}
+                              disabled={analysisLoading}
+                              className="max-w-full rounded-md border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary disabled:opacity-60"
+                            >
+                              {analysisHistory.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {formatAnalysisTimestamp(item.generated_at)} — {(item.summary ?? "").slice(0, 40)}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={handleDeleteAnalysis}
+                              disabled={!selectedId || analysisLoading}
+                              aria-label={t("stockTracker.deleteAnalysis")}
+                              title={t("stockTracker.deleteAnalysis")}
+                              className="rounded-md p-1.5 text-muted-foreground transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
+                    <button
+                      type="button"
+                      onClick={toggleAnalysisSection}
+                      aria-expanded={!analysisSectionCollapsed}
+                      aria-label={t("stockTracker.analyzeTitle")}
+                      className="rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                    >
+                      <ChevronDown
+                        className={cn("h-4 w-4 transition-transform", analysisSectionCollapsed && "rotate-180")}
+                      />
+                    </button>
                   </div>
                 </div>
 
-                {analyzeOpen ? (
-                  <TrackerAnalyzePanel
-                    symbols={snapshot?.symbols ?? []}
-                    selectedSymbols={selectedSymbols}
-                    onSelectedSymbolsChange={setSelectedSymbols}
-                    userPrompt={userPrompt}
-                    onUserPromptChange={setUserPrompt}
-                    historyLimit={historyLimit}
-                    onHistoryLimitChange={setHistoryLimit}
-                    tradingDate={tradingDate}
-                    onTradingDateChange={setTradingDate}
-                    analysisIndicators={config?.analysis_indicators}
-                    onAnalysisIndicatorsChange={handleAnalysisIndicatorsChange}
-                    analysisFocus={config?.analysis_focus ?? "balanced"}
-                    onAnalysisFocusChange={handleAnalysisFocusChange}
-                    loading={analysisLoading}
-                    onRun={() =>
-                      runAnalysis(
-                        config?.analysis_indicators ?? null,
-                        config?.analysis_focus ?? null,
-                      )
-                    }
-                    onClose={() => setAnalyzeOpen(false)}
-                  />
-                ) : null}
+                {analysisSectionCollapsed ? null : (
+                  <div className="flex flex-col gap-4 border-t border-border/60 p-4">
+                    {analyzeOpen ? (
+                      <TrackerAnalyzePanel
+                        symbols={snapshot?.symbols ?? []}
+                        selectedSymbols={selectedSymbols}
+                        onSelectedSymbolsChange={setSelectedSymbols}
+                        userPrompt={userPrompt}
+                        onUserPromptChange={setUserPrompt}
+                        historyLimit={historyLimit}
+                        onHistoryLimitChange={setHistoryLimit}
+                        tradingDate={tradingDate}
+                        onTradingDateChange={setTradingDate}
+                        analysisIndicators={config?.analysis_indicators}
+                        onAnalysisIndicatorsChange={handleAnalysisIndicatorsChange}
+                        analysisFocus={config?.analysis_focus ?? "balanced"}
+                        onAnalysisFocusChange={handleAnalysisFocusChange}
+                        loading={analysisLoading}
+                        onRun={() =>
+                          runAnalysis(
+                            config?.analysis_indicators ?? null,
+                            config?.analysis_focus ?? null,
+                          )
+                        }
+                        onClose={() => setAnalyzeOpen(false)}
+                      />
+                    ) : null}
 
-                {analysisError ? (
-                  <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{analysisError}</div>
-                ) : null}
+                    {analysisError ? (
+                      <div className="rounded-lg border border-danger/30 bg-danger/5 p-4 text-sm text-danger">{analysisError}</div>
+                    ) : null}
 
-                <TrackerAnalysisReport report={analysisReport} />
-                <TrackerTrackRecord items={trackRecord ?? []} />
+                    <TrackerAnalysisReport report={analysisReport} />
+                    <TrackerTrackRecord items={trackRecord ?? []} />
+                  </div>
+                )}
               </section>
             ) : null}
 
