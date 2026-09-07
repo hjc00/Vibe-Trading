@@ -19,8 +19,10 @@
       "rsi",
       "margin_expansion",
       "breakout",
-      "main_force_inflow",
-      "net_inflow_spike"
+      "net_inflow_spike",
+      "macd",
+      "divergence",
+      "kdj"
     ],
     "thresholds": {
       "volume_spike": 1.0,
@@ -32,7 +34,7 @@
       "beta_window": 60,
       "stop_loss_atr_multiple": 2.0
     },
-    "refresh_interval_seconds": 600,
+    "refresh_interval_seconds": 300,
     "detail_card_count": 10,
     "analysis_indicators": [
       "margin",
@@ -63,36 +65,37 @@
         "conditions": [
           {
             "primitive": "kdj_j_below",
-            "trigger": "edge_up",
+            "trigger": "state",
             "params": {
               "n": 9,
               "m1": 3,
               "m2": 3,
               "threshold": 10
             }
-          },
-          {
-            "primitive": "volume_expansion",
-            "trigger": "edge_up",
-            "params": {
-              "mult": 0.8,
-              "window": 5
-            }
           }
         ]
       },
       "sell": {
         "mode": "and",
-        "conditions": []
+        "conditions": [
+          {
+            "primitive": "close_above_boll_upper",
+            "trigger": "edge_up",
+            "params": {
+              "n": 20,
+              "k": 2
+            }
+          }
+        ]
       },
       "allow_multiple_buys": true,
       "same_bar_reentry": "stop_loss",
-      "stop_loss_pct": 0.01
+      "stop_loss_pct": 0.0005
     },
     "alert_enabled": false,
     "alert_interval_seconds": 60,
     "alert_session_only": true
   },
   "created_at": "2026-08-31T17:09:35.817597+08:00",
-  "updated_at": "2026-09-07T00:04:35.160809+08:00"
+  "updated_at": "2026-09-07T14:09:35.694953+08:00"
 }
