@@ -1,4 +1,7 @@
 import { useTranslation } from "react-i18next";
+import { ChevronDown } from "lucide-react";
+import { useCardCollapse } from "@/hooks/useCardCollapse";
+import { cn } from "@/lib/utils";
 import type {
   RecommendationAction,
   SymbolRecommendation,
@@ -10,6 +13,7 @@ import {
   getActionLabelKey,
   getActionToneClass,
 } from "@/lib/stockTracker";
+import { SectionCollapseHeader } from "./SectionCollapseHeader";
 
 interface TrackerAnalysisReportProps {
   report: TrackerAnalyzeReport | null;
@@ -37,65 +41,76 @@ function resolveAction(symbol: SymbolRecommendation): RecommendationAction | nul
 
 export function TrackerAnalysisReport({ report }: TrackerAnalysisReportProps) {
   const { t } = useTranslation();
+  const { collapsed, toggle } = useCardCollapse("analysisReport");
   if (!report) return null;
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-        <h3 className="mb-2 text-sm font-semibold">{t("stockTracker.analysisReport")}</h3>
-        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-          {report.summary}
-        </p>
-      </div>
+    <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+      <SectionCollapseHeader
+        title={t("stockTracker.analysisReport")}
+        meta={report.symbols.length > 0 ? String(report.symbols.length) : null}
+        collapsed={collapsed}
+        onToggle={toggle}
+      />
+      {!collapsed ? (
+        <div className="mt-3 space-y-4">
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+            {report.summary}
+          </p>
 
-      {report.symbols.length > 0 ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {report.symbols.map((symbol) => (
-            <SymbolCard key={symbol.code} symbol={symbol} />
-          ))}
-        </div>
-      ) : null}
-
-      {report.portfolio ? (
-        <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            {t("stockTracker.portfolioView")}
-          </h4>
-          <p className="text-sm">{report.portfolio.theme}</p>
-          {report.portfolio.top_pick ? (
-            <p className="mt-1 text-sm">
-              <span className="text-muted-foreground">{t("stockTracker.topPick")}: </span>
-              <span className="font-mono font-medium">{report.portfolio.top_pick}</span>
-            </p>
-          ) : null}
-          {report.portfolio.cautions.length > 0 ? (
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-warning">
-              {report.portfolio.cautions.map((caution, index) => (
-                <li key={index}>{caution}</li>
+          {report.symbols.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {report.symbols.map((symbol) => (
+                <SymbolCard key={symbol.code} symbol={symbol} />
               ))}
-            </ul>
+            </div>
           ) : null}
+
+          {report.portfolio ? (
+            <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                {t("stockTracker.portfolioView")}
+              </h4>
+              <p className="text-sm">{report.portfolio.theme}</p>
+              {report.portfolio.top_pick ? (
+                <p className="mt-1 text-sm">
+                  <span className="text-muted-foreground">{t("stockTracker.topPick")}: </span>
+                  <span className="font-mono font-medium">{report.portfolio.top_pick}</span>
+                </p>
+              ) : null}
+              {report.portfolio.cautions.length > 0 ? (
+                <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-warning">
+                  {report.portfolio.cautions.map((caution, index) => (
+                    <li key={index}>{caution}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+
+          {report.caveats.length > 0 ? (
+            <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
+              <p className="font-medium text-warning">{t("stockTracker.caveats")}</p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
+                {report.caveats.map((caveat, index) => (
+                  <li key={index}>{caveat}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <p className="text-xs text-muted-foreground">{t("stockTracker.researchDisclaimer")}</p>
         </div>
       ) : null}
-
-      {report.caveats.length > 0 ? (
-        <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm">
-          <p className="font-medium text-warning">{t("stockTracker.caveats")}</p>
-          <ul className="mt-2 list-inside list-disc space-y-1 text-muted-foreground">
-            {report.caveats.map((caveat, index) => (
-              <li key={index}>{caveat}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <p className="text-xs text-muted-foreground">{t("stockTracker.researchDisclaimer")}</p>
     </div>
   );
 }
 
 function SymbolCard({ symbol }: { symbol: SymbolRecommendation }) {
   const { t } = useTranslation();
+  // Per-symbol collapse so a long report collapses into a scannable list;
+  // the header keeps name/code + action badge visible when folded.
+  const { collapsed, toggle } = useCardCollapse(`analysisSymbol.${symbol.code}`);
   const action = resolveAction(symbol);
   const confidence = formatConfidence(symbol.confidence);
   const keyMetrics = Object.entries(symbol.key_metrics ?? {});
@@ -103,80 +118,96 @@ function SymbolCard({ symbol }: { symbol: SymbolRecommendation }) {
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex flex-col">
           <span className="text-sm font-semibold">{symbol.name ?? symbol.code}</span>
           <span className="font-mono text-xs text-muted-foreground">{symbol.code}</span>
         </div>
-        {action ? (
-          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getActionToneClass(action)}`}>
-            {t(getActionLabelKey(action))}
-          </span>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {action ? (
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${getActionToneClass(action)}`}>
+              {t(getActionLabelKey(action))}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? t("stockTracker.expand") : t("stockTracker.collapse")}
+            title={collapsed ? t("stockTracker.expand") : t("stockTracker.collapse")}
+            className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <ChevronDown className={cn("h-4 w-4 transition-transform", collapsed && "rotate-180")} />
+          </button>
+        </div>
       </div>
 
-      {(confidence || symbol.time_horizon) ? (
-        <div className="mb-2 flex items-center gap-3 text-xs text-muted-foreground">
-          {confidence ? (
-            <span>
-              {t("stockTracker.confidence")}:{" "}
-              <span className="font-mono font-semibold text-foreground/90">{confidence}</span>
-            </span>
-          ) : null}
-          {symbol.time_horizon ? (
-            <span>
-              {t("stockTracker.timeHorizon")}: {symbol.time_horizon}
-            </span>
-          ) : null}
-        </div>
-      ) : null}
-
-      {symbol.rationale ? (
-        <p className="mb-2 text-sm leading-relaxed text-foreground/90">{symbol.rationale}</p>
-      ) : null}
-
-      {basis.length > 0 ? (
-        <div className="mb-2">
-          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("stockTracker.analysisBasis")}</p>
-          <ul className="space-y-1">
-            {basis.map((item, index) => (
-              <li key={index} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-foreground/80">
-                  {item.indicator}
+      {!collapsed ? (
+        <div className="mt-2">
+          {(confidence || symbol.time_horizon) ? (
+            <div className="mb-2 flex items-center gap-3 text-xs text-muted-foreground">
+              {confidence ? (
+                <span>
+                  {t("stockTracker.confidence")}:{" "}
+                  <span className="font-mono font-semibold text-foreground/90">{confidence}</span>
                 </span>
-                {item.value !== undefined && item.value !== null ? (
-                  <span className="font-mono font-semibold tabular-nums text-foreground/90">
-                    {formatMetric(item.value)}
-                  </span>
-                ) : null}
-                {item.read ? <span className="text-foreground/75">{item.read}</span> : null}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-
-      <StructuredPlan symbol={symbol} />
-
-      {keyMetrics.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-2">
-          {keyMetrics.map(([key, value]) => (
-            <div key={key} className="rounded bg-muted/40 px-2 py-1 text-xs">
-              <span className="text-muted-foreground">{key}: </span>
-              <span className="font-mono font-medium">{formatMetric(value)}</span>
+              ) : null}
+              {symbol.time_horizon ? (
+                <span>
+                  {t("stockTracker.timeHorizon")}: {symbol.time_horizon}
+                </span>
+              ) : null}
             </div>
-          ))}
-        </div>
-      ) : null}
+          ) : null}
 
-      {(symbol.risks?.length ?? 0) > 0 ? (
-        <div>
-          <p className="mb-1 text-xs font-medium text-muted-foreground">{t("stockTracker.risks")}</p>
-          <ul className="list-inside list-disc space-y-0.5 text-xs text-foreground/80">
-            {symbol.risks!.map((risk, index) => (
-              <li key={index}>{risk}</li>
-            ))}
-          </ul>
+          {symbol.rationale ? (
+            <p className="mb-2 text-sm leading-relaxed text-foreground/90">{symbol.rationale}</p>
+          ) : null}
+
+          {basis.length > 0 ? (
+            <div className="mb-2">
+              <p className="mb-1 text-xs font-medium text-muted-foreground">{t("stockTracker.analysisBasis")}</p>
+              <ul className="space-y-1">
+                {basis.map((item, index) => (
+                  <li key={index} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                    <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[11px] text-foreground/80">
+                      {item.indicator}
+                    </span>
+                    {item.value !== undefined && item.value !== null ? (
+                      <span className="font-mono font-semibold tabular-nums text-foreground/90">
+                        {formatMetric(item.value)}
+                      </span>
+                    ) : null}
+                    {item.read ? <span className="text-foreground/75">{item.read}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          <StructuredPlan symbol={symbol} />
+
+          {keyMetrics.length > 0 ? (
+            <div className="mb-2 flex flex-wrap gap-2">
+              {keyMetrics.map(([key, value]) => (
+                <div key={key} className="rounded bg-muted/40 px-2 py-1 text-xs">
+                  <span className="text-muted-foreground">{key}: </span>
+                  <span className="font-mono font-medium">{formatMetric(value)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {(symbol.risks?.length ?? 0) > 0 ? (
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">{t("stockTracker.risks")}</p>
+              <ul className="list-inside list-disc space-y-0.5 text-xs text-foreground/80">
+                {symbol.risks!.map((risk, index) => (
+                  <li key={index}>{risk}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

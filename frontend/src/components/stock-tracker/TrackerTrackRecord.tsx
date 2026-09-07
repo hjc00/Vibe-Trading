@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useCardCollapse } from "@/hooks/useCardCollapse";
 import type { TrackerTrackRecordItem } from "@/lib/api";
 import {
   formatPriceZoneText,
@@ -8,6 +9,7 @@ import {
   getStatusLabelKey,
   getStatusToneClass,
 } from "@/lib/stockTracker";
+import { SectionCollapseHeader } from "./SectionCollapseHeader";
 
 interface TrackerTrackRecordProps {
   items: TrackerTrackRecordItem[];
@@ -15,16 +17,24 @@ interface TrackerTrackRecordProps {
 
 export function TrackerTrackRecord({ items }: TrackerTrackRecordProps) {
   const { t } = useTranslation();
+  const { collapsed, toggle } = useCardCollapse("trackRecord");
   if (!items || items.length === 0) return null;
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">
-      <h3 className="mb-3 text-sm font-semibold">{t("stockTracker.trackRecordTitle")}</h3>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <TrackRecordRow key={item.analysis_id + item.code} item={item} />
-        ))}
-      </div>
+      <SectionCollapseHeader
+        title={t("stockTracker.trackRecordTitle")}
+        meta={String(items.length)}
+        collapsed={collapsed}
+        onToggle={toggle}
+      />
+      {!collapsed ? (
+        <div className="mt-3 space-y-2">
+          {items.map((item) => (
+            <TrackRecordRow key={item.analysis_id + item.code} item={item} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
