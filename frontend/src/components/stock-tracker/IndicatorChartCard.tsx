@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { formatDataDate } from "@/lib/stockTracker";
 import { safeGet, safeSet } from "@/lib/storage";
 import { ChartCardHeader } from "./ChartCardHeader";
+import { SectionCollapseHeader } from "./SectionCollapseHeader";
 import type { BacktestTradePoint, IndicatorBar, SymbolSnapshot } from "@/lib/api";
 
 interface IndicatorChartCardProps {
@@ -533,8 +534,21 @@ export function IndicatorChartCard({ symbol, backtestTrades, bare = false }: Ind
     </>
   );
 
-  // Bare mode: embed inside a shared card (no own border/header).
-  if (bare) return content;
+  // Bare mode: embed inside a shared card (IndicatorBacktestCard) behind a
+  // collapsible section header, mirroring the backtest zone above it.
+  if (bare) {
+    return (
+      <>
+        <SectionCollapseHeader
+          title={t("stockTracker.indicatorChartTitle")}
+          meta={lastDate ? t("stockTracker.dataDate", { date: formatDataDate(lastDate) }) : null}
+          collapsed={collapsed}
+          onToggle={toggle}
+        />
+        {!collapsed ? content : null}
+      </>
+    );
+  }
 
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4 shadow-sm">

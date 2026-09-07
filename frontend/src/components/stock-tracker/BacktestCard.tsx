@@ -1,4 +1,4 @@
-import { ChevronDown, Circle, CircleDot, LineChart, Loader2, Play, Plus, Save, Trash2, X } from "lucide-react";
+import { Circle, CircleDot, LineChart, Loader2, Play, Plus, Save, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ import {
   type SymbolSnapshot,
 } from "@/lib/api";
 import { ChartCardHeader } from "./ChartCardHeader";
+import { SectionCollapseHeader } from "./SectionCollapseHeader";
 import { PrimitiveMenu } from "./PrimitiveMenu";
 
 interface BacktestCardProps {
@@ -504,21 +505,12 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
   // Embedded (bare) mode: collapsing the backtest section keeps just its title.
   if (bare && collapsed) {
     return (
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold">{t("stockTracker.backtestTitle")}</span>
-        {headerMeta ? (
-          <span className="text-[10px] text-muted-foreground">{headerMeta}</span>
-        ) : null}
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={t("stockTracker.expand")}
-          title={t("stockTracker.expand")}
-          className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <ChevronDown className="h-4 w-4" />
-        </button>
-      </div>
+      <SectionCollapseHeader
+        title={t("stockTracker.backtestTitle")}
+        meta={headerMeta}
+        collapsed
+        onToggle={toggle}
+      />
     );
   }
 
@@ -539,22 +531,13 @@ export function BacktestCard({ symbol, onHide, onBacktestResult, bare = false }:
       {!bare && collapsed ? null : (
         <div className="flex flex-col gap-3">
           {bare ? (
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">{t("stockTracker.backtestTitle")}</span>
-              <span className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">{headerMeta}</span>
-                {runBtn}
-                <button
-                  type="button"
-                  onClick={toggle}
-                  aria-label={t("stockTracker.collapse")}
-                  title={t("stockTracker.collapse")}
-                  className="rounded-md p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              </span>
-            </div>
+            <SectionCollapseHeader
+              title={t("stockTracker.backtestTitle")}
+              meta={headerMeta}
+              actions={runBtn}
+              collapsed={collapsed}
+              onToggle={toggle}
+            />
           ) : null}
           {/* Presets + date range */}
           <div className="flex flex-wrap items-end gap-2">
