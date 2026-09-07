@@ -14,6 +14,7 @@ import {
   getRpsToneClass,
   hiddenCardIds,
   isCardVisible,
+  isInAShareTradingSession,
   normalizeAShareCode,
   type HideableCardId,
 } from "@/lib/stockTracker";
@@ -238,8 +239,13 @@ export function StockTracker() {
   const startQuotePolling = useCallback(() => {
     stopQuotePolling();
     const intervalMs = Math.max(5000, (config?.refresh_interval_seconds ?? 10) * 1000);
-    loadQuotes();
-    quoteTimerRef.current = setInterval(loadQuotes, intervalMs);
+    // Auto-refresh only runs during A-share trading hours; outside the session
+    // the timer keeps ticking but skips the fetch, so quotes don't re-pull
+    // after close. Manual refresh is unaffected.
+    if (isInAShareTradingSession()) loadQuotes();
+    quoteTimerRef.current = setInterval(() => {
+      if (isInAShareTradingSession()) loadQuotes();
+    }, intervalMs);
   }, [config?.refresh_interval_seconds, loadQuotes, stopQuotePolling]);
 
   const pollRefreshStatus = useCallback(() => {

@@ -1634,7 +1634,7 @@
     "refreshing": "Refreshing...",
     "lastUpdated": "Last updated",
     "refreshInterval": "Refresh interval (seconds)",
-    "refreshIntervalHint": "Minimum 5 seconds. Real-time quotes are fetched on this interval.",
+    "refreshIntervalHint": "Minimum 5 seconds. Auto-refresh only runs during A-share trading hours (weekdays 9:15-11:30 / 13:00-15:00) and pauses after close; manual refresh is unaffected.",
     "detailCardCount": "Detail cards",
     "detailCardCountHint": "Number of detail cards to show. At most three per row; extras wrap to the next row.",
     "alertEnabled": "Buy-signal alerts",

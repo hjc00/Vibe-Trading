@@ -604,3 +604,41 @@ export function buildBacktestPayload(
   }
   return payloadSpec;
 }
+
+/** Weekday numbers matching Date#getDay() for the short en-US weekday names. */
+const WEEKDAY_NUMBERS: Record<string, number> = {
+  Sun: 0,
+  Mon: 1,
+  Tue: 2,
+  Wed: 3,
+  Thu: 4,
+  Fri: 5,
+  Sat: 6,
+};
+
+/**
+ * True during A-share trading sessions (Mon-Fri, 9:15-11:30 / 13:00-15:00),
+ * evaluated in Asia/Shanghai time regardless of the viewer's timezone. Mirrors
+ * the backend `_in_trading_session` gate in stock_tracker_routes; used to pause
+ * the quote auto-refresh outside trading hours.
+ */
+export function isInAShareTradingSession(now: Date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Shanghai",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  let weekday = -1;
+  let minutes = 0;
+  for (const part of parts) {
+    if (part.type === "weekday") weekday = WEEKDAY_NUMBERS[part.value] ?? -1;
+    else if (part.type === "hour") minutes += Number.parseInt(part.value, 10) * 60;
+    else if (part.type === "minute") minutes += Number.parseInt(part.value, 10);
+  }
+  if (weekday < 1 || weekday > 5) return false;
+  const morning = minutes >= 9 * 60 + 15 && minutes <= 11 * 60 + 30;
+  const afternoon = minutes >= 13 * 60 && minutes <= 15 * 60;
+  return morning || afternoon;
+}

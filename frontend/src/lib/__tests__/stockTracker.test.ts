@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBacktestPayload,
+  isInAShareTradingSession,
   serializeBacktestRule,
   type BacktestStoredSettings,
 } from "@/lib/stockTracker";
@@ -86,5 +87,27 @@ describe("serializeBacktestRule", () => {
     const out = serializeBacktestRule(rule);
     expect(out.conditions).toHaveLength(1);
     expect(out.conditions[0].enabled).toBeUndefined();
+  });
+});
+
+describe("isInAShareTradingSession", () => {
+  // Shanghai is UTC+8 year-round (no DST), so Date.UTC(h - 8) maps to the
+  // matching Shanghai wall time. 2024-01-03 was a Wednesday, 2024-01-06 a Saturday.
+  const atShanghai = (iso: string) => new Date(iso);
+
+  it("is true across the morning and afternoon sessions on weekdays", () => {
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T01:15:00Z"))).toBe(true); // 09:15 open
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T02:00:00Z"))).toBe(true); // 10:00
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T03:30:00Z"))).toBe(true); // 11:30 morning close
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T05:00:00Z"))).toBe(true); // 13:00 afternoon open
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T07:00:00Z"))).toBe(true); // 15:00 close
+  });
+
+  it("is false before open, at lunch, after close, and on weekends", () => {
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T01:14:00Z"))).toBe(false); // 09:14 pre-market
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T03:31:00Z"))).toBe(false); // 11:31 lunch start
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T04:59:00Z"))).toBe(false); // 12:59 lunch
+    expect(isInAShareTradingSession(atShanghai("2024-01-03T07:01:00Z"))).toBe(false); // 15:01 after close
+    expect(isInAShareTradingSession(atShanghai("2024-01-06T02:00:00Z"))).toBe(false); // Saturday 10:00
   });
 });

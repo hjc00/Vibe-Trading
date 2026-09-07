@@ -1,7 +1,7 @@
 # Vibe-Trading — 项目导航
 
 > 本文件是 AI 上下文索引，每次会话自动加载。改动代码后请同步更新本文件或 [docs/PROJECT_INDEX.md](docs/PROJECT_INDEX.md)（见文末「文档同步约定」）。
-> 最后更新：2026-09-07（已落地 2.2 RPS、2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度、量能对比 VolumeCard、周期价量K线与单/双列宽切换、财报速读 FinancialReportCard、2.20 技术信号、单标的策略回测卡 BacktestCard、页面右侧本页目录 SectionNav + 回到顶部、AI 分析注入整套回测策略 `render_strategy_spec` + 历史日期技术面复盘 `build_technical_snapshot`/`trading_date`、买入信号提醒（后台定时扫描 + 手动刷新命中即推送，策略 spec 持久化到 `TrackerConfig`、前端铃铛+未读角标+系统通知、交易时段门控/单飞退避/通知聚合）、回测规则保存为自定义预设并持久化（`BacktestPresetStore` 落盘 `data/stock_tracker/backtest_presets.json`、重启仍命中）、合并卡技术指标图区独立折叠（共享小节头 `SectionCollapseHeader`）、图表区（SymbolDetail+TrackerCharts）并入数据卡片区统一折叠管理、AI 分析区整体折叠（`useCardCollapse("analysisSection")`，打开分析面板/点目录自动展开）、区内报告/操作记录卡独立折叠（共享小节头 `SectionCollapseHeader`）、个股分析卡单列逐张可折叠（头部保留名称/代码+操作徽标，按 code 记 `useCardCollapse`）
+> 最后更新：2026-09-07（已落地 2.2 RPS、2.3 风险指标、2.5 行业强度看板、2.6 估值与质量、2.15 题材热度、2.16 市场情绪、2.17 一致预期、2.18 筹码集中度、量能对比 VolumeCard、周期价量K线与单/双列宽切换、财报速读 FinancialReportCard、2.20 技术信号、单标的策略回测卡 BacktestCard、页面右侧本页目录 SectionNav + 回到顶部、AI 分析注入整套回测策略 `render_strategy_spec` + 历史日期技术面复盘 `build_technical_snapshot`/`trading_date`、买入信号提醒（后台定时扫描 + 手动刷新命中即推送，策略 spec 持久化到 `TrackerConfig`、前端铃铛+未读角标+系统通知、交易时段门控/单飞退避/通知聚合）、回测规则保存为自定义预设并持久化（`BacktestPresetStore` 落盘 `data/stock_tracker/backtest_presets.json`、重启仍命中）、合并卡技术指标图区独立折叠（共享小节头 `SectionCollapseHeader`）、图表区（SymbolDetail+TrackerCharts）并入数据卡片区统一折叠管理、AI 分析区整体折叠（`useCardCollapse("analysisSection")`，打开分析面板/点目录自动展开）、区内报告/操作记录卡独立折叠（共享小节头 `SectionCollapseHeader`）、个股分析卡单列逐张可折叠（头部保留名称/代码+操作徽标，按 code 记 `useCardCollapse`）、行情自动刷新仅交易时段运行（`isInAShareTradingSession` 按 Asia/Shanghai 判断 9:15-11:30/13:00-15:00 工作日，收盘后定时器空转不拉取、手动刷新不受影响）
 
 ## 项目定位
 

@@ -1634,7 +1634,7 @@
     "refreshing": "刷新中...",
     "lastUpdated": "最后更新",
     "refreshInterval": "刷新间隔（秒）",
-    "refreshIntervalHint": "最小 5 秒。系统将按此间隔拉取实时行情。",
+    "refreshIntervalHint": "最小 5 秒。仅 A 股交易时段（工作日 9:15-11:30 / 13:00-15:00）自动刷新，收盘后暂停；手动刷新不受影响。",
     "detailCardCount": "详情卡片数量",
     "detailCardCountHint": "显示详情卡片的数量。每行最多 3 个，超出自动换行到下一行。",
     "alertEnabled": "买入信号提醒",
