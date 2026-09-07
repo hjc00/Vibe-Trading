@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "code": "603444.SH",
+  "fetched_at": "2026-09-07T06:35:55.528418+00:00",
+  "expires_at": "2026-09-08T06:35:55.528418+00:00",
+  "periods": [
+    {
+      "end_date": "2026-06-30",
+      "report_type": "中报",
+      "roe": 18.57,
+      "gross_margin": 93.7077935337,
+      "net_margin": 34.2235601836,
+      "net_profit_yoy": 69.314173961788,
+      "revenue_yoy": 48.013807860022,
+      "debt_to_assets": 22.6104712704,
+      "eps": 15.15,
+      "operating_cashflow_to_net_profit": 1.166
+    },
+    {
+      "end_date": "2026-03-31",
+      "report_type": "一季报",
+      "roe": 8.98,
+      "gross_margin": 93.7665844592,
+      "net_margin": 33.3726612214,
+      "net_profit_yoy": 82.678547209746,
+      "revenue_yoy": 62.667189946108,
+      "debt_to_assets": 21.6029129257,
+      "eps": 7.18,
+      "operating_cashflow_to_net_profit": 1.121
+    },
+    {
+      "end_date": "2025-12-31",
+      "report_type": "年报",
+      "roe": 33.27,
+      "gross_margin": 93.9013892002,
+      "net_margin": 34.584656529,
+      "net_profit_yoy": 89.822052429922,
+      "revenue_yoy": 67.88940400894,
+      "debt_to_assets": 24.1583554445,
+      "eps": 24.9,
+      "operating_cashflow_to_net_profit": 1.559
+    },
+    {
+      "end_date": "2025-09-30",
+      "report_type": "三季报",
+      "roe": 22.86,
+      "gross_margin": 93.3140178335,
+      "net_margin": 33.6134217374,
+      "net_profit_yoy": 84.659101218388,
+      "revenue_yoy": 59.167156219336,
+      "debt_to_assets": 21.9590068112,
+      "eps": 16.85,
+      "operating_cashflow_to_net_profit": 1.531
+    },
+    {
+      "end_date": "2025-06-30",
+      "report_type": "中报",
+      "roe": 12.54,
+      "gross_margin": 92.3148590713,
+      "net_margin": 32.5583164437,
+      "net_profit_yoy": 24.497249297954,
+      "revenue_yoy": 28.48737745167,
+      "debt_to_assets": 20.4204748836,
+      "eps": 8.95,
+      "operating_cashflow_to_net_profit": 1.67
+    },
+    {
+      "end_date": "2025-03-31",
+      "report_type": "一季报",
+      "roe": 5.62,
+      "gross_margin": 90.8888839523,
+      "net_margin": 33.3863089117,
+      "net_profit_yoy": 11.8193376992,
+      "revenue_yoy": 22.474556425267,
+      "debt_to_assets": 16.2775599318,
+      "eps": 3.93,
+      "operating_cashflow_to_net_profit": 0.751
+    },
+    {
+      "end_date": "2024-12-31",
+      "report_type": "年报",
+      "roe": 19.79,
+      "gross_margin": 87.8647795736,
+      "net_margin": 31.9001247495,
+      "net_profit_yoy": -16.01603218948,
+      "revenue_yoy": -11.689036219283,
+      "debt_to_assets": 18.633166741,
+      "eps": 13.15,
+      "operating_cashflow_to_net_profit": 1.318
+    },
+    {
+      "end_date": "2024-09-30",
+      "report_type": "三季报",
+      "roe": 13.91,
+      "gross_margin": 88.4648669447,
+      "net_margin": 29.0598841051,
+      "net_profit_yoy": -23.484914632968,
+      "revenue_yoy": -14.772424806979,
+      "debt_to_assets": 19.6800342654,
+      "eps": 9.11,
+      "operating_cashflow_to_net_profit": 1.26
+    },
+    {
+      "end_date": "2024-06-30",
+      "report_type": "中报",
+      "roe": 11.0,
+      "gross_margin": 88.2153751553,
+      "net_margin": 31.8769303744,
+      "net_profit_yoy": -23.394999467428,
+      "revenue_yoy": -16.572499500653,
+      "debt_to_assets": 20.1121898798,
+      "eps": 7.18,
+      "operating_cashflow_to_net_profit": 1.149
+    },
+    {
+      "end_date": "2024-03-31",
+      "report_type": "一季报",
+      "roe": 5.53,
+      "gross_margin": 89.2440948696,
+      "net_margin": 32.2379071898,
+      "net_profit_yoy": -17.350933252585,
+      "revenue_yoy": -18.97157612433,
+      "debt_to_assets": 21.0160898827,
+      "eps": 3.52,
+      "operating_cashflow_to_net_profit": 0.909
+    },
+    {
+      "end_date": "2023-12-31",
+      "report_type": "年报",
+      "roe": 26.04,
+      "gross_margin": 88.5323172932,
+      "net_margin": 34.9138427594,
+      "net_profit_yoy": -22.983169094732,
+      "revenue_yoy": -19.017748173985,
+      "debt_to_assets": 20.9313044062,
+      "eps": 15.63,
+      "operating_cashflow_to_net_profit": 1.053
+    },
+    {
+      "end_date": "2023-09-30",
+      "report_type": "三季报",
+      "roe": 19.83,
+      "gross_margin": 88.2326184659,
+      "net_margin": 33.9805065372,
+      "net_profit_yoy": -15.065166112828,
+      "revenue_yoy": -13.662145476028,
+      "debt_to_assets": 24.1061198727,
+      "eps": 11.94,
+      "operating_cashflow_to_net_profit": 0.959
+    }
+  ]
+}
