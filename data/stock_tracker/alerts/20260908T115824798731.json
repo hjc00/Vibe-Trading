@@ -1,0 +1,11 @@
+{
+  "id": "20260908T115824798731",
+  "code": "000938.SZ",
+  "name": "紫光股份",
+  "price": 34.27,
+  "signal_date": "2026-09-08",
+  "strategy_label": "自定义策略",
+  "source": "intraday",
+  "triggered_at": "2026-09-08T11:58:24.798731+08:00",
+  "acknowledged": false
+}
