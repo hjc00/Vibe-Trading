@@ -18,7 +18,7 @@
     "settings": "Settings",
     "correlation": "Correlation Matrix",
     "optionsLab": "Options Lab",
-    "stockTracker": "A-Share Tracker",
+    "stockTracker": "Dashboard",
     "sessions": "Sessions",
     "newChat": "New Chat",
     "noSessions": "No chats yet — press + to start one",
@@ -1627,8 +1627,8 @@
     }
   },
   "stockTracker": {
-    "badge": "A-Share Tracker",
-    "title": "A-Share Multi-Period Tracker",
+    "badge": "Dashboard",
+    "title": "Dashboard",
     "subtitle": "Compare A-share symbols across 10 / 20 / 60 trading-day windows with configurable signals.",
     "refresh": "Refresh",
     "refreshing": "Refreshing...",

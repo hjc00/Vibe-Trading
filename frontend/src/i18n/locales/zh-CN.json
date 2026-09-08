@@ -13,7 +13,7 @@
     "settings": "设置",
     "correlation": "相关性矩阵",
     "optionsLab": "期权实验室",
-    "stockTracker": "A股跟踪",
+    "stockTracker": "看板",
     "sessions": "会话",
     "newChat": "新建对话",
     "noSessions": "还没有对话——点 + 开始第一个",
@@ -1627,8 +1627,8 @@
     }
   },
   "stockTracker": {
-    "badge": "A股跟踪",
-    "title": "A股多周期跟踪",
+    "badge": "看板",
+    "title": "看板",
     "subtitle": "在 10 / 20 / 60 个交易日窗口下对比 A 股标的，支持可配置信号。",
     "refresh": "刷新",
     "refreshing": "刷新中...",
